@@ -7,6 +7,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/leveldb/include/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/rapidjson/)
 include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/libconfig/include/)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/lz4/include/)
+include_directories(${SNIPER_INCLUDE_DIRS})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../common_utils/")
 include(common_utils)
@@ -131,49 +132,45 @@ find_library(LZ4_LIB NAMES lib_lz4.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdPar
 find_library(CONFIG1_LIB NAMES libconfig++.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/libconfig/lib/)
 find_library(CONFIG2_LIB NAMES libconfig.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/libconfig/lib/)
 
-find_package(MHSupport)
-
-set(PROJECT_LIBS   
-    mh_mhd
-    mh_xxhash
-    mh_libevent
+set(PROJECT_LIBS
     ${LZ4_LIB}
-    
+
     ${CONFIG1_LIB}
     ${CONFIG2_LIB}
-    
+
     stdc++fs.a
-    
+
     ${LEVELDB_MEMENV}
     ${LEVELDB}
     ${LEVELDB_SNAPPY}
-        
+
+    ${SNIPER_LIBRARIES}
+
     ${SECP_LIB}
     ${SSL_LIB_2}
     ${SSL_LIB_1}
-    
+
     gmp
-        
+
     dl
-        
+
     event.a
-    ev.a
     microhttpd.a
     gcrypt
     gnutls
-    uriparser.a
     tcmalloc
-    
+
     curl
-    
+
     resolv.a
-    
+
     ${CMAKE_THREAD_LIBS_INIT}
+
+    ${FMT}
 )
 
 add_library(${PROJECT_NAME}_lib STATIC ${LIBRARY_HEADERS} ${LIBRARY_SOURCES})
 target_compile_options(${PROJECT_NAME}_lib PRIVATE -Wno-unused-parameter -g -rdynamic -Wno-unused-variable)
-target_compile_options(${PROJECT_NAME}_lib PRIVATE -no-pie -D_GLIBCXX_USE_CXX11_ABI=0)
 Install(TARGETS ${PROJECT_NAME}_lib DESTINATION ${CMAKE_BINARY_DIR}/lib/sync)
 foreach ( file ${LIBRARY_HEADERS} )
     get_filename_component( dir ${file} DIRECTORY )
@@ -185,7 +182,6 @@ Install(FILES ${LEVELDB_MEMENV} DESTINATION ${CMAKE_BINARY_DIR}/lib/sync)
 
 add_library(common STATIC ${COMMON_SOURCES})
 target_compile_options(common PRIVATE -Wno-unused-parameter -g -rdynamic -Wno-unused-variable)
-target_compile_options(common PRIVATE -no-pie -D_GLIBCXX_USE_CXX11_ABI=0)
 Install(TARGETS common DESTINATION ${CMAKE_BINARY_DIR}/lib/common)
 foreach ( file ${COMMON_LIBRARY_HEADERS} )
     get_filename_component( dir ${file} DIRECTORY )
@@ -195,8 +191,6 @@ endforeach()
 #APP
 add_executable(${PROJECT_NAME} ${PROJECT_MAIN})
 target_compile_options(${PROJECT_NAME} PRIVATE -Wno-unused-parameter -g -rdynamic)
-target_compile_options(${PROJECT_NAME} PRIVATE -no-pie -D_GLIBCXX_USE_CXX11_ABI=0)
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-g -rdynamic")
-set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-no-pie -D_GLIBCXX_USE_CXX11_ABI=0")
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_lib common)
 target_link_libraries(${PROJECT_NAME} ${PROJECT_LIBS})
