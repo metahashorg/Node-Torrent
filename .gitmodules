@@ -1,6 +1,3 @@
-[submodule "common_utils"]
-	path = common_utils
-	url = git@github.com:adsniper-tech/common_utils.git
 [submodule "3rdParty/libsniper"]
 	path = 3rdParty/libsniper
 	url = git@github.com:metahashorg/libsniper.git
