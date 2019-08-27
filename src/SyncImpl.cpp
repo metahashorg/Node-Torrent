@@ -296,6 +296,8 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     break;
                 }
                 
+                Timer tt2;
+                
                 if (prevBi == nullptr) {
                     CHECK(prevDump == nullptr, "Ups");
                     prevBi = nextBi;
@@ -327,19 +329,14 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                 
                 for (TransactionInfo &tx: prevBi->txs) {
                     tx.blockNumber = prevBi->header.blockNumber.value();
-                    
-                    if (tx.fromAddress.isInitialWallet()) {
-                        prevBi->txsStatistic.countInitTxs++;
-                    } else {
-                        prevBi->txsStatistic.countTransferTxs++;
-                    }
                 }
                 
                 tt.stop();
+                tt2.stop();
                 
                 prevBi->times.timeEndGetBlock = ::now();
                 
-                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << prevBi->txs.size() << ". Time ms " << tt.countMs() << " current block " << toHex(prevBi->header.hash) << ". Parent hash " << toHex(prevBi->header.prevHash);
+                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << prevBi->txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(prevBi->header.hash) << ". Parent hash " << toHex(prevBi->header.prevHash);
                 
                 for (Worker* worker: workers) {
                     worker->process(prevBi, prevDump);
