@@ -18,9 +18,9 @@ P2P_Ips::P2P_Ips(const std::vector<std::string> &servers, size_t countConnection
     CHECK(countConnections != 0, "Incorrect count connections: 0");
     Curl::initialize();
     
-    for (const std::string &server: servers) {
+    for (size_t j = 0; j < servers.size(); j++) {
         for (size_t i = 0; i < countConnections; i++) {
-            curls[server].emplace_back(Curl::getInstance());
+            curls.emplace_back(Curl::getInstance());
         }
     }
 }
@@ -58,10 +58,15 @@ std::string P2P_Ips::runOneRequest(const std::string& server, const std::string&
     return request(Curl::getInstance(), qs, postData, header, server);
 }
 
-std::vector<std::reference_wrapper<const P2P_Ips::Server>> P2P_Ips::getServersList(const std::vector<Server> &srves) const {
-    std::vector<std::reference_wrapper<const P2P_Ips::Server>> result;
+std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> P2P_Ips::getServersList(const std::vector<Server> &srves) const {
+    std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> result;
+    size_t curlIndex = 0;
     for (size_t i = 0; i < countConnections; i++) {
-        result.insert(result.end(), srves.begin(), srves.end());
+        CHECK(curls.size() >= curlIndex + srves.size(), "Incorrect curls size");
+        for (const Server &server: srves) {
+            result.emplace_back(server, curls[curlIndex]);
+            curlIndex++;
+        }
     }
     return result;
 }
@@ -69,30 +74,15 @@ std::vector<std::reference_wrapper<const P2P_Ips::Server>> P2P_Ips::getServersLi
 std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &/*hintsServers*/) const {
     CHECK(responseSize != 0, "response size 0");
     
-    const std::vector<std::reference_wrapper<const Server>> requestServers = getServersList(servers);
+    const auto requestServers = getServersList(servers);
     
     const bool isMultitplyRequests = minResponseSize == 1;
     const size_t countSegments = isMultitplyRequests ? responseSize : std::min((responseSize + minResponseSize - 1) / minResponseSize, requestServers.size());
     
     std::vector<std::string> answers(countSegments);
-    
-    std::map<std::string, std::map<size_t, size_t>> curlsDistribution;
-    std::mutex curlsDistributionMutex;
-    
-    const RequestFunction requestFunction = [&answers, &header, &responseParse, isPrecisionSize, &curlsDistribution, &curlsDistributionMutex, this](size_t threadNumber, const std::string &qs, const std::string &post, const std::string &server, const Segment &segment) {
-        const auto foundCurl = curls.find(server);
-        CHECK(foundCurl != curls.end(), "curl instance not found");
         
-        std::unique_lock<std::mutex> lock(curlsDistributionMutex);
-        std::map<size_t, size_t> &curlDist = curlsDistribution[server];
-        if (curlDist.find(threadNumber) == curlDist.end()) {
-            curlDist[threadNumber] = curlDist.size();
-        }
-        const size_t indexInCurls = curlDist[threadNumber];
-        lock.unlock();
-        
-        CHECK(foundCurl->second.size() > indexInCurls, "curl instance not found");
-        const std::string response = request(foundCurl->second[indexInCurls], qs, post, header, server);
+    const RequestFunction requestFunction = [&answers, &header, &responseParse, isPrecisionSize, this](const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment) {        
+        const std::string response = request(curl, qs, post, header, server);
         const ResponseParse parsed = responseParse(response);
         CHECK(!parsed.error.has_value(), parsed.error.value());
         if (isPrecisionSize) {

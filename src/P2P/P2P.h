@@ -10,6 +10,10 @@
 
 #include "duration.h"
 
+namespace common {
+struct CurlInstance;
+}
+
 namespace torrent_node_lib {
 
 struct CurlException {
@@ -108,13 +112,13 @@ protected:
         {}
     };
         
-    using RequestFunction = std::function<void(size_t threadNumber, const std::string &qs, const std::string &post, const std::string &server, const Segment &segment)>;
+    using RequestFunction = std::function<void(const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment)>;
     
     using RequestFunctionSimple = std::function<std::string(const std::string &qs, const std::string &post, const std::string &header, const std::string &server)>;
         
     static std::vector<Segment> makeSegments(size_t countSegments, size_t size, size_t minSize);
     
-    static bool process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction);
+    static bool process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction);
     
     static SendAllResult process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::string &qs, const std::string &post, const std::string &header, const RequestFunctionSimple &requestFunction);
     

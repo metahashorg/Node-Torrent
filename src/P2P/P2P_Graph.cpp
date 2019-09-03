@@ -69,8 +69,12 @@ std::string P2P_Graph::runOneRequest(const std::string& server, const std::strin
     return request(curls[0], qs, postData, header, server);
 }
 
-std::vector<std::reference_wrapper<const P2P::Server>> P2P_Graph::getServersList(const Server &server) const {
-    std::vector<std::reference_wrapper<const Server>> result(countConnections, std::cref(server));
+std::vector<std::pair<std::reference_wrapper<const P2P_Graph::Server>, std::reference_wrapper<const common::CurlInstance>>> P2P_Graph::getServersList(const Server &server) const {
+    std::vector<std::pair<std::reference_wrapper<const P2P_Graph::Server>, std::reference_wrapper<const common::CurlInstance>>> result;
+    CHECK(curls.size() >= countConnections, "Incorrect curls size");
+    for (size_t i = 0; i < countConnections; i++) {
+        result.emplace_back(server, curls[i]);
+    }
     return result;
 }
 
@@ -79,16 +83,15 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     
     CHECK(hintsServers.size() == 1, "Incorrect hint servers");
     const Server server(hintsServers[0]); // Этот объект не должен пропасть до конца действия процедуры, так как на него берется ссылка
-    const std::vector<std::reference_wrapper<const Server>> requestServers = getServersList(server);
+    const auto requestServers = getServersList(server);
     
     const bool isMultitplyRequests = minResponseSize == 1;
     const size_t countSegments = isMultitplyRequests ? responseSize : std::min((responseSize + minResponseSize - 1) / minResponseSize, requestServers.size());
     
     std::vector<std::string> answers(countSegments);
     
-    const RequestFunction requestFunction = [&answers, &header, &responseParse, isPrecisionSize, this](size_t threadNumber, const std::string &qs, const std::string &post, const std::string &server, const Segment &segment) {
-        CHECK(curls.size() > threadNumber, "Curls empty");
-        const std::string response = request(curls[threadNumber], qs, post, header, server);
+    const RequestFunction requestFunction = [&answers, &header, &responseParse, isPrecisionSize, this](const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment) {
+        const std::string response = request(curl, qs, post, header, server);
         const ResponseParse parsed = responseParse(response);
         CHECK(!parsed.error.has_value(), parsed.error.value());
         if (isPrecisionSize) {

@@ -32,7 +32,7 @@ public:
     
 private:
     
-    std::vector<std::reference_wrapper<const Server>> getServersList(const Server &server) const;
+    std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> getServersList(const Server &server) const;
     
     std::string request(const common::Curl::CurlInstance &curl, const std::string &qs, const std::string &postData, const std::string &header, const std::string &server) const;
     

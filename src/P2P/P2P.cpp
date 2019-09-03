@@ -7,6 +7,8 @@
 #include "Thread.h"
 #include "log.h"
 
+#include "curlWrapper.h"
+
 using namespace common;
 
 namespace torrent_node_lib {
@@ -38,7 +40,7 @@ static size_t countUnique(const std::vector<T> &elements, const F &compare) {
     return std::distance(copy.begin(), endIter);
 }
 
-bool P2P::process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction) {
+bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction) {
     size_t countSuccessRequests = 0;
     size_t countFailureRequests = 0;
     size_t countExitThreads = 0;
@@ -47,14 +49,14 @@ bool P2P::process(const std::vector<std::reference_wrapper<const Server>> &reque
     
     BlockedQueue<QueueElement, 1000> blockedQueue;
     
-    const size_t countUniqueServer = countUnique(requestServers, [](const Server &first, const Server &second) {
-        return first.server < second.server;
+    const size_t countUniqueServer = countUnique(requestServers, [](const auto &first, const auto &second) {
+        return first.first.get().server < second.first.get().server;
     });
     
     std::vector<Thread> threads;
     threads.reserve(requestServers.size());
-    for (const Server &server: requestServers) {
-        threads.emplace_back([&blockedQueue, &countSuccessRequests, &countFailureRequests, &countExitThreads, &mut, &cond, &requestFunction, &makeQsAndPost, threadNumber=threads.size(), countUniqueServer](const Server &server){
+    for (const auto &[server, curl]: requestServers) {
+        threads.emplace_back([&blockedQueue, &countSuccessRequests, &countFailureRequests, &countExitThreads, &mut, &cond, &requestFunction, &makeQsAndPost, countUniqueServer](const Server &server, const common::CurlInstance &curl){
             try {
                 while (true) {
                     QueueElement segment;
@@ -67,7 +69,7 @@ bool P2P::process(const std::vector<std::reference_wrapper<const Server>> &reque
                     
                     const auto &[qs, post] = makeQsAndPost(segment.segment.fromByte, segment.segment.toByte);
                     try {
-                        requestFunction(threadNumber, qs, post, server.server, segment.segment);
+                        requestFunction(qs, post, server.server, curl, segment.segment);
                         std::lock_guard<std::mutex> lock(mut);
                         countSuccessRequests++;
                         cond.notify_one();
@@ -99,7 +101,7 @@ bool P2P::process(const std::vector<std::reference_wrapper<const Server>> &reque
             countExitThreads++;
             cond.notify_one();
         },
-        server
+        server, std::cref(curl)
         );
     }
     
