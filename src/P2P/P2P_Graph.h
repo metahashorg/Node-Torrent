@@ -9,6 +9,8 @@
 
 #include "curlWrapper.h"
 
+#include "LimitArray.h"
+
 using GraphString = Graph<std::string>;
 
 class P2P_Graph: public torrent_node_lib::P2P {   
@@ -32,7 +34,9 @@ public:
     
 private:
     
-    std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> getServersList(const Server &server) const;
+    size_t getMaxServersCount(const Server &srvr) const;
+    
+    std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> getServersList(const Server &server, size_t countSegments) const;
     
     std::string request(const common::Curl::CurlInstance &curl, const std::string &qs, const std::string &postData, const std::string &header, const std::string &server) const;
     
@@ -46,7 +50,9 @@ private:
     
     size_t countConnections;
     
-    std::vector<common::Curl::CurlInstance> curls;
+    mutable std::vector<common::Curl::CurlInstance> curls;
+    
+    mutable torrent_node_lib::LimitArray limitArray;
     
 };
 

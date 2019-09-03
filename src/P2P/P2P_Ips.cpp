@@ -14,14 +14,13 @@ namespace torrent_node_lib {
 P2P_Ips::P2P_Ips(const std::vector<std::string> &servers, size_t countConnections)
     : servers(servers.begin(), servers.end())
     , countConnections(countConnections)
+    , limitArray(10)
 {
     CHECK(countConnections != 0, "Incorrect count connections: 0");
     Curl::initialize();
     
-    for (size_t j = 0; j < servers.size(); j++) {
-        for (size_t i = 0; i < countConnections; i++) {
-            curls.emplace_back(Curl::getInstance());
-        }
+    for (size_t i = 0; i < countConnections * servers.size(); i++) {
+        curls.emplace_back(Curl::getInstance());
     }
 }
 
@@ -58,14 +57,27 @@ std::string P2P_Ips::runOneRequest(const std::string& server, const std::string&
     return request(Curl::getInstance(), qs, postData, header, server);
 }
 
-std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> P2P_Ips::getServersList(const std::vector<Server> &srves) const {
+size_t P2P_Ips::getMaxServersCount(const std::vector<Server> &srvrs) const {
+    return countConnections * srvrs.size();
+}
+
+std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> P2P_Ips::getServersList(const std::vector<Server> &srves, size_t countSegments) const {
     std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> result;
+    
+    const size_t currConnections = std::min((countSegments + srves.size() - 1) / srves.size(), countConnections);
+    for (size_t i = curls.size(); i < currConnections * srves.size(); i++) {
+        curls.emplace_back(Curl::getInstance());
+    }
+    
     size_t curlIndex = 0;
-    for (size_t i = 0; i < countConnections; i++) {
-        CHECK(curls.size() >= curlIndex + srves.size(), "Incorrect curls size");
+    for (size_t i = 0; i < currConnections; i++) {
         for (const Server &server: srves) {
             result.emplace_back(server, curls[curlIndex]);
             curlIndex++;
+        }
+        
+        if (result.size() >= countSegments) {
+            break;
         }
     }
     return result;
@@ -74,13 +86,14 @@ std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::refere
 std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &/*hintsServers*/) const {
     CHECK(responseSize != 0, "response size 0");
     
-    const auto requestServers = getServersList(servers);
+    const size_t maxServers = getMaxServersCount(servers);
     
     const bool isMultitplyRequests = minResponseSize == 1;
-    const size_t countSegments = isMultitplyRequests ? responseSize : std::min((responseSize + minResponseSize - 1) / minResponseSize, requestServers.size());
+    const size_t countSegments = isMultitplyRequests ? responseSize : std::min((responseSize + minResponseSize - 1) / minResponseSize, maxServers);
+    const auto requestServers = getServersList(servers, countSegments);
     
     std::vector<std::string> answers(countSegments);
-        
+
     const RequestFunction requestFunction = [&answers, &header, &responseParse, isPrecisionSize, this](const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment) {        
         const std::string response = request(curl, qs, post, header, server);
         const ResponseParse parsed = responseParse(response);
@@ -93,14 +106,21 @@ std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minRes
     
     const std::vector<Segment> segments = P2P::makeSegments(countSegments, responseSize, minResponseSize);
     const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, requestFunction);
-    
     CHECK(isSuccess, "dont run request");
+    
+    LOGINFO << "Count: " << countSegments << " " << requestServers.size() << " " << segments.size() << " " << curls.size();
+    
+    limitArray.add(requestServers.size());
+    if (limitArray.filled()) {
+        const size_t leaveElements = std::min(limitArray.max() + 2, servers.size() * countConnections);
+        curls.resize(std::min(leaveElements, curls.size()));
+    }
     
     return answers;
 }
 
 std::string P2P_Ips::request(size_t responseSize, bool isPrecisionSize, const MakeQsAndPostFunction& makeQsAndPost, const std::string& header, const ResponseParseFunction& responseParse, const std::vector<std::string> &hintsServers) const {
-    const size_t MIN_RESPONSE_SIZE = 1000;
+    const size_t MIN_RESPONSE_SIZE = 10000;
     
     const std::vector<std::string> answers = requestImpl(responseSize, MIN_RESPONSE_SIZE, isPrecisionSize, makeQsAndPost, header, responseParse, hintsServers);
     

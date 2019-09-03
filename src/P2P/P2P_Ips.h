@@ -5,6 +5,8 @@
 
 #include <map>
 
+#include "LimitArray.h"
+
 namespace common {
 struct CurlInstance;
 }
@@ -34,7 +36,9 @@ public:
     
 private:
     
-    std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> getServersList(const std::vector<Server> &srvrs) const;
+    size_t getMaxServersCount(const std::vector<Server> &srvrs) const;
+    
+    std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> getServersList(const std::vector<Server> &srvrs, size_t countSegments) const;
     
     std::string request(const common::CurlInstance &curl, const std::string &qs, const std::string &postData, const std::string &header, const std::string &server) const;
     
@@ -46,7 +50,9 @@ private:
     
     size_t countConnections;
     
-    std::vector<common::CurlInstance> curls;
+    mutable std::vector<common::CurlInstance> curls;
+    
+    mutable LimitArray limitArray;
     
 };
 
