@@ -78,7 +78,7 @@ void GetNewBlocksFromServer::clearAdvanced() {
     advancedLoadsBlocksDumps.clear();
 }
 
-MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::string &server) const {
+MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers) const {
     const auto foundBlock = std::find_if(advancedLoadsBlocksHeaders.begin(), advancedLoadsBlocksHeaders.end(), [blockNum](const auto &pair) {
         return pair.first == blockNum;
     });
@@ -103,9 +103,21 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
     
     const std::vector<std::string> answer = p2p.requests(countParts, makeQsAndPost, "", [](const std::string &result) {
         ResponseParse r;
+        
+        rapidjson::Document doc;
+        const rapidjson::ParseResult pr = doc.Parse(result.c_str());
+        if (!pr) {
+            r.error = "result not parsed";
+            return r;
+        }
+        if (doc.HasMember("error") && !doc["error"].IsNull()) {
+            r.error = jsonToString(doc["error"], false);
+            return r;
+        }
+        
         r.response = result;
         return r;
-    }, {server});
+    }, servers);
     
     CHECK(answer.size() == countParts, "Incorrect answer");
     

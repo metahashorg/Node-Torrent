@@ -89,12 +89,13 @@ std::vector<std::pair<std::reference_wrapper<const P2P_Graph::Server>, std::refe
 std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const {
     CHECK(responseSize != 0, "response size 0");
     
+    const bool isMultitplyRequests = minResponseSize == 1;
+        
     CHECK(hintsServers.size() == 1, "Incorrect hint servers");
     const Server server(hintsServers[0]); // Этот объект не должен пропасть до конца действия процедуры, так как на него берется ссылка
     
     const size_t maxServers = getMaxServersCount(server);
     
-    const bool isMultitplyRequests = minResponseSize == 1;
     const size_t countSegments = isMultitplyRequests ? responseSize : std::min((responseSize + minResponseSize - 1) / minResponseSize, maxServers);
     const auto requestServers = getServersList(server, countSegments);
     

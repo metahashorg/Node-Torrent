@@ -35,7 +35,7 @@ public:
         
     LastBlockResponse getLastBlock() const;
         
-    MinimumBlockHeader getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::string &server) const;
+    MinimumBlockHeader getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers) const;
     
     MinimumBlockHeader getBlockHeaderWithoutAdvanceLoad(size_t blockNum, const std::string &server) const;
     

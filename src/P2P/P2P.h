@@ -81,7 +81,7 @@ protected:
     struct Server {
         std::string server;
         
-        explicit Server(const std::string &server)
+        Server(const std::string &server)
             : server(server)
         {}
     };

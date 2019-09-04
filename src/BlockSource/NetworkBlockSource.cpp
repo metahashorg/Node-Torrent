@@ -76,7 +76,7 @@ bool NetworkBlockSource::process(BlockInfo &bi, std::string &binaryDump) {
         const size_t currBlock = nextBlockToRead + i;
         AdvancedBlock advanced;
         try {
-            advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers[0]);
+            advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers);
             advanced.dump = getterBlocks.getBlockDump(advanced.header.hash, advanced.header.blockSize, servers, isVerifySign);
         } catch (...) {
             advanced.exception = std::current_exception();

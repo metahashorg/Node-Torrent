@@ -86,9 +86,10 @@ std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::refere
 std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &/*hintsServers*/) const {
     CHECK(responseSize != 0, "response size 0");
     
+    const bool isMultitplyRequests = minResponseSize == 1;
+    
     const size_t maxServers = getMaxServersCount(servers);
     
-    const bool isMultitplyRequests = minResponseSize == 1;
     const size_t countSegments = isMultitplyRequests ? responseSize : std::min((responseSize + minResponseSize - 1) / minResponseSize, maxServers);
     const auto requestServers = getServersList(servers, countSegments);
     

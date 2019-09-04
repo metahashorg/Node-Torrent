@@ -125,6 +125,7 @@ BlockHeader BlockChain::getLastBlock() const {
 }
 
 size_t BlockChain::countBlocks() const {
+    std::lock_guard<std::shared_mutex> lock(mut);
     return hashes.size() - 1;
 }
 
