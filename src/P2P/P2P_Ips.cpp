@@ -108,7 +108,7 @@ std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minRes
     const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, requestFunction);
     CHECK(isSuccess, "dont run request");
     
-    LOGINFO << "Count: " << countSegments << " " << requestServers.size() << " " << segments.size() << " " << curls.size();
+    //LOGINFO << "Count: " << countSegments << " " << requestServers.size() << " " << segments.size() << " " << curls.size() << " " << responseSize;
     
     limitArray.add(requestServers.size());
     if (limitArray.filled()) {
