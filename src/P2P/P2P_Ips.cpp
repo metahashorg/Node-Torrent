@@ -11,6 +11,8 @@ using namespace common;
 
 namespace torrent_node_lib {
 
+const static size_t SIZE_PARALLEL_BROADCAST = 8;
+    
 P2P_Ips::P2P_Ips(const std::vector<std::string> &servers, size_t countConnections)
     : servers(servers.begin(), servers.end())
     , countConnections(countConnections)
@@ -21,6 +23,10 @@ P2P_Ips::P2P_Ips(const std::vector<std::string> &servers, size_t countConnection
     
     for (size_t i = 0; i < countConnections * servers.size(); i++) {
         curls.emplace_back(Curl::getInstance());
+    }
+    
+    for (size_t i = 0; i < SIZE_PARALLEL_BROADCAST; i++) {
+        curlsBroadcast.emplace_back(Curl::getInstance());
     }
 }
 
@@ -38,9 +44,9 @@ std::string P2P_Ips::request(const CurlInstance &curl, const std::string& qs, co
 }
 
 void P2P_Ips::broadcast(const std::string &qs, const std::string &postData, const std::string &header, const BroadcastResult& callback) const {
-    parallelFor(8, servers.begin(), servers.end(), [&qs, &postData, &header, &callback, this](const Server &server) {
+    parallelFor(SIZE_PARALLEL_BROADCAST, servers.begin(), servers.end(), [&qs, &postData, &header, &callback, this](size_t threadNum, const Server &server) {
         try {
-            const std::string response = request(Curl::getInstance(), qs, postData, header, server.server);
+            const std::string response = request(curlsBroadcast.at(threadNum), qs, postData, header, server.server);
             callback(server.server, response, {});
         } catch (const exception &e) {
             callback(server.server, "", CurlException(e));

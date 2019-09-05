@@ -52,6 +52,8 @@ private:
     
     mutable std::vector<common::CurlInstance> curls;
     
+    std::vector<common::CurlInstance> curlsBroadcast;
+    
     mutable LimitArray limitArray;
     
 };
