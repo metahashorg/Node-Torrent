@@ -620,6 +620,7 @@ std::string BlockHeader::serialize() const {
     res += serializeInt<uint64_t>(blockType);
     res += serializeInt<size_t>(timestamp);
     res += serializeInt<size_t>(countTxs);
+    res += serializeInt<size_t>(countSignTx);
     
     res += serializeString(std::string(senderSign.begin(), senderSign.end()));
     res += serializeString(std::string(senderPubkey.begin(), senderPubkey.end()));
@@ -642,6 +643,7 @@ BlockHeader BlockHeader::deserialize(const std::string& raw) {
     result.blockType = deserializeInt<uint64_t>(raw, from);
     result.timestamp = deserializeInt<size_t>(raw, from);
     result.countTxs = deserializeInt<size_t>(raw, from);
+    result.countSignTx = deserializeInt<size_t>(raw, from);
     
     const std::string senderSign = deserializeString(raw, from);
     result.senderSign = std::vector<unsigned char>(senderSign.begin(), senderSign.end());

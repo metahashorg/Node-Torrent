@@ -413,6 +413,8 @@ struct BlockHeader {
        
     size_t countTxs = 0;
     
+    size_t countSignTx = 0;
+    
     FilePosition filePos;
         
     std::optional<size_t> blockNumber;

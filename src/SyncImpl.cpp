@@ -26,7 +26,7 @@ using namespace common;
 
 namespace torrent_node_lib {
     
-const static std::string VERSION_DB = "v4.4";
+const static std::string VERSION_DB = "v4.5";
     
 bool isInitialized = false;
 
@@ -309,7 +309,8 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                 } else {
                     if (isValidate) {
                         const auto &thisHashFromHex = prevBi->header.hash;
-                        for (const TransactionInfo &tx: nextBi->txs) {
+                        for (size_t i = 0; i < nextBi->header.countSignTx; i++) {
+                            const TransactionInfo &tx = nextBi->txs[i];
                             if (tx.isSignBlockTx) {
                                 CHECK(thisHashFromHex == tx.data, "Block signatures not confirmed");
                             }

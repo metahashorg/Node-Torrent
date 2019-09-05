@@ -408,6 +408,7 @@ static void readBlockTxs(const char *begin_pos, const char *end_pos, size_t posI
     PrevTransactionSignHelper prevTransactionSignBlockHelper;
     prevTransactionSignBlockHelper.isFirst = true;
     prevTransactionSignBlockHelper.isPrevSign = true;
+    size_t countSignTxs = 0;
     do {
         TransactionInfo txInfo;
         txInfo.filePos.pos = cur_pos - begin_pos + posInFile + offsetBeginBlock;
@@ -429,10 +430,15 @@ static void readBlockTxs(const char *begin_pos, const char *end_pos, size_t posI
         prevTransactionSignBlockHelper.prevTxData = txInfo.data;
         prevTransactionSignBlockHelper.isFirst = false;
         
+        if (txInfo.isSignBlockTx) {
+            countSignTxs++;
+        }
+        
         txIndex++;
     } while (tx_size > 0);
     if (countTx == 0) {
         bi.header.countTxs = bi.txs.size();
+        bi.header.countSignTx = countSignTxs;
     }
     if (!bi.txs.empty()) {
         const TransactionInfo &tx = bi.txs.front();

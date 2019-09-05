@@ -70,8 +70,6 @@ const static int HTTP_STATUS_BAD_REQUEST = 400;
 const static int HTTP_STATUS_NO_CONTENT = 204;
 const static int HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
 
-const static size_t MAX_COUNT_SIGN_TXS = 15;
-
 struct IncCountRunningThread {
   
     IncCountRunningThread(std::atomic<int> &countRunningThreads)
@@ -166,7 +164,7 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
             const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
             std::vector<TransactionInfo> signs;
             if (nextBh.blockNumber.has_value()) {
-                const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, MAX_COUNT_SIGN_TXS);
+                const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
                 signs = nextBi.getBlockSignatures();
             }
             return blockHeaderToJson(requestId, bh, signs, isFormat, type, version);
@@ -177,7 +175,7 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
         const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
         std::vector<TransactionInfo> signs;
         if (nextBh.blockNumber.has_value()) {
-            const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, MAX_COUNT_SIGN_TXS);
+            const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
             signs = nextBi.getBlockSignatures();
         }
         const BlockInfo bi = sync.getFullBlock(bh, beginTx, countTxs);
@@ -217,7 +215,7 @@ static std::string getBlocks(const RequestId &requestId, const rapidjson::Docume
     const auto processBlock = [&bhs, &signs, &sync, type](int64_t i) {
         bhs.emplace_back(sync.getBlockchain().getBlock(i));
         if (type == BlockTypeInfo::Simple) {
-            const BlockInfo bi = sync.getFullBlock(bhs.back(), 0, MAX_COUNT_SIGN_TXS);
+            const BlockInfo bi = sync.getFullBlock(bhs.back(), 0, bhs.back().countSignTx);
             signs.emplace_back(bi.getBlockSignatures());
         } else {
             signs.push_back({});
