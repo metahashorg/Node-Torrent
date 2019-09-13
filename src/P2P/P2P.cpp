@@ -13,7 +13,7 @@ using namespace common;
 
 namespace torrent_node_lib {
 
-std::vector<P2P::Segment> P2P::makeSegments(size_t countSegments, size_t size, size_t minSize) {
+std::vector<Segment> P2P::makeSegments(size_t countSegments, size_t size, size_t minSize) {
     const size_t step = std::min(size, std::max(size / countSegments, minSize));
     CHECK(step != 0, "step == 0");
     
@@ -47,7 +47,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     std::mutex mut;
     std::condition_variable cond;
     
-    BlockedQueue<QueueElement, 1000> blockedQueue;
+    QueueP2P blockedQueue;
     
     const size_t countUniqueServer = countUnique(requestServers, [](const auto &first, const auto &second) {
         return first.first.get().server < second.first.get().server;
@@ -59,26 +59,33 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
         threads.emplace_back([&blockedQueue, &countSuccessRequests, &countFailureRequests, &countExitThreads, &mut, &cond, &requestFunction, &makeQsAndPost, countUniqueServer](const Server &server, const common::CurlInstance &curl){
             try {
                 while (true) {
-                    QueueElement segment;
-                    const bool isStopped = !blockedQueue.pop(segment, [&server](const QueueElement &element) {
-                        return element.servers.find(server.server) == element.servers.end();
-                    });
+                    QueueP2PElement element;
+                    const bool isStopped = !blockedQueue.getElement(element, [&server](const Segment &segment, const std::set<std::string> &servers) {
+                        return servers.find(server.server) == servers.end();
+                    }, server.server);
                     if (isStopped) {
                         break;
                     }
                     
-                    const auto &[qs, post] = makeQsAndPost(segment.segment.fromByte, segment.segment.toByte);
+                    const std::optional<Segment> segment = element.getSegment();
+                    if (!segment.has_value()) {
+                        continue;
+                    }
+                    
+                    const auto &[qs, post] = makeQsAndPost(segment->fromByte, segment->toByte);
                     try {
-                        requestFunction(qs, post, server.server, curl, segment.segment);
-                        std::lock_guard<std::mutex> lock(mut);
-                        countSuccessRequests++;
-                        cond.notify_one();
+                        const bool uniqueRequest = requestFunction(qs, post, server.server, curl, *segment);
+                        blockedQueue.removeElement(element);
+                        if (uniqueRequest) {
+                            std::lock_guard<std::mutex> lock(mut);
+                            countSuccessRequests++;
+                            cond.notify_one();
+                        }
                     } catch (const exception &e) {
                         LOGWARN << "Error " << e << " " << server.server;
-                        segment.servers.emplace(server.server);
-                        if (segment.servers.size() < countUniqueServer) {
-                            blockedQueue.push(segment);
-                        } else {
+                        const size_t countErrors = blockedQueue.errorElement(element, server.server);
+                        if (countErrors >= countUniqueServer) {
+                            blockedQueue.removeElement(element);
                             std::lock_guard<std::mutex> lock(mut);
                             countFailureRequests++;
                             cond.notify_one();
@@ -106,7 +113,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     }
     
     for (const Segment &segment: segments) {
-        blockedQueue.push(QueueElement(segment));
+        blockedQueue.addElement(segment);
     }
     
     std::unique_lock<std::mutex> lock(mut);

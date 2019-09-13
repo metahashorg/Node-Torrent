@@ -10,6 +10,8 @@
 
 #include "duration.h"
 
+#include "QueueP2P.h"
+
 namespace common {
 struct CurlInstance;
 }
@@ -85,34 +87,8 @@ protected:
             : server(server)
         {}
     };
-    
-    struct Segment {
-        size_t fromByte;
-        size_t toByte;
-        size_t posInArray;
         
-        Segment() = default;
-        
-        Segment(size_t fromByte, size_t toByte, size_t posInArray)
-            : fromByte(fromByte)
-            , toByte(toByte)
-            , posInArray(posInArray)
-        {}
-    };
-    
-    struct QueueElement {
-        P2P::Segment segment;
-        
-        std::set<std::string> servers;
-        
-        QueueElement() = default;
-        
-        explicit QueueElement(const P2P::Segment &segment)
-            : segment(segment)
-        {}
-    };
-        
-    using RequestFunction = std::function<void(const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment)>;
+    using RequestFunction = std::function<bool(const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment)>;
     
     using RequestFunctionSimple = std::function<std::string(const std::string &qs, const std::string &post, const std::string &header, const std::string &server)>;
         

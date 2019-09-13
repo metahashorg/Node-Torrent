@@ -100,15 +100,23 @@ std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minRes
     const auto requestServers = getServersList(servers, countSegments);
     
     std::vector<std::string> answers(countSegments);
+    std::mutex answersMut;
 
-    const RequestFunction requestFunction = [&answers, &header, &responseParse, isPrecisionSize, this](const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment) {        
+    const RequestFunction requestFunction = [&answers, &answersMut, &header, &responseParse, isPrecisionSize, this](const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment) {        
         const std::string response = request(curl, qs, post, header, server);
         const ResponseParse parsed = responseParse(response);
         CHECK(!parsed.error.has_value(), parsed.error.value());
         if (isPrecisionSize) {
             CHECK(parsed.response.size() == segment.toByte - segment.fromByte, "Incorrect response size");
         }
-        answers.at(segment.posInArray) = parsed.response;
+        
+        std::lock_guard<std::mutex> lock(answersMut);
+        if (answers.at(segment.posInArray).empty()) {
+            answers.at(segment.posInArray) = parsed.response;
+            return true;
+        } else {
+            return false;
+        }
     };
     
     const std::vector<Segment> segments = P2P::makeSegments(countSegments, responseSize, minResponseSize);
