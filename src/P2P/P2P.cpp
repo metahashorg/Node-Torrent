@@ -9,6 +9,8 @@
 
 #include "curlWrapper.h"
 
+#include "ReferenceWrapper.h"
+
 using namespace common;
 
 namespace torrent_node_lib {
@@ -40,8 +42,21 @@ static size_t countUnique(const std::vector<T> &elements, const F &compare) {
     return std::distance(copy.begin(), endIter);
 }
 
+struct P2PReferences {
+    
+    P2PReferences(const MakeQsAndPostFunction &makeQsAndPost, const P2P::RequestFunction &requestFunction)
+        : makeQsAndPost(makeQsAndPost)
+        , requestFunction(requestFunction)
+    {}
+    
+    std::reference_wrapper<const MakeQsAndPostFunction> makeQsAndPost;
+    std::reference_wrapper<const P2P::RequestFunction> requestFunction;
+};
+
 bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction) {   
     QueueP2P blockedQueue;
+    
+    ReferenseWrapperMaster<P2PReferences> referenceWrapper(P2PReferences(makeQsAndPost, requestFunction));
     
     const size_t countUniqueServer = countUnique(requestServers, [](const auto &first, const auto &second) {
         return first.first.get().server < second.first.get().server;
@@ -50,7 +65,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     std::vector<Thread> threads;
     threads.reserve(requestServers.size());
     for (const auto &[server, curl]: requestServers) {
-        threads.emplace_back([&blockedQueue, &requestFunction, &makeQsAndPost, countUniqueServer](const Server &server, const common::CurlInstance &curl){
+        threads.emplace_back([&blockedQueue, countUniqueServer](const Server &server, const common::CurlInstance &curl, const ReferenseWrapperSlave<P2PReferences> &referenceWrapper){
             try {
                 while (true) {
                     QueueP2PElement element;
@@ -66,8 +81,9 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
                         continue;
                     }
                     
-                    const auto &[qs, post] = makeQsAndPost(segment->fromByte, segment->toByte);
+                    const auto &[qs, post] = referenceWrapper->get()->makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
                     try {
+                        const auto requestFunction = referenceWrapper->get()->requestFunction;
                         requestFunction(qs, post, server.server, curl, *segment);
                         blockedQueue.removeElement(element);
                     } catch (const exception &e) {
@@ -91,7 +107,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
                 LOGERR << "Unknown error";
             }
         },
-        server, std::cref(curl)
+        server, std::cref(curl), referenceWrapper.makeSlave()
         );
     }
     

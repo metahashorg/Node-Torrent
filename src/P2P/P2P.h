@@ -59,7 +59,10 @@ struct SendAllResult {
     std::vector<SendOneResult> results;
 };
 
+struct P2PReferences;
+
 class P2P {   
+    friend struct P2PReferences;
 public:
     
     virtual ~P2P() = default;
