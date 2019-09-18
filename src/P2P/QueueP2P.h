@@ -51,9 +51,19 @@ public:
     
     void removeElement(const QueueP2PElement &element);
     
+    void removeElementError(const QueueP2PElement &element);
+    
     size_t errorElement(QueueP2PElement &element, const std::string &server);
     
     void stop();
+    
+    void waitEmpty() const;
+    
+    bool error() const;
+    
+private:
+    
+    void removeElementInternal(const QueueP2PElement &element);
     
 private:
     
@@ -61,10 +71,13 @@ private:
     
     std::condition_variable cond_pop;
     
+    mutable std::condition_variable cond_empty;
+    
     std::list<std::shared_ptr<QueueElement>> queue;
     
     bool isStopped = false;
     
+    bool isError = false;
 };
 
 class QueueP2PElement {

@@ -40,13 +40,7 @@ static size_t countUnique(const std::vector<T> &elements, const F &compare) {
     return std::distance(copy.begin(), endIter);
 }
 
-bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction) {
-    size_t countSuccessRequests = 0;
-    size_t countFailureRequests = 0;
-    size_t countExitThreads = 0;
-    std::mutex mut;
-    std::condition_variable cond;
-    
+bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction) {   
     QueueP2P blockedQueue;
     
     const size_t countUniqueServer = countUnique(requestServers, [](const auto &first, const auto &second) {
@@ -56,7 +50,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     std::vector<Thread> threads;
     threads.reserve(requestServers.size());
     for (const auto &[server, curl]: requestServers) {
-        threads.emplace_back([&blockedQueue, &countSuccessRequests, &countFailureRequests, &countExitThreads, &mut, &cond, &requestFunction, &makeQsAndPost, countUniqueServer](const Server &server, const common::CurlInstance &curl){
+        threads.emplace_back([&blockedQueue, &requestFunction, &makeQsAndPost, countUniqueServer](const Server &server, const common::CurlInstance &curl){
             try {
                 while (true) {
                     QueueP2PElement element;
@@ -74,21 +68,13 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
                     
                     const auto &[qs, post] = makeQsAndPost(segment->fromByte, segment->toByte);
                     try {
-                        const bool uniqueRequest = requestFunction(qs, post, server.server, curl, *segment);
+                        requestFunction(qs, post, server.server, curl, *segment);
                         blockedQueue.removeElement(element);
-                        if (uniqueRequest) {
-                            std::lock_guard<std::mutex> lock(mut);
-                            countSuccessRequests++;
-                            cond.notify_one();
-                        }
                     } catch (const exception &e) {
                         LOGWARN << "Error " << e << " " << server.server;
                         const size_t countErrors = blockedQueue.errorElement(element, server.server);
                         if (countErrors >= countUniqueServer) {
                             blockedQueue.removeElement(element);
-                            std::lock_guard<std::mutex> lock(mut);
-                            countFailureRequests++;
-                            cond.notify_one();
                         }
                         break;
                     }
@@ -104,9 +90,6 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
             } catch (...) {
                 LOGERR << "Unknown error";
             }
-            std::lock_guard<std::mutex> lock(mut);
-            countExitThreads++;
-            cond.notify_one();
         },
         server, std::cref(curl)
         );
@@ -116,11 +99,8 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
         blockedQueue.addElement(segment);
     }
     
-    std::unique_lock<std::mutex> lock(mut);
-    conditionWait(cond, lock, [&countSuccessRequests, &countFailureRequests, &countExitThreads, countSegments=segments.size(), &threads](){
-        return countSuccessRequests + countFailureRequests == countSegments || countExitThreads == threads.size(); 
-    });
-    lock.unlock();
+    blockedQueue.waitEmpty();
+    const bool isError = blockedQueue.error();
     blockedQueue.stop();
     for (auto &thread: threads) {
         thread.join();
@@ -128,7 +108,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     
     checkStopSignal();
     
-    return countSuccessRequests == segments.size();
+    return !isError;
 }
 
 SendAllResult P2P::process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::string &qs, const std::string &post, const std::string &header, const RequestFunctionSimple &requestFunction) {

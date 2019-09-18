@@ -1,6 +1,7 @@
 #include "QueueP2P.h"
 
 #include "stopProgram.h"
+#include "check.h"
 
 using namespace common;
 
@@ -20,6 +21,7 @@ void QueueP2P::addElement(const Segment &segment) {
     const auto iter = queue.insert(queue.end(), std::make_shared<QueueElement>(segment));
     iter->get()->it = iter;
     cond_pop.notify_one();
+    cond_empty.notify_all();
 }
     
 bool QueueP2P::getElement(QueueP2PElement &element, const std::function<bool(const Segment &segment, const std::set<std::string> &servers)> &predicate, const std::string &currentServer) {
@@ -46,15 +48,26 @@ bool QueueP2P::getElement(QueueP2PElement &element, const std::function<bool(con
     return true;
 }
 
-void QueueP2P::removeElement(const QueueP2PElement &element) {
-    std::lock_guard<std::mutex> lock(mut);
+void QueueP2P::removeElementInternal(const QueueP2PElement &element) {
     const std::shared_ptr<QueueP2P::QueueElement> lockPtr(element.element.lock());
     if (lockPtr == nullptr) {
         return;
     } else {
         const auto it = lockPtr->it;
         queue.erase(it);
+        cond_empty.notify_all();
     }
+}
+
+void QueueP2P::removeElement(const QueueP2PElement &element) {
+    std::lock_guard<std::mutex> lock(mut);
+    removeElementInternal(element);
+}
+
+void QueueP2P::removeElementError(const QueueP2PElement &element) {
+    std::lock_guard<std::mutex> lock(mut);
+    removeElement(element);
+    isError = true;
 }
 
 size_t QueueP2P::errorElement(QueueP2PElement &element, const std::string &server) {
@@ -68,10 +81,28 @@ size_t QueueP2P::errorElement(QueueP2PElement &element, const std::string &serve
     }
 }
 
+void QueueP2P::waitEmpty() const {
+    std::unique_lock<std::mutex> lock(mut);
+    conditionWait(cond_empty, lock, [this]{
+        if (isStopped) {
+            return true;
+        }
+        return queue.empty();
+    });
+}
+
 void QueueP2P::stop() {
     std::lock_guard<std::mutex> lock(mut);
     isStopped = true;
+    isError = false;
     cond_pop.notify_all();
+    cond_empty.notify_all();
+}
+
+bool QueueP2P::error() const {
+    std::lock_guard<std::mutex> lock(mut);
+    CHECK(!isStopped, "Already stopped");
+    return isError;
 }
 
 } // namespace torrent_node_lib 
