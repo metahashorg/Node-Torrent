@@ -44,19 +44,30 @@ static size_t countUnique(const std::vector<T> &elements, const F &compare) {
 
 struct P2PReferences {
     
-    P2PReferences(const MakeQsAndPostFunction &makeQsAndPost, const P2P::RequestFunction &requestFunction)
+    P2PReferences(const MakeQsAndPostFunction &makeQsAndPost, const P2P::ProcessResponse &processResponse)
         : makeQsAndPost(makeQsAndPost)
-        , requestFunction(requestFunction)
+        , processResponse(processResponse)
     {}
     
-    std::reference_wrapper<const MakeQsAndPostFunction> makeQsAndPost;
-    std::reference_wrapper<const P2P::RequestFunction> requestFunction;
+    const MakeQsAndPostFunction &makeQsAndPost;
+    const P2P::ProcessResponse &processResponse;
 };
 
-bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const RequestFunction &requestFunction) {   
+std::string P2P::request(const CurlInstance &curl, const std::string& qs, const std::string& postData, const std::string& header, const std::string& server) {
+    std::string url = server;
+    CHECK(!url.empty(), "server empty");
+    if (url[url.size() - 1] != '/') {
+        url += '/';
+    }
+    url += qs;
+    const std::string response = Curl::request(curl, url, postData, header, "", 5);
+    return response;
+}
+
+bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse) {   
     QueueP2P blockedQueue;
     
-    ReferenseWrapperMaster<P2PReferences> referenceWrapper(P2PReferences(makeQsAndPost, requestFunction));
+    ReferenseWrapperMaster<P2PReferences> referenceWrapper(P2PReferences(makeQsAndPost, processResponse));
     
     const size_t countUniqueServer = countUnique(requestServers, [](const auto &first, const auto &second) {
         return first.first.get().server < second.first.get().server;
@@ -83,14 +94,14 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
                     
                     const auto &[qs, post] = referenceWrapper->get()->makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
                     try {
-                        const auto requestFunction = referenceWrapper->get()->requestFunction;
-                        requestFunction(qs, post, server.server, curl, *segment);
+                        const std::string response = P2P::request(curl, qs, post, "", server.server);
+                        referenceWrapper->get()->processResponse(response, *segment);
                         blockedQueue.removeElement(element);
                     } catch (const exception &e) {
                         LOGWARN << "Error " << e << " " << server.server;
                         const size_t countErrors = blockedQueue.errorElement(element, server.server);
                         if (countErrors >= countUniqueServer) {
-                            blockedQueue.removeElement(element);
+                            blockedQueue.removeElementError(element);
                         }
                         break;
                     }
@@ -117,6 +128,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     
     blockedQueue.waitEmpty();
     const bool isError = blockedQueue.error();
+    referenceWrapper.destroy();
     blockedQueue.stop();
     for (auto &thread: threads) {
         thread.join();

@@ -32,21 +32,10 @@ P2P_Ips::P2P_Ips(const std::vector<std::string> &servers, size_t countConnection
 
 P2P_Ips::~P2P_Ips() = default;
 
-std::string P2P_Ips::request(const CurlInstance &curl, const std::string& qs, const std::string& postData, const std::string& header, const std::string& server) const {
-    std::string url = server;
-    CHECK(!url.empty(), "server empty");
-    if (url[url.size() - 1] != '/') {
-        url += '/';
-    }
-    url += qs;
-    const std::string response = Curl::request(curl, url, postData, header, "", 5);
-    return response;
-}
-
 void P2P_Ips::broadcast(const std::string &qs, const std::string &postData, const std::string &header, const BroadcastResult& callback) const {
     parallelFor(SIZE_PARALLEL_BROADCAST, servers.begin(), servers.end(), [&qs, &postData, &header, &callback, this](size_t threadNum, const Server &server) {
         try {
-            const std::string response = request(curlsBroadcast.at(threadNum), qs, postData, header, server.server);
+            const std::string response = P2P::request(curlsBroadcast.at(threadNum), qs, postData, header, server.server);
             callback(server.server, response, {});
         } catch (const exception &e) {
             callback(server.server, "", CurlException(e));
@@ -60,7 +49,7 @@ void P2P_Ips::broadcast(const std::string &qs, const std::string &postData, cons
 }
 
 std::string P2P_Ips::runOneRequest(const std::string& server, const std::string& qs, const std::string& postData, const std::string& header) const {
-    return request(Curl::getInstance(), qs, postData, header, server);
+    return P2P::request(Curl::getInstance(), qs, postData, header, server);
 }
 
 size_t P2P_Ips::getMaxServersCount(const std::vector<Server> &srvrs) const {
@@ -102,8 +91,7 @@ std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minRes
     std::vector<std::string> answers(countSegments);
     std::mutex answersMut;
 
-    const RequestFunction requestFunction = [&answers, &answersMut, &header, &responseParse, isPrecisionSize, this](const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment) {        
-        const std::string response = request(curl, qs, post, header, server);
+    const ProcessResponse processResponse = [&answers, &answersMut, &header, &responseParse, isPrecisionSize, this](const std::string &response, const Segment &segment) {        
         const ResponseParse parsed = responseParse(response);
         CHECK(!parsed.error.has_value(), parsed.error.value());
         if (isPrecisionSize) {
@@ -120,7 +108,7 @@ std::vector<std::string> P2P_Ips::requestImpl(size_t responseSize, size_t minRes
     };
     
     const std::vector<Segment> segments = P2P::makeSegments(countSegments, responseSize, minResponseSize);
-    const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, requestFunction);
+    const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, processResponse);
     CHECK(isSuccess, "dont run request");
     
     //LOGINFO << "Count: " << countSegments << " " << requestServers.size() << " " << segments.size() << " " << curls.size() << " " << responseSize;
@@ -170,7 +158,7 @@ SendAllResult P2P_Ips::requestAll(const std::string &qs, const std::string &post
     allServers.insert(allServers.end(), otherServers.begin(), otherServers.end());
     
     const auto requestFunction = [this](const std::string &qs, const std::string &post, const std::string &header, const std::string &server) -> std::string {
-        return request(Curl::getInstance(), qs, post, header, server);
+        return P2P::request(Curl::getInstance(), qs, post, header, server);
     };
     
     return P2P::process(allServers, qs, postData, header, requestFunction);

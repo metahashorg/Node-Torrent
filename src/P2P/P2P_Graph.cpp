@@ -31,23 +31,12 @@ P2P_Graph::P2P_Graph(const std::vector<std::pair<std::string, std::string>> &gra
     LOGINFO << "Found parent on this: " << parent->getElement();
 }
 
-std::string P2P_Graph::request(const Curl::CurlInstance &curl, const std::string& qs, const std::string& postData, const std::string& header, const std::string& server) const {
-    std::string url = server;
-    CHECK(!url.empty(), "server empty");
-    if (url[url.size() - 1] != '/') {
-        url += '/';
-    }
-    url += qs;
-    const std::string response = Curl::request(curl, url, postData, header, "", 5);
-    return response;
-}
-
 void P2P_Graph::broadcast(const std::string &qs, const std::string &postData, const std::string &header, const BroadcastResult& callback) const {
     const GraphString::Element *curServ = parent;
     CHECK(!curls.empty(), "Curls empty");
     while (true) {
         try {
-            const std::string response = request(curls[0], qs, postData, header, curServ->getElement());
+            const std::string response = P2P::request(curls[0], qs, postData, header, curServ->getElement());
             callback(curServ->getElement(), response, {});
             break;
         } catch (const exception &e) {
@@ -67,7 +56,7 @@ void P2P_Graph::broadcast(const std::string &qs, const std::string &postData, co
 
 std::string P2P_Graph::runOneRequest(const std::string& server, const std::string& qs, const std::string& postData, const std::string& header) const {
     CHECK(!curls.empty(), "Curls empty");
-    return request(curls[0], qs, postData, header, server);
+    return P2P::request(curls[0], qs, postData, header, server);
 }
 
 size_t P2P_Graph::getMaxServersCount(const Server &srvr) const {
@@ -102,8 +91,7 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     std::vector<std::string> answers(countSegments);
     std::mutex answersMut;
     
-    const RequestFunction requestFunction = [&answers, &answersMut, &header, &responseParse, isPrecisionSize, this](const std::string &qs, const std::string &post, const std::string &server, const common::CurlInstance &curl, const Segment &segment) {
-        const std::string response = request(curl, qs, post, header, server);
+    const ProcessResponse processResponse = [&answers, &answersMut, &header, &responseParse, isPrecisionSize, this](const std::string &response, const Segment &segment) {
         const ResponseParse parsed = responseParse(response);
         CHECK(!parsed.error.has_value(), parsed.error.value());
         if (isPrecisionSize) {
@@ -120,7 +108,7 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     };
     
     const std::vector<Segment> segments = P2P::makeSegments(countSegments, responseSize, minResponseSize);
-    const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, requestFunction);
+    const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, processResponse);
     CHECK(isSuccess, "dont run request");
     
     limitArray.add(requestServers.size());
@@ -168,7 +156,7 @@ SendAllResult P2P_Graph::requestAll(const std::string &qs, const std::string &po
     allServers.insert(allServers.end(), otherServers.begin(), otherServers.end());
     
     const auto requestFunction = [this](const std::string &qs, const std::string &post, const std::string &header, const std::string &server) -> std::string {
-        return request(Curl::getInstance(), qs, post, header, server);
+        return P2P::request(Curl::getInstance(), qs, post, header, server);
     };
     
     return P2P::process(allServers, qs, postData, header, requestFunction);
