@@ -43,7 +43,7 @@ void P2PThread::work() {
             }, server, currId);
             if (isClosed) {
                 std::unique_lock<std::mutex> lock2(mut);
-                conditionWait(cond, lock2, [currId, this]{
+                conditionWait(cond, lock2, [currId, this]{ // TODO удалять curl
                     const auto taskNumberChanged = [currId, this]{
                         return currId != this->taskNumber;
                     };

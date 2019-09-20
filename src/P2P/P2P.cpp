@@ -42,6 +42,13 @@ static size_t countUnique(const std::vector<T> &elements, const F &compare) {
     return std::distance(copy.begin(), endIter);
 }
 
+P2P::P2P(size_t countThreads) {
+    for (size_t i = 0; i < countThreads; i++) {
+        curls.emplace_back(Curl::getInstance());
+        threads.emplace_back(curls.back(), blockedQueue);
+    }
+}
+
 std::string P2P::request(const CurlInstance &curl, const std::string& qs, const std::string& postData, const std::string& header, const std::string& server) {
     std::string url = server;
     CHECK(!url.empty(), "server empty");
@@ -53,62 +60,20 @@ std::string P2P::request(const CurlInstance &curl, const std::string& qs, const 
     return response;
 }
 
-bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse) {   
-    QueueP2P blockedQueue;
-    
+bool P2P::process(const std::vector<ThreadDistribution> &threadsDistribution, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse) {   
     ReferenseWrapperMaster<P2PReferences> referenceWrapper(P2PReferences(makeQsAndPost, processResponse));
     
-    const size_t countUniqueServer = countUnique(requestServers, [](const auto &first, const auto &second) {
-        return first.first.get().server < second.first.get().server;
+    const size_t countUniqueServer = countUnique(threadsDistribution, [](const auto &first, const auto &second) {
+        return first.server < second.server;
     });
     
-    std::vector<Thread> threads;
-    threads.reserve(requestServers.size());
-    for (const auto &[server, curl]: requestServers) {
-        threads.emplace_back([&blockedQueue, countUniqueServer](const Server &server, const common::CurlInstance &curl, const ReferenseWrapperSlave<P2PReferences> &referenceWrapper){
-            try {
-                while (true) {
-                    QueueP2PElement element;
-                    const bool isStopped = !blockedQueue.getElement(element, [&server](const Segment &segment, const std::set<std::string> &servers) {
-                        return servers.find(server.server) == servers.end();
-                    }, server.server, 0);
-                    if (isStopped) {
-                        break;
-                    }
-                    
-                    const std::optional<Segment> segment = element.getSegment();
-                    if (!segment.has_value()) {
-                        continue;
-                    }
-                    
-                    const auto &[qs, post] = referenceWrapper->get()->makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
-                    try {
-                        const std::string response = P2P::request(curl, qs, post, "", server.server);
-                        referenceWrapper->get()->processResponse(response, *segment);
-                        blockedQueue.removeElement(element);
-                    } catch (const exception &e) {
-                        LOGWARN << "Error " << e << " " << server.server;
-                        const size_t countErrors = blockedQueue.errorElement(element, server.server);
-                        if (countErrors >= countUniqueServer) {
-                            blockedQueue.removeElementError(element);
-                        }
-                        break;
-                    }
-                    
-                    checkStopSignal();
-                }
-            } catch (const exception &e) {
-                LOGERR << e;
-            } catch (const StopException &e) {
-                LOGINFO << "Stop p2p::request thread";
-            } catch (const std::exception &e) {
-                LOGERR << e.what();
-            } catch (...) {
-                LOGERR << "Unknown error";
-            }
-        },
-        server, std::cref(curl), referenceWrapper.makeSlave()
-        );
+    blockedQueue.start(taskId);
+    
+    for (const ThreadDistribution &distr: threadsDistribution) {
+        for (size_t index = distr.from; index < distr.to; index++) {
+            CHECK(index < threads.size(), "Incorrect thread number");
+            threads[index].newTask(taskId, distr.server, referenceWrapper.makeSlave(), countUniqueServer);
+        }
     }
     
     for (const Segment &segment: segments) {
@@ -119,9 +84,6 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     const bool isError = blockedQueue.error();
     referenceWrapper.destroy();
     blockedQueue.stop();
-    for (auto &thread: threads) {
-        thread.join();
-    }
     
     checkStopSignal();
     

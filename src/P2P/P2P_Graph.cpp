@@ -12,8 +12,8 @@ using namespace common;
 using namespace torrent_node_lib;
 
 P2P_Graph::P2P_Graph(const std::vector<std::pair<std::string, std::string>> &graphVec, const std::string &thisIp, size_t countConnections)
-    : countConnections(countConnections)
-    , limitArray(10)
+    : P2P(countConnections)
+    , countConnections(countConnections)
 {
     CHECK(countConnections != 0, "Incorrect count connections: 0");
     Curl::initialize();
@@ -24,19 +24,14 @@ P2P_Graph::P2P_Graph(const std::vector<std::pair<std::string, std::string>> &gra
     const GraphString::Element &thisElement = graph.findElement(thisIp);
     parent = &thisElement.getParent();
     
-    for (size_t i = 0; i < countConnections; i++) {
-        curls.emplace_back(Curl::getInstance());
-    }
-    
     LOGINFO << "Found parent on this: " << parent->getElement();
 }
 
 void P2P_Graph::broadcast(const std::string &qs, const std::string &postData, const std::string &header, const BroadcastResult& callback) const {
     const GraphString::Element *curServ = parent;
-    CHECK(!curls.empty(), "Curls empty");
     while (true) {
         try {
-            const std::string response = P2P::request(curls[0], qs, postData, header, curServ->getElement());
+            const std::string response = P2P::request(curlBroadcast, qs, postData, header, curServ->getElement());
             callback(curServ->getElement(), response, {});
             break;
         } catch (const exception &e) {
@@ -55,23 +50,16 @@ void P2P_Graph::broadcast(const std::string &qs, const std::string &postData, co
 }
 
 std::string P2P_Graph::runOneRequest(const std::string& server, const std::string& qs, const std::string& postData, const std::string& header) const {
-    CHECK(!curls.empty(), "Curls empty");
-    return P2P::request(curls[0], qs, postData, header, server);
+    return P2P::request(curlBroadcast, qs, postData, header, server);
 }
 
 size_t P2P_Graph::getMaxServersCount(const Server &srvr) const {
     return countConnections;
 }
 
-std::vector<std::pair<std::reference_wrapper<const P2P_Graph::Server>, std::reference_wrapper<const common::CurlInstance>>> P2P_Graph::getServersList(const Server &server, size_t countSegments) const {
-    std::vector<std::pair<std::reference_wrapper<const P2P_Graph::Server>, std::reference_wrapper<const common::CurlInstance>>> result;
-    for (size_t i = curls.size(); i < std::min(countConnections, countSegments); i++) {
-        curls.emplace_back(Curl::getInstance());
-    }
-    
-    for (size_t i = 0; i < std::min(countConnections, countSegments); i++) {
-        result.emplace_back(server, curls[i]);
-    }
+std::vector<P2P::ThreadDistribution> P2P_Graph::getServersList(const Server &server, size_t countSegments) const {
+    std::vector<P2P::ThreadDistribution> result;
+    result.emplace_back(0, std::min(countConnections, countSegments), server.server);
     return result;
 }
 
@@ -91,7 +79,7 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     std::vector<std::string> answers(countSegments);
     std::mutex answersMut;
     
-    const ProcessResponse processResponse = [&answers, &answersMut, &header, &responseParse, isPrecisionSize, this](const std::string &response, const Segment &segment) {
+    const ProcessResponse processResponse = [&answers, &answersMut, &header, &responseParse, isPrecisionSize](const std::string &response, const Segment &segment) {
         const ResponseParse parsed = responseParse(response);
         CHECK(!parsed.error.has_value(), parsed.error.value());
         if (isPrecisionSize) {
@@ -110,13 +98,7 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     const std::vector<Segment> segments = P2P::makeSegments(countSegments, responseSize, minResponseSize);
     const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, processResponse);
     CHECK(isSuccess, "dont run request");
-    
-    limitArray.add(requestServers.size());
-    if (limitArray.filled()) {
-        const size_t leaveElements = std::min(limitArray.max() + 2, countConnections);
-        curls.resize(std::min(leaveElements, curls.size()));
-    }
-    
+        
     return answers;
 }
 

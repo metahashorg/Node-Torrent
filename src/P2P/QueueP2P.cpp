@@ -106,6 +106,7 @@ void QueueP2P::stop() {
 
 void QueueP2P::start(size_t taskId) {
     std::lock_guard<std::mutex> lock(mut);
+    CHECK(isStopped, "Already started");
     isStopped = false;
     isError = false;
     CHECK(taskId > this->taskId, "Incorrect sequences task");

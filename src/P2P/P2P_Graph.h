@@ -36,7 +36,7 @@ private:
     
     size_t getMaxServersCount(const Server &srvr) const;
     
-    std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> getServersList(const Server &server, size_t countSegments) const;
+    std::vector<P2P::ThreadDistribution> getServersList(const Server &server, size_t countSegments) const;
         
     std::vector<std::string> requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers); 
     
@@ -46,11 +46,9 @@ private:
     
     const GraphString::Element *parent;
     
+    common::CurlInstance curlBroadcast;
+    
     size_t countConnections;
-    
-    mutable std::vector<common::Curl::CurlInstance> curls;
-    
-    mutable torrent_node_lib::LimitArray limitArray;
     
 };
 

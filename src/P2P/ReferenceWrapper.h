@@ -96,8 +96,10 @@ public:
     
     ReferenseWrapperMaster(T &&t) 
         : ptr(safe_ptr<T>::make_safe(std::move(t)))
-    {
-        
+    {}
+    
+    ~ReferenseWrapperMaster() {
+        ptr->destroy();
     }
     
 public:

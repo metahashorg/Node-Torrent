@@ -6,6 +6,7 @@
 #include <set>
 #include <functional>
 #include <optional>
+#include <deque>
 #include <mutex>
 
 #include "duration.h"
@@ -87,6 +88,10 @@ public:
     
 protected:
     
+    P2P(size_t countThreads);
+    
+protected:
+    
     struct Server {
         std::string server;
         
@@ -95,13 +100,27 @@ protected:
         {}
     };
     
+    struct ThreadDistribution {
+        size_t from;
+        size_t to;
+        std::string server;
+        
+        ThreadDistribution(size_t from, size_t to, const std::string &server)
+            : from(from)
+            , to(to)
+            , server(server)
+        {}
+    };
+    
+protected:
+    
     using RequestFunctionSimple = std::function<std::string(const std::string &qs, const std::string &post, const std::string &header, const std::string &server)>;
         
     static std::vector<Segment> makeSegments(size_t countSegments, size_t size, size_t minSize);
     
     static std::string request(const common::CurlInstance &curl, const std::string &qs, const std::string &postData, const std::string &header, const std::string &server);
     
-    bool process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse);
+    bool process(const std::vector<ThreadDistribution> &threadsDistribution, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse);
     
     static SendAllResult process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::string &qs, const std::string &post, const std::string &header, const RequestFunctionSimple &requestFunction);
     
@@ -109,6 +128,11 @@ private:
     
     size_t taskId = 1;
     
+    QueueP2P blockedQueue; // queue должна стоять выше по стеку чем threads, чтобы уничтожится после всех
+    
+    std::deque<common::CurlInstance> curls;
+    
+    std::deque<P2PThread> threads;
 };
 
 }
