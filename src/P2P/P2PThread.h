@@ -9,6 +9,8 @@
 #include "ReferenceWrapper.h"
 #include "P2PStructs.h"
 
+#include "OopUtils.h"
+
 namespace common {
 struct CurlInstance;
 }
@@ -17,7 +19,7 @@ namespace torrent_node_lib {
 
 class QueueP2P;
     
-class P2PThread {
+class P2PThread: public common::no_copyable, public common::no_moveable {
 public:
     
     P2PThread(common::CurlInstance &curl, QueueP2P &queue);

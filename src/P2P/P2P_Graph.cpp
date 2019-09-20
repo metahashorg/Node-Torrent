@@ -75,7 +75,7 @@ std::vector<std::pair<std::reference_wrapper<const P2P_Graph::Server>, std::refe
     return result;
 }
 
-std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const {
+std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) {
     CHECK(responseSize != 0, "response size 0");
     
     const bool isMultitplyRequests = minResponseSize == 1;
@@ -120,7 +120,7 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     return answers;
 }
 
-std::string P2P_Graph::request(size_t responseSize, bool isPrecisionSize, const MakeQsAndPostFunction& makeQsAndPost, const std::string& header, const ResponseParseFunction& responseParse, const std::vector<std::string> &hintsServers) const {
+std::string P2P_Graph::request(size_t responseSize, bool isPrecisionSize, const MakeQsAndPostFunction& makeQsAndPost, const std::string& header, const ResponseParseFunction& responseParse, const std::vector<std::string> &hintsServers) {
     const size_t MIN_RESPONSE_SIZE = 10000;
     
     const std::vector<std::string> answers = requestImpl(responseSize, MIN_RESPONSE_SIZE, isPrecisionSize, makeQsAndPost, header, responseParse, hintsServers);
@@ -137,7 +137,7 @@ std::string P2P_Graph::request(size_t responseSize, bool isPrecisionSize, const 
     return response;
 }
 
-std::vector<std::string> P2P_Graph::requests(size_t countRequests, const MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const {
+std::vector<std::string> P2P_Graph::requests(size_t countRequests, const MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) {
     const auto makeQsAndPortImpl = [makeQsAndPost](size_t from, size_t to) {
         CHECK(to == from + 1, "Incorrect call makeQsAndPortFunc");
         return makeQsAndPost(from);

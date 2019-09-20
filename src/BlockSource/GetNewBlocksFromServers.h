@@ -26,7 +26,7 @@ public:
     
 public:
     
-    GetNewBlocksFromServer(size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, const P2P &p2p, bool isCompress)
+    GetNewBlocksFromServer(size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, P2P &p2p, bool isCompress)
         : maxAdvancedLoadBlocks(maxAdvancedLoadBlocks)
         , countBlocksInBatch(countBlocksInBatch)
         , p2p(p2p)
@@ -35,7 +35,7 @@ public:
         
     LastBlockResponse getLastBlock() const;
         
-    MinimumBlockHeader getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers) const;
+    MinimumBlockHeader getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers);
     
     MinimumBlockHeader getBlockHeaderWithoutAdvanceLoad(size_t blockNum, const std::string &server) const;
     
@@ -51,7 +51,7 @@ private:
     
     const size_t countBlocksInBatch;
     
-    const P2P &p2p;
+    P2P &p2p;
     
     const bool isCompress;
     

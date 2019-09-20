@@ -26,9 +26,9 @@ public:
      */
     void broadcast(const std::string &qs, const std::string &postData, const std::string &header, const BroadcastResult &callback) const override;
     
-    std::string request(size_t responseSize, bool isPrecisionSize, const MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const override;
+    std::string request(size_t responseSize, bool isPrecisionSize, const MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) override;
     
-    std::vector<std::string> requests(size_t countRequests, const MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const override;
+    std::vector<std::string> requests(size_t countRequests, const MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) override;
     
     std::string runOneRequest(const std::string &server, const std::string &qs, const std::string &postData, const std::string &header) const override;
    
@@ -40,7 +40,7 @@ private:
     
     std::vector<std::pair<std::reference_wrapper<const P2P_Ips::Server>, std::reference_wrapper<const common::CurlInstance>>> getServersList(const std::vector<Server> &srvrs, size_t countSegments) const;
     
-    std::vector<std::string> requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const;
+    std::vector<std::string> requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers);
     
 private:
     

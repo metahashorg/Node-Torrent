@@ -14,9 +14,7 @@
 using namespace common;
 
 namespace torrent_node_lib {
-
-size_t P2P::taskId = 0;
-    
+   
 std::vector<Segment> P2P::makeSegments(size_t countSegments, size_t size, size_t minSize) {
     const size_t step = std::min(size, std::max(size / countSegments, minSize));
     CHECK(step != 0, "step == 0");

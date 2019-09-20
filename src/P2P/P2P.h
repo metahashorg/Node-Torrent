@@ -13,6 +13,7 @@
 #include "QueueP2P.h"
 
 #include "P2PStructs.h"
+#include "P2PThread.h"
 
 namespace common {
 struct CurlInstance;
@@ -76,9 +77,9 @@ public:
      */
     virtual void broadcast(const std::string &qs, const std::string &postData, const std::string &header, const BroadcastResult &callback) const = 0;
     
-    virtual std::string request(size_t responseSize, bool isPrecisionSize, const MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const = 0;
+    virtual std::string request(size_t responseSize, bool isPrecisionSize, const MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) = 0;
     
-    virtual std::vector<std::string> requests(size_t countRequests, const MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const = 0;
+    virtual std::vector<std::string> requests(size_t countRequests, const MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) = 0;
     
     virtual std::string runOneRequest(const std::string &server, const std::string &qs, const std::string &postData, const std::string &header) const = 0;
     
@@ -100,13 +101,13 @@ protected:
     
     static std::string request(const common::CurlInstance &curl, const std::string &qs, const std::string &postData, const std::string &header, const std::string &server);
     
-    static bool process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse);
+    bool process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse);
     
     static SendAllResult process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::string &qs, const std::string &post, const std::string &header, const RequestFunctionSimple &requestFunction);
     
 private:
     
-    static size_t taskId;
+    size_t taskId = 1;
     
 };
 

@@ -78,7 +78,7 @@ void GetNewBlocksFromServer::clearAdvanced() {
     advancedLoadsBlocksDumps.clear();
 }
 
-MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers) const {
+MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers) {
     const auto foundBlock = std::find_if(advancedLoadsBlocksHeaders.begin(), advancedLoadsBlocksHeaders.end(), [blockNum](const auto &pair) {
         return pair.first == blockNum;
     });
