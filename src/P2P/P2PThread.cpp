@@ -31,48 +31,52 @@ P2PThread::~P2PThread() {
 void P2PThread::work() {
     try {
         while (true) {
-            std::unique_lock<std::mutex> lock(mut);
-            const size_t currId = taskNumber;
-            const std::string server = currentServer;
-            const ReferenseWrapperSlave<P2PReferences> referenceWrapper = *this->referencesWrapper;
-            lock.unlock();
-            
-            QueueP2PElement element;
-            const bool isClosed = !queue.getElement(element, [&server](const Segment &segment, const std::set<std::string> &servers) {
-                return servers.find(server) == servers.end();
-            }, server, currId);
-            if (isClosed) {
-                std::unique_lock<std::mutex> lock2(mut);
-                conditionWait(cond, lock2, [currId, this]{ // TODO удалять curl
-                    const auto taskNumberChanged = [currId, this]{
-                        return currId != this->taskNumber;
-                    };
-                    return taskNumberChanged() || stopped;
-                });
-                if (stopped) {
-                    break;
-                } else {
+            try {
+                std::unique_lock<std::mutex> lock(mut);
+                const size_t currId = taskNumber;
+                const std::string server = currentServer;
+                const ReferenseWrapperSlave<P2PReferences> referenceWrapper = *this->referencesWrapper;
+                const size_t countUniqueSv = this->countUniqueServers;
+                lock.unlock();
+                
+                QueueP2PElement element;
+                const bool isClosed = !queue.getElement(element, [&server](const Segment &segment, const std::set<std::string> &servers) {
+                    return servers.find(server) == servers.end();
+                }, server, currId);
+                if (isClosed) {
+                    std::unique_lock<std::mutex> lock2(mut);
+                    conditionWait(cond, lock2, [currId, this]{ // TODO удалять curl
+                        const auto taskNumberChanged = [currId, this]{
+                            return currId != this->taskNumber;
+                        };
+                        return taskNumberChanged() || stopped;
+                    });
+                    if (stopped) {
+                        break;
+                    } else {
+                        continue;
+                    }
+                }
+                
+                const std::optional<Segment> segment = element.getSegment();
+                if (!segment.has_value()) {
                     continue;
                 }
-            }
-            
-            const std::optional<Segment> segment = element.getSegment();
-            if (!segment.has_value()) {
-                continue;
-            }
-            
-            const auto &[qs, post] = referenceWrapper->get()->makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
-            try {
-                const std::string response = P2P::request(curl, qs, post, "", server);
-                referenceWrapper->get()->processResponse(response, *segment);
-                queue.removeElement(element);
-            } catch (const exception &e) {
-                LOGWARN << "Error " << e << " " << server;
-                const size_t countErrors = queue.errorElement(element, server);
-                if (countErrors >= countUniqueServers) {
-                    queue.removeElementError(element);
+                
+                const auto &[qs, post] = referenceWrapper->get()->makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
+                try {
+                    const std::string response = P2P::request(curl, qs, post, "", server);
+                    referenceWrapper->get()->processResponse(response, *segment);
+                    queue.removeElement(element);
+                } catch (const exception &e) {
+                    LOGWARN << "Error " << e << " " << server;
+                    const size_t countErrors = queue.errorElement(element, server);
+                    if (countErrors >= countUniqueSv) {
+                        queue.removeElementError(element);
+                    }
                 }
-                break;
+            } catch (const DestroyedException&) {
+                // empty
             }
             
             checkStopSignal();

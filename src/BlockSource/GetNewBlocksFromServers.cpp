@@ -115,6 +115,14 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
             return r;
         }
         
+        if (doc["result"].IsArray()) {
+            const auto &resultJson = doc["result"].GetArray();
+            if (resultJson.Empty()) {
+                r.error = "Not all blocks";
+                return r;
+            }
+        }
+        
         r.response = result;
         return r;
     }, servers);

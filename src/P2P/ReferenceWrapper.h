@@ -43,6 +43,9 @@ public:
     }
     
     const T* get() const {
+        if (isDestroyed) {
+            throw DestroyedException();
+        }
         return &t;
     }
     

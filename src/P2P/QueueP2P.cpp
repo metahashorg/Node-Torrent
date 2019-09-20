@@ -28,12 +28,12 @@ void QueueP2P::addElement(const Segment &segment) {
 bool QueueP2P::getElement(QueueP2PElement &element, const std::function<bool(const Segment &segment, const std::set<std::string> &servers)> &predicate, const std::string &currentServer, size_t taskId) {
     std::unique_lock<std::mutex> lock(mut);
     CHECK(taskId <= this->taskId, "Ups");
-    if (taskId != this->taskId) {
-        return false;
-    }
     typename std::list<std::shared_ptr<QueueElement>>::reverse_iterator it;
-    conditionWait(cond_pop, lock, [this, &it, &predicate]{ 
+    conditionWait(cond_pop, lock, [this, &it, &predicate, taskId]{ 
         if (isStopped) {
+            return true;
+        }
+        if (taskId != this->taskId) {
             return true;
         }
         const auto p = [&predicate](const std::shared_ptr<QueueElement> &ptr) {
@@ -42,6 +42,9 @@ bool QueueP2P::getElement(QueueP2PElement &element, const std::function<bool(con
         it = std::find_if(queue.rbegin(), queue.rend(), p);
         return it != queue.rend(); 
     });
+    if (taskId != this->taskId) {
+        return false;
+    }
     if (isStopped) {
         return false;
     }
@@ -71,7 +74,7 @@ void QueueP2P::removeElement(const QueueP2PElement &element) {
 
 void QueueP2P::removeElementError(const QueueP2PElement &element) {
     std::lock_guard<std::mutex> lock(mut);
-    removeElement(element);
+    removeElementInternal(element);
     isError = true;
 }
 

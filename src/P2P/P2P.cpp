@@ -63,7 +63,7 @@ std::string P2P::request(const CurlInstance &curl, const std::string& qs, const 
 bool P2P::process(const std::vector<ThreadDistribution> &threadsDistribution, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse) {   
     ReferenseWrapperMaster<P2PReferences> referenceWrapper(P2PReferences(makeQsAndPost, processResponse));
     
-    const size_t countUniqueServer = countUnique(threadsDistribution, [](const auto &first, const auto &second) {
+    const size_t countUniqueServer = countUnique(threadsDistribution, [](const ThreadDistribution &first, const ThreadDistribution &second) {
         return first.server < second.server;
     });
     
