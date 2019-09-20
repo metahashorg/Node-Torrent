@@ -18,14 +18,19 @@ std::optional<Segment> QueueP2PElement::getSegment() const {
     
 void QueueP2P::addElement(const Segment &segment) {
     std::lock_guard<std::mutex> lock(mut);
+    CHECK(!isStopped, "Already stopped");
     const auto iter = queue.insert(queue.end(), std::make_shared<QueueElement>(segment));
     iter->get()->it = iter;
     cond_pop.notify_one();
     cond_empty.notify_all();
 }
     
-bool QueueP2P::getElement(QueueP2PElement &element, const std::function<bool(const Segment &segment, const std::set<std::string> &servers)> &predicate, const std::string &currentServer) {
+bool QueueP2P::getElement(QueueP2PElement &element, const std::function<bool(const Segment &segment, const std::set<std::string> &servers)> &predicate, const std::string &currentServer, size_t taskId) {
     std::unique_lock<std::mutex> lock(mut);
+    CHECK(taskId <= this->taskId, "Ups");
+    if (taskId != this->taskId) {
+        return false;
+    }
     typename std::list<std::shared_ptr<QueueElement>>::reverse_iterator it;
     conditionWait(cond_pop, lock, [this, &it, &predicate]{ 
         if (isStopped) {
@@ -97,6 +102,25 @@ void QueueP2P::stop() {
     isError = false;
     cond_pop.notify_all();
     cond_empty.notify_all();
+}
+
+void QueueP2P::start(size_t taskId) {
+    std::lock_guard<std::mutex> lock(mut);
+    isStopped = false;
+    isError = false;
+    CHECK(taskId > this->taskId, "Incorrect sequences task");
+    this->taskId = taskId;
+    cond_pop.notify_all();
+    cond_empty.notify_all();
+}
+
+std::optional<size_t> QueueP2P::started() const {
+    std::lock_guard<std::mutex> lock(mut);
+    if (isStopped) {
+        return std::nullopt;
+    } else {
+        return taskId;
+    }
 }
 
 bool QueueP2P::error() const {

@@ -15,6 +15,8 @@ using namespace common;
 
 namespace torrent_node_lib {
 
+size_t P2P::taskId = 0;
+    
 std::vector<Segment> P2P::makeSegments(size_t countSegments, size_t size, size_t minSize) {
     const size_t step = std::min(size, std::max(size / countSegments, minSize));
     CHECK(step != 0, "step == 0");
@@ -41,17 +43,6 @@ static size_t countUnique(const std::vector<T> &elements, const F &compare) {
     });
     return std::distance(copy.begin(), endIter);
 }
-
-struct P2PReferences {
-    
-    P2PReferences(const MakeQsAndPostFunction &makeQsAndPost, const P2P::ProcessResponse &processResponse)
-        : makeQsAndPost(makeQsAndPost)
-        , processResponse(processResponse)
-    {}
-    
-    const MakeQsAndPostFunction &makeQsAndPost;
-    const P2P::ProcessResponse &processResponse;
-};
 
 std::string P2P::request(const CurlInstance &curl, const std::string& qs, const std::string& postData, const std::string& header, const std::string& server) {
     std::string url = server;
@@ -82,7 +73,7 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
                     QueueP2PElement element;
                     const bool isStopped = !blockedQueue.getElement(element, [&server](const Segment &segment, const std::set<std::string> &servers) {
                         return servers.find(server.server) == servers.end();
-                    }, server.server);
+                    }, server.server, 0);
                     if (isStopped) {
                         break;
                     }
@@ -135,6 +126,8 @@ bool P2P::process(const std::vector<std::pair<std::reference_wrapper<const Serve
     }
     
     checkStopSignal();
+    
+    taskId++;
     
     return !isError;
 }

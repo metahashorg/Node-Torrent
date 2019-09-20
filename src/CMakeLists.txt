@@ -64,6 +64,7 @@ set(LIBRARY_SOURCES
     P2P/P2P.cpp
     P2P/P2P_Ips.cpp
     P2P/QueueP2P.cpp
+    P2P/P2PThread.cpp
     
     BlockSource/GetNewBlocksFromServers.cpp
     BlockSource/FileBlockSource.cpp

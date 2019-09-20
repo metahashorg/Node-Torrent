@@ -9,20 +9,10 @@
 #include <condition_variable>
 #include <functional>
 
+#include "P2PStructs.h"
+
 namespace torrent_node_lib {
-    
-struct Segment {
-    size_t fromByte;
-    size_t toByte;
-    size_t posInArray;
-    
-    Segment(size_t fromByte, size_t toByte, size_t posInArray)
-        : fromByte(fromByte)
-        , toByte(toByte)
-        , posInArray(posInArray)
-    {}
-};
-    
+
 class QueueP2PElement;
 
 class QueueP2P {
@@ -47,7 +37,7 @@ public:
     
     void addElement(const Segment &segment);
     
-    bool getElement(QueueP2PElement &element, const std::function<bool(const Segment &segment, const std::set<std::string> &servers)> &predicate, const std::string &currentServer);
+    bool getElement(QueueP2PElement &element, const std::function<bool(const Segment &segment, const std::set<std::string> &servers)> &predicate, const std::string &currentServer, size_t taskId);
     
     void removeElement(const QueueP2PElement &element);
     
@@ -56,6 +46,10 @@ public:
     size_t errorElement(QueueP2PElement &element, const std::string &server);
     
     void stop();
+    
+    void start(size_t taskId);
+    
+    std::optional<size_t> started() const;
     
     void waitEmpty() const;
     
@@ -72,12 +66,14 @@ private:
     std::condition_variable cond_pop;
     
     mutable std::condition_variable cond_empty;
-    
+        
     std::list<std::shared_ptr<QueueElement>> queue;
     
-    bool isStopped = false;
+    bool isStopped = true;
     
     bool isError = false;
+    
+    size_t taskId;
 };
 
 class QueueP2PElement {

@@ -12,6 +12,8 @@
 
 #include "QueueP2P.h"
 
+#include "P2PStructs.h"
+
 namespace common {
 struct CurlInstance;
 }
@@ -29,8 +31,6 @@ struct CurlException {
 };
 
 using BroadcastResult = std::function<void(const std::string &server, const std::string &result, const std::optional<CurlException> &exception)>;
-
-using MakeQsAndPostFunction = std::function<std::pair<std::string, std::string>(size_t fromByte, size_t toByte)>;
 
 using MakeQsAndPostFunction2 = std::function<std::pair<std::string, std::string>(size_t number)>;
 
@@ -61,8 +61,11 @@ struct SendAllResult {
 
 struct P2PReferences;
 
+class P2PThread;
+
 class P2P {   
     friend struct P2PReferences;
+    friend class P2PThread;
 public:
     
     virtual ~P2P() = default;
@@ -90,8 +93,6 @@ protected:
             : server(server)
         {}
     };
-        
-    using ProcessResponse = std::function<bool(const std::string &response, const Segment &segment)>;
     
     using RequestFunctionSimple = std::function<std::string(const std::string &qs, const std::string &post, const std::string &header, const std::string &server)>;
         
@@ -102,6 +103,10 @@ protected:
     static bool process(const std::vector<std::pair<std::reference_wrapper<const Server>, std::reference_wrapper<const common::CurlInstance>>> &requestServers, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse);
     
     static SendAllResult process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::string &qs, const std::string &post, const std::string &header, const RequestFunctionSimple &requestFunction);
+    
+private:
+    
+    static size_t taskId;
     
 };
 
