@@ -12,7 +12,7 @@ using namespace common;
 using namespace torrent_node_lib;
 
 P2P_Graph::P2P_Graph(const std::vector<std::pair<std::string, std::string>> &graphVec, const std::string &thisIp, size_t countConnections)
-    : P2P(countConnections)
+    : p2p(countConnections)
     , countConnections(countConnections)
 {
     CHECK(countConnections != 0, "Incorrect count connections: 0");
@@ -31,7 +31,7 @@ void P2P_Graph::broadcast(const std::string &qs, const std::string &postData, co
     const GraphString::Element *curServ = parent;
     while (true) {
         try {
-            const std::string response = P2P::request(curlBroadcast, qs, postData, header, curServ->getElement());
+            const std::string response = P2P_Impl::request(curlBroadcast, qs, postData, header, curServ->getElement());
             callback(curServ->getElement(), response, {});
             break;
         } catch (const exception &e) {
@@ -50,16 +50,16 @@ void P2P_Graph::broadcast(const std::string &qs, const std::string &postData, co
 }
 
 std::string P2P_Graph::runOneRequest(const std::string& server, const std::string& qs, const std::string& postData, const std::string& header) const {
-    return P2P::request(curlBroadcast, qs, postData, header, server);
+    return P2P_Impl::request(curlBroadcast, qs, postData, header, server);
 }
 
-size_t P2P_Graph::getMaxServersCount(const Server &srvr) const {
+size_t P2P_Graph::getMaxServersCount(const std::string &srvr) const {
     return countConnections;
 }
 
-std::vector<P2P::ThreadDistribution> P2P_Graph::getServersList(const Server &server, size_t countSegments) const {
-    std::vector<P2P::ThreadDistribution> result;
-    result.emplace_back(0, std::min(countConnections, countSegments), server.server);
+std::vector<P2P_Impl::ThreadDistribution> P2P_Graph::getServersList(const std::string &server, size_t countSegments) const {
+    std::vector<P2P_Impl::ThreadDistribution> result;
+    result.emplace_back(0, std::min(countConnections, countSegments), server);
     return result;
 }
 
@@ -69,7 +69,7 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     const bool isMultitplyRequests = minResponseSize == 1;
         
     CHECK(hintsServers.size() == 1, "Incorrect hint servers");
-    const Server server(hintsServers[0]); // Этот объект не должен пропасть до конца действия процедуры, так как на него берется ссылка
+    const std::string server(hintsServers[0]); // Этот объект не должен пропасть до конца действия процедуры, так как на него берется ссылка
     
     const size_t maxServers = getMaxServersCount(server);
     
@@ -95,8 +95,8 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
         }
     };
     
-    const std::vector<Segment> segments = P2P::makeSegments(countSegments, responseSize, minResponseSize);
-    const bool isSuccess = P2P::process(requestServers, segments, makeQsAndPost, processResponse);
+    const std::vector<Segment> segments = P2P_Impl::makeSegments(countSegments, responseSize, minResponseSize);
+    const bool isSuccess = p2p.process(requestServers, segments, makeQsAndPost, processResponse);
     CHECK(isSuccess, "dont run request");
         
     return answers;
@@ -132,14 +132,14 @@ std::vector<std::string> P2P_Graph::requests(size_t countRequests, const MakeQsA
 SendAllResult P2P_Graph::requestAll(const std::string &qs, const std::string &postData, const std::string &header, const std::set<std::string> &additionalServers) const {
     const auto &mainElementsGraph = graph.getAllElements();
     //const std::vector<Server> mainServers(mainElementsGraph.begin(), mainElementsGraph.end());
-    const std::vector<Server> otherServers(additionalServers.begin(), additionalServers.end());
-    std::vector<std::reference_wrapper<const Server>> allServers;
+    const std::vector<std::string> otherServers(additionalServers.begin(), additionalServers.end());
+    std::vector<std::reference_wrapper<const std::string>> allServers;
     //allServers.insert(allServers.end(), mainServers.begin(), mainServers.end());
     allServers.insert(allServers.end(), otherServers.begin(), otherServers.end());
     
     const auto requestFunction = [this](const std::string &qs, const std::string &post, const std::string &header, const std::string &server) -> std::string {
-        return P2P::request(Curl::getInstance(), qs, post, header, server);
+        return P2P_Impl::request(Curl::getInstance(), qs, post, header, server);
     };
     
-    return P2P::process(allServers, qs, postData, header, requestFunction);
+    return P2P_Impl::process(allServers, qs, postData, header, requestFunction);
 }

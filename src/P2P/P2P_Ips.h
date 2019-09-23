@@ -2,6 +2,7 @@
 #define P2P_IPS_H_
 
 #include "P2P.h"
+#include "P2P_Impl.h"
 
 #include <map>
 
@@ -36,15 +37,17 @@ public:
     
 private:
     
-    size_t getMaxServersCount(const std::vector<Server> &srvrs) const;
+    size_t getMaxServersCount(const std::vector<std::string> &srvrs) const;
     
-    std::vector<P2P::ThreadDistribution> getServersList(const std::vector<Server> &srvrs, size_t countSegments) const;
+    std::vector<P2P_Impl::ThreadDistribution> getServersList(const std::vector<std::string> &srvrs, size_t countSegments) const;
     
     std::vector<std::string> requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers);
     
 private:
     
-    std::vector<Server> servers;
+    P2P_Impl p2p;
+    
+    std::vector<std::string> servers;
     
     size_t countConnections;
     

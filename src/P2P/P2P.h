@@ -6,15 +6,10 @@
 #include <set>
 #include <functional>
 #include <optional>
-#include <deque>
-#include <mutex>
 
 #include "duration.h"
 
-#include "QueueP2P.h"
-
 #include "P2PStructs.h"
-#include "P2PThread.h"
 
 namespace common {
 struct CurlInstance;
@@ -35,8 +30,6 @@ struct CurlException {
 using BroadcastResult = std::function<void(const std::string &server, const std::string &result, const std::optional<CurlException> &exception)>;
 
 using MakeQsAndPostFunction2 = std::function<std::pair<std::string, std::string>(size_t number)>;
-
-using MakeQsAndPostFunctionSimple = std::function<std::pair<std::string, std::string>()>;
 
 struct ResponseParse {
     std::string response;
@@ -61,13 +54,7 @@ struct SendAllResult {
     std::vector<SendOneResult> results;
 };
 
-struct P2PReferences;
-
-class P2PThread;
-
 class P2P {   
-    friend struct P2PReferences;
-    friend class P2PThread;
 public:
     
     virtual ~P2P() = default;
@@ -85,52 +72,7 @@ public:
     virtual std::string runOneRequest(const std::string &server, const std::string &qs, const std::string &postData, const std::string &header) const = 0;
     
     virtual SendAllResult requestAll(const std::string &qs, const std::string &postData, const std::string &header, const std::set<std::string> &additionalServers) const = 0;
-    
-protected:
-    
-    P2P(size_t countThreads);
-    
-protected:
-    
-    struct Server {
-        std::string server;
-        
-        Server(const std::string &server)
-            : server(server)
-        {}
-    };
-    
-    struct ThreadDistribution {
-        size_t from;
-        size_t to;
-        std::string server;
-        
-        ThreadDistribution(size_t from, size_t to, const std::string &server)
-            : from(from)
-            , to(to)
-            , server(server)
-        {}
-    };
-    
-protected:
-    
-    using RequestFunctionSimple = std::function<std::string(const std::string &qs, const std::string &post, const std::string &header, const std::string &server)>;
-        
-    static std::vector<Segment> makeSegments(size_t countSegments, size_t size, size_t minSize);
-    
-    static std::string request(const common::CurlInstance &curl, const std::string &qs, const std::string &postData, const std::string &header, const std::string &server);
-    
-    bool process(const std::vector<ThreadDistribution> &threadsDistribution, const std::vector<Segment> &segments, const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse);
-    
-    static SendAllResult process(const std::vector<std::reference_wrapper<const Server>> &requestServers, const std::string &qs, const std::string &post, const std::string &header, const RequestFunctionSimple &requestFunction);
-    
-private:
-    
-    size_t taskId = 1;
-    
-    QueueP2P blockedQueue; // queue должна стоять выше по стеку чем threads, чтобы уничтожится после всех
-        
-    std::deque<P2PThread> threads;
+
 };
 
 }

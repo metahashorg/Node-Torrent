@@ -8,7 +8,7 @@
 #include "duration.h"
 
 #include "QueueP2P.h"
-#include "P2P.h"
+#include "P2P_Impl.h"
 
 using namespace common;
 
@@ -76,7 +76,7 @@ void P2PThread::work() {
                     if (curl == nullptr) {
                         curl = std::make_unique<CurlInstance>(Curl::getInstance());
                     }
-                    const std::string response = P2P::request(*curl, qs, post, "", server);
+                    const std::string response = P2P_Impl::request(*curl, qs, post, "", server);
                     referenceWrapper->get()->processResponse(response, *segment);
                     queue.removeElement(element);
                 } catch (const exception &e) {

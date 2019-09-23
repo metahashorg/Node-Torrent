@@ -3,6 +3,8 @@
 
 #include "P2P.h"
 
+#include "P2P_Impl.h"
+
 #include <vector>
 
 #include "utils/Graph.h"
@@ -34,13 +36,15 @@ public:
     
 private:
     
-    size_t getMaxServersCount(const Server &srvr) const;
+    size_t getMaxServersCount(const std::string &srvr) const;
     
-    std::vector<P2P::ThreadDistribution> getServersList(const Server &server, size_t countSegments) const;
+    std::vector<torrent_node_lib::P2P_Impl::ThreadDistribution> getServersList(const std::string &server, size_t countSegments) const;
         
     std::vector<std::string> requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers); 
     
 private:
+    
+    torrent_node_lib::P2P_Impl p2p;
     
     GraphString graph;
     
