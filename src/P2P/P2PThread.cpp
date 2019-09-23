@@ -70,14 +70,14 @@ void P2PThread::work() {
                 if (!segment.has_value()) {
                     continue;
                 }
-                
-                const auto &[qs, post] = referenceWrapper->get()->makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
+
+                const auto &[qs, post] = referenceWrapper->get().makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
                 try {
                     if (curl == nullptr) {
                         curl = std::make_unique<CurlInstance>(Curl::getInstance());
                     }
                     const std::string response = P2P_Impl::request(*curl, qs, post, "", server);
-                    referenceWrapper->get()->processResponse(response, *segment);
+                    referenceWrapper->get().processResponse(response, *segment);
                     queue.removeElement(element);
                 } catch (const exception &e) {
                     LOGWARN << "Error " << e << " " << server;

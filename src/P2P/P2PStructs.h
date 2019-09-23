@@ -4,6 +4,8 @@
 #include <functional>
 #include <string>
 
+#include "OopUtils.h"
+
 namespace torrent_node_lib {
     
 struct Segment {
@@ -23,7 +25,7 @@ using MakeQsAndPostFunction = std::function<std::pair<std::string, std::string>(
     
 using ProcessResponse = std::function<bool(const std::string &response, const Segment &segment)>;
 
-struct P2PReferences {
+struct P2PReferences: public common::no_copyable, public common::no_moveable {
     
     P2PReferences(const MakeQsAndPostFunction &makeQsAndPost, const ProcessResponse &processResponse)
         : makeQsAndPost(makeQsAndPost)

@@ -22,31 +22,18 @@ class ReferenceWrapperPtr {
     template<class T2> friend class ReferenseWrapperMaster;
 public:
     
-    ReferenceWrapperPtr(T &&t)
-        : t(std::move(t))
+    template<typename... Args>
+    ReferenceWrapperPtr(Args&& ...t)
+        : t(std::forward<Args>(t)...)
     {}
     
 public:
-       
-    const T* operator->() const {
-        if (isDestroyed) {
-            throw DestroyedException();
-        }
-        return &t;
-    }
     
-    const T* operator*() const {
+    const T& get() const {
         if (isDestroyed) {
             throw DestroyedException();
         }
-        return &t;
-    }
-    
-    const T* get() const {
-        if (isDestroyed) {
-            throw DestroyedException();
-        }
-        return &t;
+        return t;
     }
     
 protected:
@@ -95,11 +82,18 @@ private:
 
 template<class T>
 class ReferenseWrapperMaster: public common::no_copyable, public common::no_moveable {
+private:
+    
+    ReferenseWrapperMaster(safe_ptr<T> ptr)
+        : ptr(std::move(ptr))
+    {}
+    
 public:
     
-    ReferenseWrapperMaster(T &&t) 
-        : ptr(safe_ptr<T>::make_safe(std::move(t)))
-    {}
+    template<typename... Args>
+    static ReferenseWrapperMaster make_wrapper(Args&& ...t) {
+        return ReferenseWrapperMaster(safe_ptr<T>::make_safe(std::forward<Args>(t)...));
+    }
     
     ~ReferenseWrapperMaster() {
         ptr->destroy();
