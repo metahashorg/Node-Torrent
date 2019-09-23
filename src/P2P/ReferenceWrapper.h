@@ -19,12 +19,20 @@ template<class T>
 class NonCopyReference: public common::no_copyable, public common::no_moveable {
 public:
     
-    NonCopyReference(const T &t) 
+    NonCopyReference(T &t) 
         : t(t)
     {}
     
+    T& getUnwrap() {
+        return t;
+    }
+    
     const T& getUnwrap() const {
         return t;
+    }
+    
+    T* operator->() && {
+        return &t;
     }
     
     const T* operator->() const && {
@@ -39,7 +47,7 @@ public:
     
 private:
     
-    const T &t;
+    T &t;
 };
 
 template<class T>
@@ -57,11 +65,11 @@ public:
     
 public:
     
-    NonCopyReference<T> get() const {
+    NonCopyReference<const T> get() const {
         if (isDestroyed) {
             throw DestroyedException();
         }
-        return NonCopyReference<T>(t);
+        return NonCopyReference<const T>(t);
     }
     
 protected:

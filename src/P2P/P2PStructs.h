@@ -34,8 +34,8 @@ struct P2PReferences: public common::no_copyable, public common::no_moveable {
         , processResponse(processResponse)
     {}
     
-    NonCopyReference<MakeQsAndPostFunction> makeQsAndPost;
-    NonCopyReference<ProcessResponse> processResponse;
+    NonCopyReference<const MakeQsAndPostFunction> makeQsAndPost;
+    NonCopyReference<const ProcessResponse> processResponse;
 };
 
 } // namespace torrent_node_lib
