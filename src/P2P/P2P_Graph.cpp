@@ -80,7 +80,7 @@ std::vector<std::string> P2P_Graph::requestImpl(size_t responseSize, size_t minR
     std::mutex answersMut;
     
     const ProcessResponse processResponse = [&answers, &answersMut, &header, &responseParse, isPrecisionSize](const std::string &response, const Segment &segment) {
-        const ResponseParse parsed = responseParse(response);
+        const ResponseParse parsed = responseParse(response, segment.fromByte, segment.toByte);
         CHECK(!parsed.error.has_value(), parsed.error.value());
         if (isPrecisionSize) {
             CHECK(parsed.response.size() == segment.toByte - segment.fromByte, "Incorrect response size");

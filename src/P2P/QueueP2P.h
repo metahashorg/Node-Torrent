@@ -35,6 +35,10 @@ private:
     
 public:
     
+    ~QueueP2P();
+    
+public:
+    
     void addElement(const Segment &segment);
     
     bool getElement(QueueP2PElement &element, const std::function<bool(const Segment &segment, const std::set<std::string> &servers)> &predicate, const std::string &currentServer, size_t taskId);

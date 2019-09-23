@@ -16,6 +16,10 @@ std::optional<Segment> QueueP2PElement::getSegment() const {
     }
 }
     
+QueueP2P::~QueueP2P() {
+    stop();
+}
+    
 void QueueP2P::addElement(const Segment &segment) {
     std::lock_guard<std::mutex> lock(mut);
     CHECK(!isStopped, "Already stopped");
@@ -43,6 +47,7 @@ bool QueueP2P::getElement(QueueP2PElement &element, const std::function<bool(con
         return it != queue.rend(); 
     });
     if (taskId != this->taskId) {
+        cond_pop.notify_one();
         return false;
     }
     if (isStopped) {

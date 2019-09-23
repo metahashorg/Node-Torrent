@@ -87,13 +87,19 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
     }
     
     advancedLoadsBlocksHeaders.clear();
-    
+        
     const size_t countBlocks = std::min(maxBlockNum - blockNum + 1, maxAdvancedLoadBlocks);
     const size_t countParts = (countBlocks + countBlocksInBatch - 1) / countBlocksInBatch;
     CHECK(countBlocks != 0 && countParts != 0, "Incorrect count blocks");
-    const auto makeQsAndPost = [blockNum, countBlocksInBatch=this->countBlocksInBatch, maxCountBlocks=countBlocks](size_t number) {
+    
+    const auto calcBlockIndexes = [blockNum, countBlocksInBatch=this->countBlocksInBatch, maxCountBlocks=countBlocks](size_t number) {
         const size_t beginBlock = blockNum + number * countBlocksInBatch;
         const size_t countBlocks = std::min(countBlocksInBatch, maxCountBlocks - number * countBlocksInBatch);
+        return std::make_pair(beginBlock, countBlocks);
+    };
+    
+    const auto makeQsAndPost = [blockNum, calcBlockIndexes](size_t number) {
+        const auto [beginBlock, countBlocks] = calcBlockIndexes(number);
         if (countBlocks != 1) {
             return std::make_pair("get-blocks", "{\"id\":1,\"params\":{\"beginBlock\": " + std::to_string(beginBlock) + ", \"countBlocks\": " + std::to_string(countBlocks) + ", \"type\": \"forP2P\", \"direction\": \"forward\"}}");
         } else {
@@ -101,8 +107,10 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
         }
     };
     
-    const std::vector<std::string> answer = p2p.requests(countParts, makeQsAndPost, "", [](const std::string &result) {
+    const std::vector<std::string> answer = p2p.requests(countParts, makeQsAndPost, "", [calcBlockIndexes](const std::string &result, size_t fromIndex, size_t toIndex) {
         ResponseParse r;
+        
+        const auto [beginBlock, countBlocks] = calcBlockIndexes(fromIndex);
         
         rapidjson::Document doc;
         const rapidjson::ParseResult pr = doc.Parse(result.c_str());
@@ -117,7 +125,7 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
         
         if (doc["result"].IsArray()) {
             const auto &resultJson = doc["result"].GetArray();
-            if (resultJson.Empty()) {
+            if (resultJson.Size() != countBlocks) {
                 r.error = "Not all blocks";
                 return r;
             }
@@ -167,7 +175,7 @@ std::pair<std::string, std::string> GetNewBlocksFromServer::makeRequestForDumpBl
     return std::make_pair(QS, post);
 }
 
-ResponseParse GetNewBlocksFromServer::parseDumpBlockResponse(const std::string& result) {
+ResponseParse GetNewBlocksFromServer::parseDumpBlockResponse(const std::string& result, size_t fromByte, size_t toByte) {
     ResponseParse parsed;
     if (result.empty()) {
         return parsed;

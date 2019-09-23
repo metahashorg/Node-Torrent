@@ -43,7 +43,7 @@ struct ResponseParse {
     std::optional<std::string> error;
 };
 
-using ResponseParseFunction = std::function<ResponseParse(const std::string &result)>;
+using ResponseParseFunction = std::function<ResponseParse(const std::string &result, size_t fromIndex, size_t toIndex)>;
 
 struct SendAllResult {
     struct SendOneResult {
