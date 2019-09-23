@@ -55,20 +55,16 @@ size_t P2P_Ips::getMaxServersCount(const std::vector<std::string> &srvrs) const 
 std::vector<P2P_Impl::ThreadDistribution> P2P_Ips::getServersList(const std::vector<std::string> &srves, size_t countSegments) const {
     std::vector<P2P_Impl::ThreadDistribution> result;
     
-    // TODO сейчас эта функция не принимает в рассчет предыдущее распределение серверов по потокам, что нехорошо
-    
     const size_t currConnections = std::min((countSegments + srves.size() - 1) / srves.size(), countConnections);
     
-    size_t curlIndex = 0;
-    for (size_t i = 0; i < currConnections; i++) {
-        for (const std::string &server: srves) {
-            result.emplace_back(curlIndex, curlIndex + 1, server); // TODO оптимизировать
-            curlIndex++;
-        }
-        
-        if (curlIndex >= countSegments) {
-            break;
-        }
+    const size_t maxConnectionsForServer = countConnections;
+    CHECK(currConnections <= maxConnectionsForServer, "Ups");
+    
+    for (const std::string &srv: srves) {
+        const auto found = std::find(servers.begin(), servers.end(), srv);
+        CHECK(found != servers.end(), "where did this come from?");
+        const size_t index = std::distance(servers.begin(), found);
+        result.emplace_back(index * maxConnectionsForServer, index * maxConnectionsForServer + currConnections, srv);
     }
     return result;
 }
