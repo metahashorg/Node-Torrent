@@ -5,6 +5,7 @@
 #include "stopProgram.h"
 #include "check.h"
 #include "log.h"
+#include "duration.h"
 
 #include "QueueP2P.h"
 #include "P2P.h"
@@ -13,8 +14,8 @@ using namespace common;
 
 namespace torrent_node_lib {
     
-P2PThread::P2PThread(common::CurlInstance &curl, QueueP2P &queue) 
-    : curl(curl)
+P2PThread::P2PThread(QueueP2P &queue) 
+    : curl(std::make_unique<CurlInstance>(Curl::getInstance()))
     , queue(queue)
 {}
 
@@ -45,12 +46,19 @@ void P2PThread::work() {
                 }, server, currId);
                 if (isClosed) {
                     std::unique_lock<std::mutex> lock2(mut);
-                    conditionWait(cond, lock2, [currId, this]{ // TODO удалять curl
-                        const auto taskNumberChanged = [currId, this]{
-                            return currId != this->taskNumber;
-                        };
-                        return taskNumberChanged() || stopped;
-                    });
+                    Timer timerWait;
+                    bool isTimeout = true;
+                    while (isTimeout) {
+                        isTimeout = !conditionWaitTimeout(cond, lock2, [currId, this]{
+                            const auto taskNumberChanged = [currId, this]{
+                                return currId != this->taskNumber;
+                            };
+                            return taskNumberChanged() || stopped;
+                        });
+                        if (isTimeout && timerWait.count() >= 30s) {
+                            curl = nullptr;
+                        }
+                    }
                     if (stopped) {
                         break;
                     } else {
@@ -65,7 +73,10 @@ void P2PThread::work() {
                 
                 const auto &[qs, post] = referenceWrapper->get()->makeQsAndPost(segment->fromByte, segment->toByte); // TODO понять как сделать красивую стрелочку
                 try {
-                    const std::string response = P2P::request(curl, qs, post, "", server);
+                    if (curl == nullptr) {
+                        curl = std::make_unique<CurlInstance>(Curl::getInstance());
+                    }
+                    const std::string response = P2P::request(*curl, qs, post, "", server);
                     referenceWrapper->get()->processResponse(response, *segment);
                     queue.removeElement(element);
                 } catch (const exception &e) {

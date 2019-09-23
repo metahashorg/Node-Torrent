@@ -129,9 +129,7 @@ private:
     size_t taskId = 1;
     
     QueueP2P blockedQueue; // queue должна стоять выше по стеку чем threads, чтобы уничтожится после всех
-    
-    std::deque<common::CurlInstance> curls;
-    
+        
     std::deque<P2PThread> threads;
 };
 

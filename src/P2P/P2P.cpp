@@ -44,8 +44,7 @@ static size_t countUnique(const std::vector<T> &elements, const F &compare) {
 
 P2P::P2P(size_t countThreads) {
     for (size_t i = 0; i < countThreads; i++) {
-        curls.emplace_back(Curl::getInstance());
-        threads.emplace_back(curls.back(), blockedQueue);
+        threads.emplace_back(blockedQueue);
     }
 }
 

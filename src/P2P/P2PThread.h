@@ -22,7 +22,7 @@ class QueueP2P;
 class P2PThread: public common::no_copyable, public common::no_moveable {
 public:
     
-    P2PThread(common::CurlInstance &curl, QueueP2P &queue);
+    P2PThread(QueueP2P &queue);
     
     ~P2PThread();
     
@@ -38,7 +38,7 @@ private:
     
     std::thread th;
     
-    common::CurlInstance &curl;
+    std::unique_ptr<common::CurlInstance> curl;
     
     QueueP2P &queue;
     
