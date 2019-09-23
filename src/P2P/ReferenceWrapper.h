@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <shared_mutex>
+#include <functional>
 
 #include "OopUtils.h"
 
@@ -12,6 +13,33 @@ namespace torrent_node_lib {
 
 class DestroyedException {
     
+};
+
+template<class T>
+class NonCopyReference: public common::no_copyable, public common::no_moveable {
+public:
+    
+    NonCopyReference(const T &t) 
+        : t(t)
+    {}
+    
+    const T& getUnwrap() const {
+        return t;
+    }
+    
+    const T* operator->() const && {
+        return &t;
+    }
+    
+    template<typename... Args>
+    typename std::result_of<T&(Args&&...)>::type
+    operator()(Args&&... args) const {
+        return std::invoke(getUnwrap(), std::forward<Args>(args)...);
+    }
+    
+private:
+    
+    const T &t;
 };
 
 template<class T>
@@ -29,11 +57,11 @@ public:
     
 public:
     
-    const T& get() const {
+    NonCopyReference<T> get() const {
         if (isDestroyed) {
             throw DestroyedException();
         }
-        return t;
+        return NonCopyReference<T>(t);
     }
     
 protected:

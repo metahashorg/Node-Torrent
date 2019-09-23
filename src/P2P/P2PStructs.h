@@ -6,6 +6,8 @@
 
 #include "OopUtils.h"
 
+#include "ReferenceWrapper.h"
+
 namespace torrent_node_lib {
     
 struct Segment {
@@ -32,8 +34,8 @@ struct P2PReferences: public common::no_copyable, public common::no_moveable {
         , processResponse(processResponse)
     {}
     
-    const MakeQsAndPostFunction &makeQsAndPost;
-    const ProcessResponse &processResponse;
+    NonCopyReference<MakeQsAndPostFunction> makeQsAndPost;
+    NonCopyReference<ProcessResponse> processResponse;
 };
 
 } // namespace torrent_node_lib
