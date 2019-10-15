@@ -131,8 +131,6 @@ private:
     
     std::optional<TransactionStatus> calcTransactionStatusDelegate(const TransactionInfo &tx, size_t blockNumber, DelegateTransactionsCache &delegateCache, Batch &batch);
     
-    [[nodiscard]] bool checkAddressToSave(const TransactionInfo &tx, const Address &address) const;
-       
     void readTransactionInFile(TransactionInfo &filePos) const;
     
     void validateStateBlock(const BlockInfo &bi) const;

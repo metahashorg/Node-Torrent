@@ -300,19 +300,6 @@ std::optional<TransactionStatus> WorkerMain::getInstantDelegateStatus(const Tran
     }
 }
 
-bool WorkerMain::checkAddressToSave(const TransactionInfo& tx, const Address& address) const {
-    if (!tx.isSaveToBd) {
-        return false;
-    }
-    if (modules[MODULE_USERS]) {
-        std::lock_guard<std::mutex> lock(usersMut);
-        if (users.find(address) == users.end()) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void WorkerMain::validateStateBlock(const BlockInfo &bi) const {
     if (!validateState) {
         return;
@@ -418,10 +405,6 @@ void WorkerMain::worker() {
                             return;
                         }
                         
-                        if (!checkAddressToSave(tx, address)) {
-                            return;
-                        }
-                        
                         if (tx.isIntStatusNodeTest()) {
                             return;
                         }
@@ -452,57 +435,53 @@ void WorkerMain::worker() {
                         }
                         
                         if (modules[MODULE_TXS]) {
-                            if (tx.isSaveToBd) {
-                                saveTransaction(tx, batch, buffer);
-                                
-                                if (txStatusDelegate.has_value()) {
-                                    saveTransactionStatus(txStatusDelegate.value(), buffer, batch, attributeTxStatusCache);
-                                }
-                                
-                                if (tx.tokenInfo.has_value()) {
-                                    if (!tx.isIntStatusNotSuccess()) {
-                                        if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
-                                            const TransactionInfo::TokenInfo::Create &createToken = std::get<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info);
-                                            
-                                            Token token;
-                                            token.type = createToken.type;
-                                            token.allValue = createToken.value;
-                                            token.beginValue = createToken.value;
-                                            token.decimals = createToken.decimals;
-                                            token.emission = createToken.emission;
-                                            token.name = createToken.name;
-                                            token.owner = createToken.owner;
-                                            token.symbol = createToken.symbol;
-                                            token.txHash = tx.hash;
-                                            
-                                            token.serialize(buffer);
-                                            batch.addToken(tx.toAddress.toBdString(), buffer);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeOwner>(tx.tokenInfo->info)) {
-                                            changeTokenOwner(tx, batch);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeEmission>(tx.tokenInfo->info)) {
-                                            changeTokenEmission(tx, batch);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
-                                            changeTokenValue(tx, batch);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::MoveTokens>(tx.tokenInfo->info)) {
-                                            // empty
-                                        } else {
-                                            throwErr("Unknown token type");
-                                        }
+                            saveTransaction(tx, batch, buffer);
+                            
+                            if (txStatusDelegate.has_value()) {
+                                saveTransactionStatus(txStatusDelegate.value(), buffer, batch, attributeTxStatusCache);
+                            }
+                            
+                            if (tx.tokenInfo.has_value()) {
+                                if (!tx.isIntStatusNotSuccess()) {
+                                    if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
+                                        const TransactionInfo::TokenInfo::Create &createToken = std::get<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info);
+                                        
+                                        Token token;
+                                        token.type = createToken.type;
+                                        token.allValue = createToken.value;
+                                        token.beginValue = createToken.value;
+                                        token.decimals = createToken.decimals;
+                                        token.emission = createToken.emission;
+                                        token.name = createToken.name;
+                                        token.owner = createToken.owner;
+                                        token.symbol = createToken.symbol;
+                                        token.txHash = tx.hash;
+                                        
+                                        token.serialize(buffer);
+                                        batch.addToken(tx.toAddress.toBdString(), buffer);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeOwner>(tx.tokenInfo->info)) {
+                                        changeTokenOwner(tx, batch);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeEmission>(tx.tokenInfo->info)) {
+                                        changeTokenEmission(tx, batch);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                        changeTokenValue(tx, batch);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::MoveTokens>(tx.tokenInfo->info)) {
+                                        // empty
+                                    } else {
+                                        throwErr("Unknown token type");
                                     }
                                 }
                             }
                         }
                         
                         if (modules[MODULE_BALANCE]) {
-                            if (tx.isSaveToBd) {
-                                if (tx.tokenInfo.has_value()) {
-                                    if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
-                                        saveAddressBalanceCreateToken(tx, balances);
-                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
-                                        saveAddressBalanceAddToken(tx, balances);
-                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
-                                        saveAddressBalanceMoveToken(tx, balances);
-                                    }
+                            if (tx.tokenInfo.has_value()) {
+                                if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
+                                    saveAddressBalanceCreateToken(tx, balances);
+                                } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                    saveAddressBalanceAddToken(tx, balances);
+                                } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                    saveAddressBalanceMoveToken(tx, balances);
                                 }
                             }
                         }
@@ -846,7 +825,7 @@ BalanceInfo WorkerMain::getBalance(const Address &address) const {
 }
 
 BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const {
-    CHECK(modules[MODULE_BLOCK_RAW] && !modules[MODULE_USERS], "module " + MODULE_BLOCK_RAW_STR + " not set");
+    CHECK(modules[MODULE_BLOCK_RAW], "module " + MODULE_BLOCK_RAW_STR + " not set");
     
     BlockInfo bi;
     bi.header = bh;

@@ -198,7 +198,6 @@ public:
     size_t blockNumber = 0;
     size_t blockIndex = 0;
     size_t sizeRawTx = 0;
-    bool isSaveToBd = true;
 
     bool isSignBlockTx = false;
 

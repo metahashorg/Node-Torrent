@@ -72,10 +72,6 @@ void Sync::synchronize(int countThreads) {
     impl->synchronize(countThreads);
 }
 
-void Sync::addUsers(const std::set<Address>& addresses) {
-    impl->addUsers(addresses);
-}
-
 const BlockChainReadInterface & Sync::getBlockchain() const {
     return impl->getBlockchain();
 }

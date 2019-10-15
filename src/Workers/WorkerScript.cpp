@@ -98,10 +98,6 @@ void WorkerScript::work() {
                         continue;
                     }
                     
-                    if (!tx.isSaveToBd) {
-                        continue;
-                    }
-                    
                     LOGDEBUG << "Script transaction " << toHex(tx.hash.begin(), tx.hash.end()) << " " << tx.fromAddress.calcHexString() << " " << std::string(tx.data.begin(), tx.data.end());
                     
                     TransactionStatus::V8Status status;

@@ -56,8 +56,6 @@ public:
 public:
     
     void synchronize(int countThreads);
-
-    void addUsers(const std::set<Address> &addresses);
     
     std::vector<TransactionInfo> getTxsForAddress(const Address &address, size_t from, size_t count, size_t limitTxs) const;
 
