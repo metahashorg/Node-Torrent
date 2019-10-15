@@ -77,7 +77,6 @@ FilePosition FilePosition::deserialize(const std::string& raw) {
 }
 
 void TransactionInfo::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     CHECK(blockNumber != 0, "block number not setted");
     
     filePos.serialize(buffer);
@@ -177,7 +176,6 @@ void TransactionStatus::parseVarint(const std::string &raw, size_t &fromPos, siz
 }
 
 void TransactionStatus::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     serializeInt<uint8_t>(isSuccess, buffer);
     serializeInt<size_t>(blockNumber, buffer);
     serializeString(transaction, buffer);
@@ -206,7 +204,6 @@ TransactionStatus TransactionStatus::deserialize(const std::string& raw) {
 }
 
 void Token::serialize(std::vector<char> &buffer) const {
-    buffer.clear();
     serializeString(type, buffer);
     serializeString(owner.toBdString(), buffer);
     serializeInt<unsigned int>(decimals, buffer);
@@ -239,7 +236,6 @@ Token Token::deserialize(const std::string &raw) {
 }
 
 void AddressInfo::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     CHECK(blockNumber != 0, "AddressInfo not initialized");
     
     filePos.serialize(buffer);
@@ -470,7 +466,6 @@ BalanceInfo operator+(const BalanceInfo &first, const BalanceInfo &second) {
 }
 
 void BalanceInfo::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     serializeInt<size_t>(balance.received(), buffer);
     serializeInt<size_t>(balance.spent(), buffer);
     serializeInt<size_t>(countReceived, buffer);
@@ -556,7 +551,6 @@ BalanceInfo BalanceInfo::deserialize(const std::string& raw) {
 }
 
 void CommonBalance::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     serializeInt<size_t>(money, buffer);
     serializeInt<size_t>(blockNumber, buffer);
 }

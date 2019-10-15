@@ -160,7 +160,7 @@ static void processStateBlock(const TransactionInfo &tx, const BlockInfo &bi, Ba
             const int trust = doc["trust"].GetInt();
             const std::string serverAddress = tx.toAddress.calcHexString();
             //LOGINFO << "Node trust found " << serverAddress;
-            batchStates.addNodeTestTrust(serverAddress, NodeTestTrust(bi.header.timestamp, tx.data, trust).serialize());
+            batchStates.addNodeTestTrust(serverAddress, NodeTestTrust(bi.header.timestamp, tx.data, trust));
         }
     }
 }
@@ -209,7 +209,6 @@ static void processRegisterTransaction(const TransactionInfo &tx, AllNodes &allN
 }
 
 void WorkerNodeTest::work() {
-    std::vector<char> buffer;
     while (true) {
         try {
             std::shared_ptr<BlockInfo> biSP;
@@ -256,54 +255,46 @@ void WorkerNodeTest::work() {
             if (bi.header.isStateBlock()) {
                 NodeTestDayNumber dayNumber;
                 dayNumber.dayNumber = currDay + 1;
-                batchStates.addNodeTestDayNumber(dayNumber.serialize());
+                batchStates.addNodeTestDayNumber(dayNumber);
             }
-            
-            buffer.clear();
             
             for (const auto &[address, count]: countTests) {
                 const std::string nodeStatStr = findNodeStatCount(address, currDay, leveldbNodeTest);
                 const NodeTestCount oldNodeStat = NodeTestCount::deserialize(nodeStatStr);
                 const NodeTestCount currNodeStat = count + oldNodeStat;
-                currNodeStat.serialize(buffer);
-                batchStates.addNodeTestCountForDay(address, buffer, currDay);
+                batchStates.addNodeTestCountForDay(address, currNodeStat, currDay);
             }
             for (const auto &[address, rps]: nodesRps) {
                 const std::string nodeRpsStr = findNodeStatRps(address, currDay, leveldbNodeTest);
                 const NodeRps oldNodeRps = NodeRps::deserialize(nodeRpsStr);
                 NodeRps currNodeRps = oldNodeRps;
                 currNodeRps.rps.insert(currNodeRps.rps.end(), rps.rps.begin(), rps.rps.end());
-                currNodeRps.serialize(buffer);
-                batchStates.addNodeTestRpsForDay(address, buffer, currDay);
+                batchStates.addNodeTestRpsForDay(address, currNodeRps, currDay);
             }
             if (allTests.countAll != 0) {
                 const std::string nodeStatsStr = findNodeStatsCount(currDay, leveldbNodeTest);
                 const NodeTestCount oldNodeStats = NodeTestCount::deserialize(nodeStatsStr);
                 const NodeTestCount currNodesStats = oldNodeStats + allTests;
-                currNodesStats.serialize(buffer);
-                batchStates.addNodeTestCounstForDay(buffer, currDay);
+                batchStates.addNodeTestCounstForDay(currNodesStats, currDay);
             }
             for (const auto &[serverAddress, res]: lastNodesTests) {
-                res.serialize(buffer);
-                batchStates.addNodeTestLastResults(serverAddress, buffer);
+                batchStates.addNodeTestLastResults(serverAddress, res);
             }
             if (!allNodesForDay.nodes.empty()) {
                 const std::string allNodesForDayStr = findAllTestedNodesForDay(currDay, leveldbNodeTest);
                 AllTestedNodes allNodesForDayOld = AllTestedNodes::deserialize(allNodesForDayStr);
                 allNodesForDayOld.plus(allNodesForDay);
                 allNodesForDayOld.day = currDay;
-                allNodesForDayOld.serialize(buffer);
-                batchStates.addAllTestedNodesForDay(buffer, currDay);
+                batchStates.addAllTestedNodesForDay(allNodesForDayOld, currDay);
             }
             if (!allNodes.nodes.empty()) {
                 const std::string allNodesStr = findAllNodes(leveldbNodeTest);
                 AllNodes allNodesOld = AllNodes::deserialize(allNodesStr);
                 allNodesOld.plus(allNodes);
-                allNodesOld.serialize(buffer);
-                batchStates.addAllNodes(buffer);
+                batchStates.addAllNodes(allNodesOld);
             }
                         
-            batchStates.addNodeStatBlock(NodeStatBlockInfo(bi.header.blockNumber.value(), bi.header.hash, 0).serialize());
+            batchStates.addNodeStatBlock(NodeStatBlockInfo(bi.header.blockNumber.value(), bi.header.hash, 0));
             
             addBatch(batchStates, leveldbNodeTest);
             

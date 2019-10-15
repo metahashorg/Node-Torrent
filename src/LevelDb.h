@@ -9,6 +9,10 @@
 #include <mutex>
 #include <vector>
 
+#include "BlockInfo.h"
+#include "Workers/NodeTestsBlockInfo.h"
+#include "Workers/ScriptBlockInfo.h"
+
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
 
@@ -36,31 +40,31 @@ public:
         
 public:
     
-    void addAddress(const std::string &address, const std::vector<char> &value, size_t counter);
+    void addAddress(const std::string &address, const AddressInfo &value, size_t counter);
     
-    void addTransaction(const std::string &txHash, const std::vector<char> &value);
+    void addTransaction(const std::string &txHash, const TransactionInfo &value);
     
-    void addBalance(const std::string &address, const std::vector<char> &value);
+    void addBalance(const std::string &address, const BalanceInfo &value);
     
-    void addAddressStatus(const std::string &address, const std::vector<char> &value);
+    void addAddressStatus(const std::string &address, const TransactionStatus &value);
     
-    void addTransactionStatus(const std::string &txHash, const std::vector<char> &value);
+    void addTransactionStatus(const std::string &txHash, const TransactionStatus &value);
 
-    void addToken(const std::string &address, const std::vector<char> &value);
+    void addToken(const std::string &address, const Token &value);
     
     std::optional<std::string> findToken(const std::string &address);
     
     void removeToken(const std::string &address);
     
-    void addV8State(const std::string &v8Address, const std::string &v8State);
+    void addV8State(const std::string &v8Address, const V8State &v8State);
     
     std::optional<std::string> findV8State(const std::string &v8Address) const;
     
-    void addV8Details(const std::string &v8Address, const std::string &v8Details);
+    void addV8Details(const std::string &v8Address, const V8Details &v8Details);
     
-    void addV8Code(const std::string &v8Address, const std::string &v8Code);
+    void addV8Code(const std::string &v8Address, const V8Code &v8Code);
     
-    std::vector<char> addDelegateKey(const std::string &delegatePair, const std::vector<char> &value, size_t counter);
+    std::vector<char> addDelegateKey(const std::string &delegatePair, const DelegateState &value, size_t counter);
     
     std::optional<std::string> findDelegateKey(const std::vector<char> &delegateKey) const;
     
@@ -68,46 +72,49 @@ public:
     
     std::unordered_set<std::string> getDeletedDelegate() const;
     
-    void addDelegateHelper(const std::string &delegatePair, const std::vector<char> &value);
+    void addDelegateHelper(const std::string &delegatePair, const DelegateStateHelper &value);
     
     std::optional<std::string> findDelegateHelper(const std::string &delegatePair) const;
     
-    void addNodeTestLastResults(const std::string &address, const std::vector<char> &result);
+    void addNodeTestLastResults(const std::string &address, const BestNodeTest &result);
     
-    void addNodeTestTrust(const std::string &address, const std::string &result);
+    void addNodeTestTrust(const std::string &address, const NodeTestTrust &result);
     
-    void addNodeTestCountForDay(const std::string &address, const std::vector<char> &result, size_t dayNumber);
+    void addNodeTestCountForDay(const std::string &address, const NodeTestCount &result, size_t dayNumber);
     
-    void addNodeTestCounstForDay(const std::vector<char> &result, size_t dayNumber);
+    void addNodeTestCounstForDay(const NodeTestCount &result, size_t dayNumber);
     
-    void addNodeTestDayNumber(const std::string &result);
+    void addNodeTestDayNumber(const NodeTestDayNumber &result);
     
-    void addAllTestedNodesForDay(const std::vector<char> &result, size_t dayNumber);
+    void addAllTestedNodesForDay(const AllTestedNodes &result, size_t dayNumber);
     
-    void addNodeTestRpsForDay(const std::string &address, const std::vector<char> &result, size_t dayNumber);
+    void addNodeTestRpsForDay(const std::string &address, const NodeRps &result, size_t dayNumber);
     
-    void addAllForgedSums(const std::string &result);
+    void addAllForgedSums(const ForgingSums &result);
     
-    void addBlockHeader(const std::vector<unsigned char> &blockHash, const std::string &value);
+    void addBlockHeader(const std::vector<unsigned char> &blockHash, const BlockHeader &value);
     
-    void addBlockMetadata(const std::string &value);
+    void addBlockMetadata(const BlocksMetadata &value);
     
-    void addFileMetadata(const CroppedFileName &fileName, const std::string &value);
+    void addFileMetadata(const CroppedFileName &fileName, const FileInfo &value);
     
-    void addCommonBalance(const std::vector<char> &value);
+    void addCommonBalance(const CommonBalance &value);
     
-    void addMainBlock(const std::string &value);
+    void addMainBlock(const MainBlockInfo &value);
     
-    void addNodeStatBlock(const std::string &value);
+    void addNodeStatBlock(const NodeStatBlockInfo &value);
     
-    void addScriptBlock(const std::string &value);
+    void addScriptBlock(const ScriptBlockInfo &value);
     
-    void addAllNodes(const std::vector<char> &value);
+    void addAllNodes(const AllNodes &value);
     
 private:
     
     template<class Key, class Value>
     void addKey(const Key &key, const Value &value, bool isSave=false);
+    
+    template<class Key, class Value>
+    void addKey2(const Key &key, const Value &value, bool isSave=false);
     
     std::optional<std::vector<char>> findValueInBatch(const std::vector<char> &key) const;
     
@@ -120,7 +127,9 @@ private:
     std::unordered_set<std::vector<char>> deleted;
     mutable std::mutex mut;
     
-    thread_local static std::vector<char> buffer;
+    thread_local static std::vector<char> bufferKey;
+    
+    thread_local static std::vector<char> bufferValue;
 };
 
 class LevelDb {
@@ -171,9 +180,9 @@ void saveModules(const std::string &modules, LevelDb& leveldb);
 
 std::string makeAddressStatusKey(const std::string &address, const std::string &txHash);
 
-void saveAddressStatus(const std::string &addressAndHash, const std::vector<char> &value, LevelDb &leveldb);
+void saveAddressStatus(const std::string &addressAndHash, const TransactionStatus &value, LevelDb &leveldb);
 
-void saveTransactionStatus(const std::string &txHash, const std::vector<char> &value, LevelDb &leveldb);
+void saveTransactionStatus(const std::string &txHash, const TransactionStatus &value, LevelDb &leveldb);
 
 void saveVersionDb(const std::string &value, LevelDb &leveldb);
 

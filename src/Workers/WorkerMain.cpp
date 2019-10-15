@@ -76,9 +76,7 @@ std::optional<TransactionStatus> WorkerMain::calcTransactionStatusDelegate(const
         
         if (txStatus.isSuccess) {
             const DelegateState dState(tx.delegate.value().value, tx.hash);
-            std::vector<char> serializedState;
-            dState.serialize(serializedState);
-            const auto resultKey = batch.addDelegateKey(delegateKey, serializedState, countVal.get());
+            const auto resultKey = batch.addDelegateKey(delegateKey, dState, countVal.get());
             delegateCache[delegateKey].push(resultKey);
         }
     } else {
@@ -109,9 +107,7 @@ std::optional<TransactionStatus> WorkerMain::calcTransactionStatusDelegate(const
     }
     
     const DelegateStateHelper delegateHelper(blockNumber);
-    std::vector<char> delegateHelperBuf;
-    delegateHelper.serialize(delegateHelperBuf);
-    batch.addDelegateHelper(delegateKey, delegateHelperBuf);
+    batch.addDelegateHelper(delegateKey, delegateHelper);
     
     return txStatus;
 }
@@ -133,27 +129,23 @@ static ForgingSums makeForgingSums(const BlockInfo &bi) {
     return result;
 }
 
-void WorkerMain::saveTransactionStatus(const TransactionStatus &txStatus, std::vector<char> &buffer, Batch &txsBatch, const std::string &attributeTxStatusCache) {
-    txStatus.serialize(buffer);
-    txsBatch.addTransactionStatus(txStatus.transaction, buffer);
+void WorkerMain::saveTransactionStatus(const TransactionStatus &txStatus, Batch &txsBatch, const std::string &attributeTxStatusCache) {
+    txsBatch.addTransactionStatus(txStatus.transaction, txStatus);
     caches.txsStatusCache.addValue(txStatus.transaction, attributeTxStatusCache, txStatus);
 }
 
-void WorkerMain::saveTransaction(const TransactionInfo &tx, Batch &txsBatch, std::vector<char> &buffer) {
-    tx.serialize(buffer);
-    txsBatch.addTransaction(tx.hash, buffer);
+void WorkerMain::saveTransaction(const TransactionInfo &tx, Batch &txsBatch) {
+    txsBatch.addTransaction(tx.hash, tx);
 }
 
-void WorkerMain::saveAddressTransaction(const TransactionInfo &tx, const Address &address, std::vector<char> &buffer, Batch &batch) {
+void WorkerMain::saveAddressTransaction(const TransactionInfo &tx, const Address &address, Batch &batch) {
     AddressInfo addrInfo(tx.filePos.pos, tx.filePos.fileNameRelative, tx.blockNumber, tx.blockIndex);
-    addrInfo.serialize(buffer);
-    batch.addAddress(address.toBdString(), buffer, countVal.get());
+    batch.addAddress(address.toBdString(), addrInfo, countVal.get());
 }
 
-void WorkerMain::saveAddressStatus(const TransactionStatus &status, const Address &address, std::vector<char> &buffer, Batch &batch) {
-    status.serialize(buffer);
+void WorkerMain::saveAddressStatus(const TransactionStatus &status, const Address &address, Batch &batch) {
     const std::string addressAndHash = makeAddressStatusKey(address.toBdString(), status.transaction);
-    batch.addAddressStatus(addressAndHash, buffer);
+    batch.addAddressStatus(addressAndHash, status);
 }
 
 void WorkerMain::saveAddressBalance(const TransactionInfo &tx, const Address &address, std::unordered_map<std::string, BalanceInfo> &balances, bool isForging) {
@@ -235,9 +227,7 @@ void WorkerMain::processTokenOperation(const Address &token, Batch &txsBatch, co
     
     const Token newToken = process(tokenInfo);
     
-    std::vector<char> buffer;
-    newToken.serialize(buffer);
-    txsBatch.addToken(token.toBdString(), buffer);
+    txsBatch.addToken(token.toBdString(), newToken);
 }
 
 void WorkerMain::changeTokenOwner(const TransactionInfo &tx, Batch &txsBatch) {
@@ -399,7 +389,6 @@ void WorkerMain::worker() {
             std::unordered_map<std::string, BalanceInfo> balances;
             if (bi.header.isForgingBlock() || bi.header.isSimpleBlock()) {
                 for (const TransactionInfo &tx: bi.txs) {                   
-                    static thread_local std::vector<char> buffer;
                     const auto toLeveldb = [this, &bi](const Address &address, const TransactionInfo &tx, Batch &batch, std::unordered_map<std::string, BalanceInfo> &balances, const std::optional<TransactionStatus> &statusDelegate) {
                         if (address.isInitialWallet()) {
                             return;
@@ -410,10 +399,10 @@ void WorkerMain::worker() {
                         }
                             
                         if (modules[MODULE_ADDR_TXS]) {
-                            saveAddressTransaction(tx, address, buffer, batch); // TODO Действия по заполнению кэша должны производиться только в основном потоке
+                            saveAddressTransaction(tx, address, batch); // TODO Действия по заполнению кэша должны производиться только в основном потоке
                             
                             if (statusDelegate.has_value()) {
-                                saveAddressStatus(statusDelegate.value(), address, buffer, batch);
+                                saveAddressStatus(statusDelegate.value(), address, batch);
                             }
                         }
                         
@@ -435,10 +424,10 @@ void WorkerMain::worker() {
                         }
                         
                         if (modules[MODULE_TXS]) {
-                            saveTransaction(tx, batch, buffer);
+                            saveTransaction(tx, batch);
                             
                             if (txStatusDelegate.has_value()) {
-                                saveTransactionStatus(txStatusDelegate.value(), buffer, batch, attributeTxStatusCache);
+                                saveTransactionStatus(txStatusDelegate.value(), batch, attributeTxStatusCache);
                             }
                             
                             if (tx.tokenInfo.has_value()) {
@@ -457,8 +446,7 @@ void WorkerMain::worker() {
                                         token.symbol = createToken.symbol;
                                         token.txHash = tx.hash;
                                         
-                                        token.serialize(buffer);
-                                        batch.addToken(tx.toAddress.toBdString(), buffer);
+                                        batch.addToken(tx.toAddress.toBdString(), token);
                                     } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeOwner>(tx.tokenInfo->info)) {
                                         changeTokenOwner(tx, batch);
                                     } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeEmission>(tx.tokenInfo->info)) {
@@ -504,12 +492,11 @@ void WorkerMain::worker() {
                 const std::string oldForgingSumsStr = findForgingSumsAll(leveldb);
                 const ForgingSums oldForgingSums = ForgingSums::deserialize(oldForgingSumsStr);
                 fs += oldForgingSums;
-                batch.addAllForgedSums(fs.serialize());
+                batch.addAllForgedSums(fs);
             }
             
             if (modules[MODULE_BALANCE]) {
                 parallelFor(countThreads, balances.begin(), balances.end(), [this, &batch, &bi](auto balanceIter){
-                    static thread_local std::vector<char> buffer;
                     BalanceInfo &currBalance = balanceIter.second;
                     const std::string &address = balanceIter.first;
                     const std::string oldBalanceString = findBalance(address, leveldb);
@@ -522,19 +509,16 @@ void WorkerMain::worker() {
                         if (newBalance.received() < newBalance.spent()) { 
                             LOGWARN << "Incorrect balance " + toHex(address.begin(), address.end());
                         }
-                        newBalance.serialize(buffer);
-                        batch.addBalance(address, buffer);
+                        batch.addBalance(address, newBalance);
                     }
                 });
             }
             
             if (modules[MODULE_BLOCK]) {
-                std::vector<char> commonBalanceVect;
-                commonBalance.serialize(commonBalanceVect);
-                batch.addCommonBalance(commonBalanceVect);
+                batch.addCommonBalance(commonBalance);
             }
                         
-            batch.addMainBlock(MainBlockInfo(bi.header.blockNumber.value(), bi.header.hash, countVal.load()).serialize());
+            batch.addMainBlock(MainBlockInfo(bi.header.blockNumber.value(), bi.header.hash, countVal.load()));
             
             addBatch(batch, leveldb);
             

@@ -101,13 +101,13 @@ private:
     
     BalanceInfo readBalance(const Address& address) const;
     
-    void saveTransactionStatus(const TransactionStatus &txStatus, std::vector<char> &buffer, Batch &txsBatch, const std::string &attributeTxStatusCache);
+    void saveTransactionStatus(const TransactionStatus &txStatus, Batch &txsBatch, const std::string &attributeTxStatusCache);
     
-    void saveTransaction(const TransactionInfo &tx, Batch &txsBatch, std::vector<char> &buffer);
+    void saveTransaction(const TransactionInfo &tx, Batch &txsBatch);
     
-    void saveAddressTransaction(const TransactionInfo &tx, const Address &address, std::vector<char> &buffer, Batch &batch);
+    void saveAddressTransaction(const TransactionInfo &tx, const Address &address, Batch &batch);
     
-    void saveAddressStatus(const TransactionStatus &status, const Address &address, std::vector<char> &buffer, Batch &batch);
+    void saveAddressStatus(const TransactionStatus &status, const Address &address, Batch &batch);
     
     void saveAddressBalance(const TransactionInfo &tx, const Address &address, std::unordered_map<std::string, BalanceInfo> &balances, bool isForging);
     

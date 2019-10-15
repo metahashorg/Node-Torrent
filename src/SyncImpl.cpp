@@ -108,7 +108,7 @@ void SyncImpl::saveTransactions(BlockInfo& bi, const std::string &binaryDump, bo
 void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     Batch batch;
     if (modules[MODULE_BLOCK]) {
-        batch.addBlockHeader(bi.header.hash, bi.header.serialize());
+        batch.addBlockHeader(bi.header.hash, bi.header);
     }
     
     const std::string blockMetadata = findBlockMetadata(leveldb);
@@ -124,12 +124,12 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     } else {
         newMetadata.blockHash = bi.header.hash;
     }
-    batch.addBlockMetadata(newMetadata.serialize());
+    batch.addBlockMetadata(newMetadata);
     
     FileInfo fi;
     fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
     fi.filePos.pos = bi.header.endBlockPos();
-    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi.serialize());
+    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
     
     addBatch(batch, leveldb);
 }

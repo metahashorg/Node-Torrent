@@ -82,7 +82,6 @@ void BestNodeTest::addElement(const BestNodeElement &element, size_t currDay) {
 }
 
 void BestNodeTest::serialize(std::vector<char> &buffer) const {
-    buffer.clear();
     serializeInt(tests.size(), buffer);
     for (const BestNodeElement &test: tests) {
         test.serialize(buffer);
@@ -136,7 +135,6 @@ size_t NodeTestCount::countSuccess() const {
 }
 
 void NodeTestCount::serialize(std::vector<char> &buffer) const {
-    buffer.clear();
     serializeInt(countAll, buffer);
     serializeInt(countFailure, buffer);
     serializeInt(day, buffer);
@@ -226,7 +224,6 @@ NodeTestDayNumber NodeTestDayNumber::deserialize(const std::string &raw) {
 }
 
 void AllTestedNodes::serialize(std::vector<char> &buffer) const {
-    buffer.clear();
     serializeInt(day, buffer);
     serializeInt(nodes.size(), buffer);
     for (const std::string &node: nodes) {
@@ -257,7 +254,6 @@ void AllTestedNodes::plus(const AllTestedNodes &nodes) {
 }
 
 void AllNodes::serialize(std::vector<char> &buffer) const {
-    buffer.clear();
     serializeInt(nodes.size(), buffer);
     for (const auto &[node, pair]: nodes) {
         serializeString(node, buffer);
@@ -291,7 +287,6 @@ void AllNodes::plus(const AllNodes &second) {
 }
 
 void NodeRps::serialize(std::vector<char> &buffer) const {
-    buffer.clear();
     serializeInt(rps.size(), buffer);
     for (const uint64_t &rp: rps) {
         serializeInt(rp, buffer);

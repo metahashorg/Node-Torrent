@@ -83,7 +83,9 @@ const static std::string NODES_STATS_ALL = "nsaa2_";
 const static std::string NODE_STAT_RPS_PREFIX = "nrps_";
 const static std::string FORGING_SUMS_ALL = "fsa_";
 
-thread_local std::vector<char> Batch::buffer;
+thread_local std::vector<char> Batch::bufferKey;
+
+thread_local std::vector<char> Batch::bufferValue;
 
 LevelDb::LevelDb(long unsigned int writeBufSizeMb, bool isBloomFilter, bool isChecks, std::string_view folderName, size_t lruCacheMb) {
     createDirectories(std::string(folderName));
@@ -194,6 +196,46 @@ void LevelDb::removeKey(const std::string& key) {
     CHECK(s.ok(), "dont delete key to bd. " + s.ToString());
 }
 
+template<class Key, class Value>
+void Batch::addKey(const Key &key, const Value& value, bool isSave) {
+    std::lock_guard<std::mutex> lock(mut);
+    batch.Put(leveldb::Slice(key.data(), key.size()), leveldb::Slice(value.data(), value.size()));
+    if (isSave) {
+        save.emplace(std::vector<char>(key.begin(), key.end()), std::vector<char>(value.begin(), value.end()));
+    }
+}
+
+template<class Key, class Value>
+void Batch::addKey2(const Key &key, const Value& value, bool isSave) {
+    if constexpr (std::is_invocable_r_v<void, decltype(&Value::serialize), const Value*, std::vector<char>&>) {
+        bufferValue.clear();
+        value.serialize(bufferValue);
+        addKey(key, bufferValue, isSave);
+    } else {
+        static_assert(std::is_invocable_r_v<std::string, decltype(&Value::serialize), const Value*>, "Incorrect serialize method");
+        const std::string valueStr = value.serialize();
+        addKey(key, valueStr, isSave);
+    }
+}
+
+std::optional<std::vector<char>> Batch::findValueInBatch(const std::vector<char> &key) const {
+    const auto found = save.find(key);
+    if (found == save.end()) {
+        return std::nullopt;
+    } else {
+        return found->second;
+    }
+}
+
+void Batch::removeValue(const std::vector<char> &key, bool isSave) {
+    std::lock_guard<std::mutex> lock(mut);
+    batch.Delete(leveldb::Slice(key.data(), key.size()));
+    if (isSave) {
+        save.erase(key);
+        deleted.insert(key);
+    }
+}
+
 template<typename Arg>
 static void addToBuf(std::vector<char> &buffer, const Arg& arg) {
     using ArgT = std::decay_t<Arg>;
@@ -234,40 +276,192 @@ void addBatch(Batch& batch, LevelDb& leveldb) {
     leveldb.addBatch(batch.batch);
 }
 
-void saveAddressValue(const std::string &address, const std::string &value, size_t currVal, LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, ADDRESS_PREFIX, address, ADDRESS_POSTFIX, SerializerInt(currVal));
-    leveldb.saveValue(key, value);
+void Batch::addBlockHeader(const std::vector<unsigned char>& blockHash, const BlockHeader& value) {
+    makeKey(bufferKey, BLOCK_PREFIX, blockHash);
+    addKey2(bufferKey, value);
 }
 
-void Batch::addBlockHeader(const std::vector<unsigned char>& blockHash, const std::string& value) {
-    makeKey(buffer, BLOCK_PREFIX, blockHash);
-    addKey(buffer, value);
+void Batch::addBlockMetadata(const BlocksMetadata& value) {
+    addKey2(KEY_BLOCK_METADATA, value);
 }
 
-void Batch::addBlockMetadata(const std::string& value) {
-    addKey(KEY_BLOCK_METADATA, value);
-}
-
-void Batch::addFileMetadata(const CroppedFileName &fileName, const std::string& value) {
-    makeKey(buffer, FILE_PREFIX, fileName.str());
-    addKey(buffer, value);
+void Batch::addFileMetadata(const CroppedFileName &fileName, const FileInfo& value) {
+    makeKey(bufferKey, FILE_PREFIX, fileName.str());
+    addKey2(bufferKey, value);
 }
 
 void saveModules(const std::string& modules, LevelDb& leveldb) {
     leveldb.saveValue(MODULES_KEY, modules, true);
 }
 
-void Batch::addMainBlock(const std::string &value) {
-    addKey(MAIN_BLOCK_NUMBER_PREFIX, value);
+void Batch::addMainBlock(const MainBlockInfo &value) {
+    addKey2(MAIN_BLOCK_NUMBER_PREFIX, value);
 }
 
-void Batch::addScriptBlock(const std::string &value) {
-    addKey(SCRIPT_BLOCK_NUMBER_PREFIX, value);
+void Batch::addScriptBlock(const ScriptBlockInfo &value) {
+    addKey2(SCRIPT_BLOCK_NUMBER_PREFIX, value);
 }
 
-void Batch::addAllNodes(const std::vector<char> &value) {
-    addKey(NODES_STATS_ALL, value);
+void Batch::addAllNodes(const AllNodes &value) {
+    addKey2(NODES_STATS_ALL, value);
+}
+
+void Batch::addAddress(const std::string& address, const AddressInfo& value, size_t counter) {
+    makeKey(bufferKey, ADDRESS_PREFIX, address, ADDRESS_POSTFIX, SerializerInt(counter));
+    addKey2(bufferKey, value);
+}
+
+void Batch::addAddressStatus(const std::string& addressAndHash, const TransactionStatus& value) {
+    addKey2(addressAndHash, value);
+}
+
+void Batch::addTransaction(const std::string& txHash, const TransactionInfo& value) {
+    makeKey(bufferKey, TRANSACTION_PREFIX, txHash);
+    addKey2(bufferKey, value);
+}
+
+void Batch::addTransactionStatus(const std::string& txHash, const TransactionStatus& value) {
+    makeKey(bufferKey, TRANSACTION_STATUS_PREFIX, txHash);
+    addKey2(bufferKey, value);
+}
+
+void Batch::addToken(const std::string &address, const Token &value) {
+    makeKey(bufferKey, TOKEN_PREFIX, address);
+    addKey2(bufferKey, value);
+}
+
+void Batch::addV8State(const std::string& v8Address, const V8State& v8State) {
+    makeKey(bufferKey, V8_STATE_PREFIX, v8Address);
+    addKey2(bufferKey, v8State);
+}
+
+void Batch::addV8Details(const std::string& v8Address, const V8Details& v8Details) {
+    makeKey(bufferKey, V8_DETAILS_PREFIX, v8Address);
+    addKey2(bufferKey, v8Details, true);
+}
+
+void Batch::addV8Code(const std::string& v8Address, const V8Code& v8Code) {
+    makeKey(bufferKey, V8_CODE_PREFIX, v8Address);
+    addKey2(bufferKey, v8Code, true);
+}
+
+std::optional<std::string> Batch::findV8State(const std::string &v8Address) const {
+    makeKey(bufferKey, V8_STATE_PREFIX, v8Address);
+    const auto result = findValueInBatch(bufferKey);
+    if (!result.has_value()) {
+        return std::nullopt;
+    } else {
+        return std::string(result->begin(), result->end());
+    }
+}
+
+std::optional<std::string> Batch::findToken(const std::string &address) {
+    makeKey(bufferKey, TOKEN_PREFIX, address);
+    const auto result = findValueInBatch(bufferKey);
+    if (!result.has_value()) {
+        return std::nullopt;
+    } else {
+        return std::string(result->begin(), result->end());
+    }
+}
+
+void Batch::removeToken(const std::string &address) {
+    makeKey(bufferKey, TOKEN_PREFIX, address);
+    removeValue(bufferKey);
+}
+
+std::vector<char> Batch::addDelegateKey(const std::string &delegatePair, const DelegateState &value, size_t counter) {
+    makeKey(bufferKey, DELEGATE_PREFIX, delegatePair, DELEGATE_POSTFIX, SerializerInt(counter));
+    addKey2(bufferKey, value, true);
+    return bufferKey;
+}
+
+std::optional<std::string> Batch::findDelegateKey(const std::vector<char> &delegateKey) const {
+    const auto result = findValueInBatch(delegateKey);
+    if (!result.has_value()) {
+        return std::nullopt;
+    } else {
+        return std::string(result->begin(), result->end());
+    }
+}
+
+void Batch::removeDelegateKey(const std::vector<char> &delegateKey) {
+    removeValue(delegateKey);
+}
+
+std::unordered_set<std::string> Batch::getDeletedDelegate() const {
+    std::lock_guard<std::mutex> lock(mut);
+    std::unordered_set<std::string> result;
+    std::transform(deleted.begin(), deleted.end(), std::inserter(result, result.begin()), [](const std::vector<char> &t) {
+        return std::string(t.begin(), t.end());
+    });
+    return result;
+}
+
+void Batch::addDelegateHelper(const std::string &delegatePair, const DelegateStateHelper &value) {
+    makeKey(bufferKey, DELEGATE_HELPER_PREFIX, delegatePair);
+    addKey2(bufferKey, value, true);
+}
+
+std::optional<std::string> Batch::findDelegateHelper(const std::string &delegatePair) const {
+    makeKey(bufferKey, DELEGATE_HELPER_PREFIX, delegatePair);
+    const auto result = findValueInBatch(bufferKey);
+    if (!result.has_value()) {
+        return std::nullopt;
+    } else {
+        return std::string(result->begin(), result->end());
+    }
+}
+
+void Batch::addNodeTestLastResults(const std::string &address, const BestNodeTest &result) {
+    makeKey(bufferKey, NODE_STAT_RESULT_PREFIX, address);
+    addKey2(bufferKey, result);
+}
+
+void Batch::addNodeTestTrust(const std::string &address, const NodeTestTrust &result) {
+    makeKey(bufferKey, NODE_STAT_TRUST_PREFIX, address);
+    addKey2(bufferKey, result);
+}
+
+void Batch::addNodeTestCountForDay(const std::string &address, const NodeTestCount &result, size_t dayNumber) {
+    makeKey(bufferKey, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX, SerializerInt(-dayNumber));
+    addKey2(bufferKey, result);
+}
+
+void Batch::addNodeTestCounstForDay(const NodeTestCount &result, size_t dayNumber) {
+    makeKey(bufferKey, NODE_STATS_COUNT_PREFIX, NODE_STATS_COUNT_POSTFIX, SerializerInt(-dayNumber));
+    addKey2(bufferKey, result);
+}
+
+void Batch::addNodeTestDayNumber(const NodeTestDayNumber &result) {
+    addKey2(NODE_STAT_DAY_NUMBER, result);
+}
+
+void Batch::addAllTestedNodesForDay(const AllTestedNodes &result, size_t dayNumber) {
+    makeKey(bufferKey, NODES_TESTED_STATS_ALL_DAY, NODES_TESTED_STATS_ALL_DAY_POSTFIX, SerializerInt(-dayNumber));
+    addKey2(bufferKey, result);
+}
+
+void Batch::addNodeTestRpsForDay(const std::string &address, const NodeRps &result, size_t dayNumber) {
+    makeKey(bufferKey, NODE_STAT_RPS_PREFIX, address, NODE_STAT_RPS_POSTFIX, SerializerInt(-dayNumber));
+    addKey2(bufferKey, result);
+}
+
+void Batch::addAllForgedSums(const ForgingSums &result) {
+    addKey2(FORGING_SUMS_ALL, result);
+}
+
+void Batch::addCommonBalance(const CommonBalance &value) {
+    addKey2(COMMON_BALANCE_KEY, value);
+}
+
+void Batch::addBalance(const std::string& address, const BalanceInfo& value) {
+    makeKey(bufferKey, BALANCE_PREFIX, address);
+    addKey2(bufferKey, value);
+}
+
+void Batch::addNodeStatBlock(const NodeStatBlockInfo &value) {
+    addKey2(NODE_STAT_BLOCK_NUMBER_PREFIX, value);
 }
 
 std::vector<std::string> findAddress(const std::string &address, const LevelDb &leveldb, size_t from, size_t count) {
@@ -349,185 +543,14 @@ std::set<std::string> getAllBlocks(const LevelDb &leveldb) {
     return std::set<std::string>(res.begin(), res.end());
 }
 
-void Batch::addAddress(const std::string& address, const std::vector<char>& value, size_t counter) {
-    makeKey(buffer, ADDRESS_PREFIX, address, ADDRESS_POSTFIX, SerializerInt(counter));
-    addKey(buffer, value);
-}
-
-void Batch::addAddressStatus(const std::string& addressAndHash, const std::vector<char>& value) {
-    addKey(addressAndHash, value);
-}
-
-template<class Key, class Value>
-void Batch::addKey(const Key &key, const Value& value, bool isSave) {
-    std::lock_guard<std::mutex> lock(mut);
-    batch.Put(leveldb::Slice(key.data(), key.size()), leveldb::Slice(value.data(), value.size()));
-    if (isSave) {
-        save.emplace(std::vector<char>(key.begin(), key.end()), std::vector<char>(value.begin(), value.end()));
-    }
-}
-
-std::optional<std::vector<char>> Batch::findValueInBatch(const std::vector<char> &key) const {
-    const auto found = save.find(key);
-    if (found == save.end()) {
-        return std::nullopt;
-    } else {
-        return found->second;
-    }
-}
-
-void Batch::removeValue(const std::vector<char> &key, bool isSave) {
-    std::lock_guard<std::mutex> lock(mut);
-    batch.Delete(leveldb::Slice(key.data(), key.size()));
-    if (isSave) {
-        save.erase(key);
-        deleted.insert(key);
-    }
-}
-
-void Batch::addTransaction(const std::string& txHash, const std::vector<char>& value) {
-    makeKey(buffer, TRANSACTION_PREFIX, txHash);
-    addKey(buffer, value);
-}
-
-void Batch::addTransactionStatus(const std::string& txHash, const std::vector<char>& value) {
-    makeKey(buffer, TRANSACTION_STATUS_PREFIX, txHash);
-    addKey(buffer, value);
-}
-
-void Batch::addToken(const std::string &address, const std::vector<char> &value) {
-    makeKey(buffer, TOKEN_PREFIX, address);
-    addKey(buffer, value);
-}
-
-void Batch::addV8State(const std::string& v8Address, const std::string& v8State) {
-    CHECK(!v8State.empty(), "State is empty");
-    makeKey(buffer, V8_STATE_PREFIX, v8Address);
-    addKey(buffer, v8State);
-}
-
-void Batch::addV8Details(const std::string& v8Address, const std::string& v8Details) {
-    CHECK(!v8Details.empty(), "State is empty");
-    makeKey(buffer, V8_DETAILS_PREFIX, v8Address);
-    addKey(buffer, v8Details, true);
-}
-
-void Batch::addV8Code(const std::string& v8Address, const std::string& v8Code) {
-    CHECK(!v8Code.empty(), "State is empty");
-    makeKey(buffer, V8_CODE_PREFIX, v8Address);
-    addKey(buffer, v8Code, true);
-}
-
-std::optional<std::string> Batch::findV8State(const std::string &v8Address) const {
-    makeKey(buffer, V8_STATE_PREFIX, v8Address);
-    const auto result = findValueInBatch(buffer);
-    if (!result.has_value()) {
-        return std::nullopt;
-    } else {
-        return std::string(result->begin(), result->end());
-    }
-}
-
-std::optional<std::string> Batch::findToken(const std::string &address) {
-    makeKey(buffer, TOKEN_PREFIX, address);
-    const auto result = findValueInBatch(buffer);
-    if (!result.has_value()) {
-        return std::nullopt;
-    } else {
-        return std::string(result->begin(), result->end());
-    }
-}
-
-void Batch::removeToken(const std::string &address) {
-    makeKey(buffer, TOKEN_PREFIX, address);
-    removeValue(buffer);
-}
-
-std::vector<char> Batch::addDelegateKey(const std::string &delegatePair, const std::vector<char> &value, size_t counter) {
-    makeKey(buffer, DELEGATE_PREFIX, delegatePair, DELEGATE_POSTFIX, SerializerInt(counter));
-    addKey(buffer, value, true);
-    return buffer;
-}
-
-std::optional<std::string> Batch::findDelegateKey(const std::vector<char> &delegateKey) const {
-    const auto result = findValueInBatch(delegateKey);
-    if (!result.has_value()) {
-        return std::nullopt;
-    } else {
-        return std::string(result->begin(), result->end());
-    }
-}
-
-void Batch::removeDelegateKey(const std::vector<char> &delegateKey) {
-    removeValue(delegateKey);
-}
-
-std::unordered_set<std::string> Batch::getDeletedDelegate() const {
-    std::lock_guard<std::mutex> lock(mut);
-    std::unordered_set<std::string> result;
-    std::transform(deleted.begin(), deleted.end(), std::inserter(result, result.begin()), [](const std::vector<char> &t) {
-        return std::string(t.begin(), t.end());
-    });
-    return result;
-}
-
-void Batch::addDelegateHelper(const std::string &delegatePair, const std::vector<char> &value) {
-    makeKey(buffer, DELEGATE_HELPER_PREFIX, delegatePair);
-    addKey(buffer, value, true);
-}
-
-std::optional<std::string> Batch::findDelegateHelper(const std::string &delegatePair) const {
-    makeKey(buffer, DELEGATE_HELPER_PREFIX, delegatePair);
-    const auto result = findValueInBatch(buffer);
-    if (!result.has_value()) {
-        return std::nullopt;
-    } else {
-        return std::string(result->begin(), result->end());
-    }
-}
-
-void Batch::addNodeTestLastResults(const std::string &address, const std::vector<char> &result) {
-    makeKey(buffer, NODE_STAT_RESULT_PREFIX, address);
-    addKey(buffer, result);
-}
-
-void Batch::addNodeTestTrust(const std::string &address, const std::string &result) {
-    makeKey(buffer, NODE_STAT_TRUST_PREFIX, address);
-    addKey(buffer, result);
-}
-
-void Batch::addNodeTestCountForDay(const std::string &address, const std::vector<char> &result, size_t dayNumber) {
-    makeKey(buffer, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    addKey(buffer, result);
-}
-
-void Batch::addNodeTestCounstForDay(const std::vector<char> &result, size_t dayNumber) {
-    makeKey(buffer, NODE_STATS_COUNT_PREFIX, NODE_STATS_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    addKey(buffer, result);
-}
-
-void Batch::addNodeTestDayNumber(const std::string &result) {
-    addKey(NODE_STAT_DAY_NUMBER, result);
-}
-
-void Batch::addAllTestedNodesForDay(const std::vector<char> &result, size_t dayNumber) {
-    makeKey(buffer, NODES_TESTED_STATS_ALL_DAY, NODES_TESTED_STATS_ALL_DAY_POSTFIX, SerializerInt(-dayNumber));
-    addKey(buffer, result);
-}
-
-void Batch::addNodeTestRpsForDay(const std::string &address, const std::vector<char> &result, size_t dayNumber) {
-    makeKey(buffer, NODE_STAT_RPS_PREFIX, address, NODE_STAT_RPS_POSTFIX, SerializerInt(-dayNumber));
-    addKey(buffer, result);
-}
-
-void Batch::addAllForgedSums(const std::string &result) {
-    addKey(FORGING_SUMS_ALL, result);
-}
-
-void saveTransactionStatus(const std::string& txHash, const std::vector<char>& value, LevelDb &leveldb) {
+void saveTransactionStatus(const std::string& txHash, const TransactionStatus& value, LevelDb &leveldb) {
     std::vector<char> buffer;
     makeKey(buffer, TRANSACTION_STATUS_PREFIX, txHash);
-    leveldb.saveValue(buffer, value);
+    
+    std::vector<char> bufferValue;
+    value.serialize(bufferValue);
+    
+    leveldb.saveValue(buffer, bufferValue);
 }
 
 std::string makeAddressStatusKey(const std::string &address, const std::string &txHash) {
@@ -535,21 +558,14 @@ std::string makeAddressStatusKey(const std::string &address, const std::string &
     return key;
 }
 
-void saveAddressStatus(const std::string& addressAndHash, const std::vector<char>& value, LevelDb& leveldb) {
-    leveldb.saveValue(addressAndHash, value);
-}
-
-void Batch::addCommonBalance(const std::vector<char> &value) {
-    addKey(COMMON_BALANCE_KEY, value);
+void saveAddressStatus(const std::string& addressAndHash, const TransactionStatus& value, LevelDb& leveldb) {
+    std::vector<char> buffer;
+    value.serialize(buffer);
+    leveldb.saveValue(addressAndHash, buffer);
 }
 
 void saveVersionDb(const std::string &value, LevelDb &leveldb) {
     leveldb.saveValue(VERSION_DB, value);
-}
-
-void Batch::addBalance(const std::string& address, const std::vector<char>& value) {
-    makeKey(buffer, BALANCE_PREFIX, address);
-    addKey(buffer, value);
 }
 
 std::string findModules(const LevelDb &leveldb) {
@@ -608,10 +624,6 @@ std::string findVersionDb(const LevelDb &leveldb) {
 std::string findNodeStatBlock(const LevelDb& leveldb) {
     const std::string result = leveldb.findOneValueWithoutCheck(NODE_STAT_BLOCK_NUMBER_PREFIX);
     return result;
-}
-
-void Batch::addNodeStatBlock(const std::string &value) {
-    addKey(NODE_STAT_BLOCK_NUMBER_PREFIX, value);
 }
 
 std::string findNodeStatCount(const std::string &address, size_t dayNumber, const LevelDb &leveldb) {
