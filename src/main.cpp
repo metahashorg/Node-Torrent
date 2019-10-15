@@ -113,7 +113,7 @@ static SettingsDb parseSettingsDb(const libconfig::Setting &allSettings, const s
 int main (int argc, char *const *argv) {
     //signal(SIGSEGV, crash_handler);
     //signal(SIGABRT, crash_handler);
-        
+  
     initializeStopProgram();
     tcmallocMaintenance();
         
