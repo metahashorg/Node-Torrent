@@ -541,21 +541,6 @@ struct DelegateState {
     static DelegateState deserialize(const std::string &raw);
 };
 
-struct DelegateStateHelper {
-    size_t blockNumber = 0;
-    
-    DelegateStateHelper() = default;
-    
-    DelegateStateHelper(size_t blockNumber)
-        : blockNumber(blockNumber)
-    {}
-    
-    void serialize(std::vector<char> &buffer) const;
-    
-    static DelegateStateHelper deserialize(const std::string &raw);
-    
-};
-
 struct ForgingSums {
     std::unordered_map<uint64_t, size_t> sums;
     size_t blockNumber = 0;

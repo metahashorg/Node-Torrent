@@ -401,16 +401,6 @@ std::unordered_set<std::string> Batch::getDeletedDelegate() const {
     return result;
 }
 
-void Batch::addDelegateHelper(const std::string &delegatePair, const DelegateStateHelper &value) {
-    makeKey(bufferKey, DELEGATE_HELPER_PREFIX, delegatePair);
-    addKey(bufferKey, value, true);
-}
-
-std::optional<DelegateStateHelper> Batch::findDelegateHelper(const std::string &delegatePair) const {
-    makeKey(bufferKey, DELEGATE_HELPER_PREFIX, delegatePair);
-    return findValueInBatch<DelegateStateHelper>(bufferKey);
-}
-
 void Batch::addNodeTestLastResults(const std::string &address, const BestNodeTest &result) {
     makeKey(bufferKey, NODE_STAT_RESULT_PREFIX, address);
     addKey(bufferKey, result);
@@ -582,12 +572,6 @@ V8State findV8State(const std::string& v8Address, LevelDb& leveldb) {
     std::vector<char> key;
     makeKey(key, V8_STATE_PREFIX, v8Address);
     return leveldb.findOneValueWithoutCheckValue<V8State>(key);
-}
-
-std::optional<DelegateStateHelper> findDelegateHelper(const std::string &delegatePair, LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, DELEGATE_HELPER_PREFIX, delegatePair);
-    return leveldb.findOneValueWithoutCheckOpt<DelegateStateHelper>(key);
 }
 
 std::vector<std::pair<std::string, std::string>> findAllDelegatedPairKeys(const std::string &keyFrom, const LevelDb &leveldb) {

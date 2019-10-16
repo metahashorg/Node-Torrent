@@ -72,10 +72,6 @@ public:
     
     std::unordered_set<std::string> getDeletedDelegate() const;
     
-    void addDelegateHelper(const std::string &delegatePair, const DelegateStateHelper &value);
-    
-    std::optional<DelegateStateHelper> findDelegateHelper(const std::string &delegatePair) const;
-    
     void addNodeTestLastResults(const std::string &address, const BestNodeTest &result);
     
     void addNodeTestTrust(const std::string &address, const NodeTestTrust &result);
@@ -220,8 +216,6 @@ MainBlockInfo findMainBlock(const LevelDb &leveldb);
 ScriptBlockInfo findScriptBlock(const LevelDb &leveldb);
 
 V8State findV8State(const std::string &v8Address, LevelDb &leveldb);
-
-std::optional<DelegateStateHelper> findDelegateHelper(const std::string &delegatePair, LevelDb &leveldb);
 
 std::string makeKeyDelegatePair(const std::string &keyFrom, const std::string &keyTo);
 

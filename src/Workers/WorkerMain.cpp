@@ -57,17 +57,7 @@ std::optional<TransactionStatus> WorkerMain::calcTransactionStatusDelegate(const
     
     TransactionStatus txStatus(tx.hash, blockNumber);
     const std::string &delegateKey = makeKeyDelegatePair(tx.fromAddress.getBinaryString(), tx.toAddress.getBinaryString());
-    
-    const std::optional<DelegateStateHelper> foundDelegateHelper = batch.findDelegateHelper(delegateKey);
-    if (!foundDelegateHelper.has_value()) {
-        const std::optional<DelegateStateHelper> foundDelegateHelperInBase = findDelegateHelper(delegateKey, leveldb);
-        if (foundDelegateHelperInBase.has_value()) {
-            if (foundDelegateHelperInBase.value().blockNumber >= blockNumber) {
-                return std::nullopt;
-            }
-        }
-    }
-    
+       
     if (tx.delegate.value().isDelegate) {
         txStatus.isSuccess = !tx.isIntStatusNotSuccess();
         txStatus.status = TransactionStatus::Delegate();
@@ -102,9 +92,6 @@ std::optional<TransactionStatus> WorkerMain::calcTransactionStatusDelegate(const
             //LOGDEBUG << "Remove zero delegate";
         }
     }
-    
-    const DelegateStateHelper delegateHelper(blockNumber);
-    batch.addDelegateHelper(delegateKey, delegateHelper);
     
     return txStatus;
 }

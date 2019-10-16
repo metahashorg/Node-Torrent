@@ -739,22 +739,6 @@ DelegateState DelegateState::deserialize(const std::string &raw) {
     return state;
 }
 
-void DelegateStateHelper::serialize(std::vector<char> &buffer) const {
-    CHECK(blockNumber != 0, "DelegateStateHelper not initialized");
-    serializeInt<size_t>(blockNumber, buffer);
-}
-
-DelegateStateHelper DelegateStateHelper::deserialize(const std::string &raw) {
-    DelegateStateHelper state;
-    if (raw.empty()) {
-        return state;
-    }
-    
-    size_t from = 0;
-    state.blockNumber = deserializeInt<size_t>(raw, from);
-    return state;
-}
-
 std::string ForgingSums::serialize() const {
     std::string res;
     res += serializeInt(sums.size());
