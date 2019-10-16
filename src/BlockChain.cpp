@@ -63,7 +63,7 @@ size_t BlockChain::calcBlockchain(const std::vector<unsigned char>& lastHash) {
         for (auto iter = processedBlocks.rbegin(); iter != processedBlocks.rend(); iter++) {
             BlockHeader &bh = *iter;
             bh.blockNumber = allNum - bh.blockNumber.value();
-            CHECK(bh.blockNumber.value() == hashes.size(), "Ups");
+            CHECK(bh.blockNumber.value() == hashes.size(), "Ups " + std::to_string(bh.blockNumber.value()) + " " + toHex(bh.hash));
             hashes.emplace_back(iter->get());
         }
         return allNum;

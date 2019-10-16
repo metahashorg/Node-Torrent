@@ -769,7 +769,6 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
     CHECK(modules[MODULE_BLOCK_RAW], "module " + MODULE_BLOCK_RAW_STR + " not set");
     
     BlockInfo bi;
-    bi.header = bh;
     if (bh.blockNumber == 0) {
         return bi;
     }
@@ -786,6 +785,8 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
         std::shared_ptr<std::string> element = cache.value();
         readNextBlockInfo(element->data(), element->data() + element->size(), bh.filePos.pos, bi, true, false, beginTx, countTx);
     }
+    
+    bi.header = bh;
     
     for (TransactionInfo &tx: bi.txs) {
         tx.blockNumber = bi.header.blockNumber.value();
