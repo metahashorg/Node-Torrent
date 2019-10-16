@@ -31,6 +31,7 @@ struct DelegateState;
 struct ForgingSums;
 struct TransactionStatus;
 struct Token;
+struct AddressInfo;
 
 class WorkerMain final: public Worker {  
 public:
@@ -93,7 +94,7 @@ private:
     
     std::vector<TransactionInfo> getTxsForAddressWithoutStatuses(const Address& address, size_t &from, size_t count, size_t limitTxs, const TransactionsFilters &filters) const;
     
-    std::vector<TransactionInfo> readTxs(const std::vector<std::string> &foundResults) const;
+    std::vector<TransactionInfo> readTxs(const std::vector<AddressInfo> &foundResults) const;
     
     std::optional<TransactionInfo> findTransaction(const std::string &txHash) const;
     

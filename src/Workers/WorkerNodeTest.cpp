@@ -31,8 +31,7 @@ WorkerNodeTest::WorkerNodeTest(const BlockChain &blockchain, const std::string &
     , folderBlocks(folderBlocks)
     , leveldbNodeTest(leveldbOptNodeTest.writeBufSizeMb, leveldbOptNodeTest.isBloomFilter, leveldbOptNodeTest.isChecks, leveldbOptNodeTest.folderName, leveldbOptNodeTest.lruCacheMb)
 {
-    const std::string lastScriptBlockStr = findNodeStatBlock(leveldbNodeTest);
-    const NodeStatBlockInfo lastScriptBlock = NodeStatBlockInfo::deserialize(lastScriptBlockStr);
+    const NodeStatBlockInfo lastScriptBlock = findNodeStatBlock(leveldbNodeTest);
     initializeScriptBlockNumber = lastScriptBlock.blockNumber;
 }
 
@@ -110,7 +109,7 @@ static void processTestTransaction(const TransactionInfo &tx, std::unordered_map
         if (nodeTestResult != std::nullopt) {
             auto found = lastNodesTests.find(nodeTestResult->serverAddress);
             if (found == lastNodesTests.end()) {
-                BestNodeTest lastNodeTest = BestNodeTest::deserialize(findNodeStatLastResults(nodeTestResult->serverAddress, leveldbNodeTest));
+                BestNodeTest lastNodeTest = findNodeStatLastResults(nodeTestResult->serverAddress, leveldbNodeTest);
                 if (lastNodeTest.tests.empty()) {
                     lastNodeTest = BestNodeTest(false);
                 }
@@ -219,8 +218,7 @@ void WorkerNodeTest::work() {
             }
             BlockInfo &bi = *biSP;
             
-            const std::string lastScriptBlockStr = findNodeStatBlock(leveldbNodeTest);
-            const NodeStatBlockInfo lastScriptBlock = NodeStatBlockInfo::deserialize(lastScriptBlockStr);
+            const NodeStatBlockInfo lastScriptBlock = findNodeStatBlock(leveldbNodeTest);
             const std::vector<unsigned char> &prevHash = lastScriptBlock.blockHash;
 
             if (bi.header.blockNumber.value() <= lastScriptBlock.blockNumber) {
@@ -231,8 +229,7 @@ void WorkerNodeTest::work() {
             
             CHECK(prevHash.empty() || prevHash == bi.header.prevHash, "Incorrect prev hash. Expected " + toHex(prevHash) + ", received " + toHex(bi.header.prevHash));
 
-            const std::string currDayStr = findNodeStatDayNumber(leveldbNodeTest);
-            const size_t currDay = NodeTestDayNumber::deserialize(currDayStr).dayNumber;
+            const size_t currDay = findNodeStatDayNumber(leveldbNodeTest).dayNumber;
                         
             Batch batchStates;
             
@@ -259,21 +256,18 @@ void WorkerNodeTest::work() {
             }
             
             for (const auto &[address, count]: countTests) {
-                const std::string nodeStatStr = findNodeStatCount(address, currDay, leveldbNodeTest);
-                const NodeTestCount oldNodeStat = NodeTestCount::deserialize(nodeStatStr);
+                const NodeTestCount oldNodeStat = findNodeStatCount(address, currDay, leveldbNodeTest);
                 const NodeTestCount currNodeStat = count + oldNodeStat;
                 batchStates.addNodeTestCountForDay(address, currNodeStat, currDay);
             }
             for (const auto &[address, rps]: nodesRps) {
-                const std::string nodeRpsStr = findNodeStatRps(address, currDay, leveldbNodeTest);
-                const NodeRps oldNodeRps = NodeRps::deserialize(nodeRpsStr);
+                const NodeRps oldNodeRps = findNodeStatRps(address, currDay, leveldbNodeTest);
                 NodeRps currNodeRps = oldNodeRps;
                 currNodeRps.rps.insert(currNodeRps.rps.end(), rps.rps.begin(), rps.rps.end());
                 batchStates.addNodeTestRpsForDay(address, currNodeRps, currDay);
             }
             if (allTests.countAll != 0) {
-                const std::string nodeStatsStr = findNodeStatsCount(currDay, leveldbNodeTest);
-                const NodeTestCount oldNodeStats = NodeTestCount::deserialize(nodeStatsStr);
+                const NodeTestCount oldNodeStats = findNodeStatsCount(currDay, leveldbNodeTest);
                 const NodeTestCount currNodesStats = oldNodeStats + allTests;
                 batchStates.addNodeTestCounstForDay(currNodesStats, currDay);
             }
@@ -281,15 +275,13 @@ void WorkerNodeTest::work() {
                 batchStates.addNodeTestLastResults(serverAddress, res);
             }
             if (!allNodesForDay.nodes.empty()) {
-                const std::string allNodesForDayStr = findAllTestedNodesForDay(currDay, leveldbNodeTest);
-                AllTestedNodes allNodesForDayOld = AllTestedNodes::deserialize(allNodesForDayStr);
+                AllTestedNodes allNodesForDayOld = findAllTestedNodesForDay(currDay, leveldbNodeTest);
                 allNodesForDayOld.plus(allNodesForDay);
                 allNodesForDayOld.day = currDay;
                 batchStates.addAllTestedNodesForDay(allNodesForDayOld, currDay);
             }
             if (!allNodes.nodes.empty()) {
-                const std::string allNodesStr = findAllNodes(leveldbNodeTest);
-                AllNodes allNodesOld = AllNodes::deserialize(allNodesStr);
+                AllNodes allNodesOld = findAllNodes(leveldbNodeTest);
                 allNodesOld.plus(allNodes);
                 batchStates.addAllNodes(allNodesOld);
             }
@@ -345,16 +337,14 @@ NodeTestResult readNodeTestTransaction(const BestNodeElement &nodeTestElement, s
 }
 
 std::pair<size_t, NodeTestResult> WorkerNodeTest::getLastNodeTestResult(const std::string &address) const {
-    const std::string resultStr = findNodeStatLastResults(address, leveldbNodeTest);
+    const BestNodeTest lastNodeTests = findNodeStatLastResults(address, leveldbNodeTest);
     const size_t lastTimestamp = blockchain.getLastBlock().timestamp;
-    
-    const BestNodeTest lastNodeTests = BestNodeTest::deserialize(resultStr);
+
     BestNodeElement nodeTestElement = lastNodeTests.getMax(getLastBlockDay());
     
     NodeTestResult nodeTestResult = readNodeTestTransaction(nodeTestElement, lastNodeTests.day, folderBlocks);
        
-    const std::string nodeRpsStr = findNodeStatRps(address, nodeTestResult.day, leveldbNodeTest);
-    const NodeRps nodeRps = NodeRps::deserialize(nodeRpsStr);
+    const NodeRps nodeRps = findNodeStatRps(address, nodeTestResult.day, leveldbNodeTest);
     
     if (!nodeRps.rps.empty()) {
         const uint64_t avgRps = findAvg(nodeRps.rps);
@@ -365,32 +355,27 @@ std::pair<size_t, NodeTestResult> WorkerNodeTest::getLastNodeTestResult(const st
 }
 
 std::pair<size_t, NodeTestTrust> WorkerNodeTest::getLastNodeTestTrust(const std::string &address) const {
-    const std::string resultStr = findNodeStatLastTrust(address, leveldbNodeTest);
+    const NodeTestTrust result = findNodeStatLastTrust(address, leveldbNodeTest);
     const size_t lastTimestamp = blockchain.getLastBlock().timestamp;
-    return std::make_pair(lastTimestamp, NodeTestTrust::deserialize(resultStr));
+    return std::make_pair(lastTimestamp, result);
 }
 
 NodeTestCount WorkerNodeTest::getLastDayNodeTestCount(const std::string &address) const {
-    const std::pair<size_t, std::string> resultPair = findNodeStatCountLast(address, leveldbNodeTest);
-    return NodeTestCount::deserialize(resultPair.second);
+    return findNodeStatCountLast(address, leveldbNodeTest);
 }
 
 NodeTestCount WorkerNodeTest::getLastDayNodesTestsCount() const {
-    const std::pair<size_t, std::string> resultPair = findNodeStatsCountLast(leveldbNodeTest);
-    return NodeTestCount::deserialize(resultPair.second);
+    return findNodeStatsCountLast(leveldbNodeTest);
 }
 
 std::vector<std::pair<std::string, NodeTestExtendedStat>> WorkerNodeTest::filterLastNodes(size_t countTests) const {
-    const std::string allNodesForDayStr = findAllTestedNodesForLastDay(leveldbNodeTest).second;
-    const AllTestedNodes allNodesForDay = AllTestedNodes::deserialize(allNodesForDayStr);
+    const AllTestedNodes allNodesForDay = findAllTestedNodesForLastDay(leveldbNodeTest);
     const size_t lastBlockDay = getLastBlockDay();
     std::vector<std::pair<std::string, NodeTestExtendedStat>> result;
     for (const std::string &node: allNodesForDay.nodes) {
-        const std::string nodeCountStr = findNodeStatCount(node, allNodesForDay.day, leveldbNodeTest);
-        const NodeTestCount nodeTestCount = NodeTestCount::deserialize(nodeCountStr);
+        const NodeTestCount nodeTestCount = findNodeStatCount(node, allNodesForDay.day, leveldbNodeTest);
         
-        const std::string nodeResulttStr = findNodeStatLastResults(node, leveldbNodeTest);
-        const BestNodeTest lastNodeTests = BestNodeTest::deserialize(nodeResulttStr);
+        const BestNodeTest lastNodeTests = findNodeStatLastResults(node, leveldbNodeTest);
         const BestNodeElement nodeTestElement = lastNodeTests.getMax(lastBlockDay);
         const NodeTestResult nodeTestResult = readNodeTestTransaction(nodeTestElement, lastNodeTests.day, folderBlocks);
         
@@ -404,12 +389,10 @@ std::vector<std::pair<std::string, NodeTestExtendedStat>> WorkerNodeTest::filter
 
 std::pair<int, size_t> WorkerNodeTest::calcNodeRaiting(const std::string &address, size_t countTests) const {
     CHECK(countTests != 0, "Incorrect countTests parameter");
-    const std::string allNodesForDayStr = findAllTestedNodesForLastDay(leveldbNodeTest).second;
-    const AllTestedNodes allNodesForDay = AllTestedNodes::deserialize(allNodesForDayStr);
+    const AllTestedNodes allNodesForDay = findAllTestedNodesForLastDay(leveldbNodeTest);
     std::vector<std::pair<std::string, uint64_t>> avgs;
     for (const std::string &node: allNodesForDay.nodes) {
-        const std::string nodeRpsStr = findNodeStatRps(node, allNodesForDay.day, leveldbNodeTest);
-        const NodeRps nodeRps = NodeRps::deserialize(nodeRpsStr);
+        const NodeRps nodeRps = findNodeStatRps(node, allNodesForDay.day, leveldbNodeTest);
         if (nodeRps.rps.size() >= countTests) {
             const uint64_t median = findAvg(nodeRps.rps);
             avgs.emplace_back(node, median);
@@ -463,14 +446,12 @@ std::pair<int, size_t> WorkerNodeTest::calcNodeRaiting(const std::string &addres
 }
 
 size_t WorkerNodeTest::getLastBlockDay() const {
-    const std::string currDayStr = findNodeStatDayNumber(leveldbNodeTest);
-    const size_t currDay = NodeTestDayNumber::deserialize(currDayStr).dayNumber;
+    const size_t currDay = findNodeStatDayNumber(leveldbNodeTest).dayNumber;
     return currDay;
 }
 
 std::map<std::string, AllNodesNode> WorkerNodeTest::getAllNodes() const {
-    const std::string allNodesStr = findAllNodes(leveldbNodeTest);
-    AllNodes allNodes = AllNodes::deserialize(allNodesStr);
+    const AllNodes allNodes = findAllNodes(leveldbNodeTest);
     return allNodes.nodes;
 }
 

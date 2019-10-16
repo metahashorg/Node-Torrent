@@ -111,8 +111,7 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
         batch.addBlockHeader(bi.header.hash, bi.header);
     }
     
-    const std::string blockMetadata = findBlockMetadata(leveldb);
-    const BlocksMetadata metadata = BlocksMetadata::deserialize(blockMetadata);
+    const BlocksMetadata metadata = findBlockMetadata(leveldb);
     BlocksMetadata newMetadata;
     newMetadata.prevBlockHash = bi.header.prevHash;
     if (metadata.prevBlockHash == bi.header.prevHash) {
@@ -150,8 +149,7 @@ void SyncImpl::initialize() {
         saveVersionDb(VERSION_DB, leveldb);
     }
     
-    const std::string blockMetadata = findBlockMetadata(leveldb);
-    const BlocksMetadata metadata = BlocksMetadata::deserialize(blockMetadata);
+    const BlocksMetadata metadata = findBlockMetadata(leveldb);
     
     getBlockAlgorithm->initialize();
     

@@ -379,7 +379,7 @@ public:
     
     int64_t calcBalance();
     
-    int64_t calcBalanceWithoutDelegate();
+    int64_t calcBalanceWithoutDelegate() const;
     
     void serialize(std::vector<char> &buffer) const;
     

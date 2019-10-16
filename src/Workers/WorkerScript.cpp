@@ -20,8 +20,7 @@ WorkerScript::WorkerScript(LevelDb &leveldb, const LevelDbOptions &leveldbOptScr
     , modules(modules)
     , caches(caches)
 {
-    const std::string lastScriptBlockStr = findScriptBlock(leveldbV8);
-    const ScriptBlockInfo lastScriptBlock = ScriptBlockInfo::deserialize(lastScriptBlockStr);
+    const ScriptBlockInfo lastScriptBlock = findScriptBlock(leveldbV8);
     initializeScriptBlockNumber = lastScriptBlock.blockNumber;
 }
 
@@ -48,8 +47,7 @@ void WorkerScript::work() {
             }
             BlockInfo &bi = *biSP;
             
-            const std::string lastScriptBlockStr = findScriptBlock(leveldbV8);
-            const ScriptBlockInfo lastScriptBlock = ScriptBlockInfo::deserialize(lastScriptBlockStr);
+            const ScriptBlockInfo lastScriptBlock = findScriptBlock(leveldbV8);
             const std::vector<unsigned char> &prevHash = lastScriptBlock.blockHash;            
 
             if (bi.header.blockNumber.value() <= lastScriptBlock.blockNumber) {
@@ -80,16 +78,15 @@ void WorkerScript::work() {
                                
                 const auto findV8StateF = [this, &batchStates](const Address &address) {
                     const auto findV8State = batchStates.findV8State(address.getBinaryString());
-                    std::string prevV8StateStr;
+                    V8State prevV8State;
                     bool isBatch;
                     if (findV8State.has_value()) {
-                        prevV8StateStr = findV8State.value();
+                        prevV8State = findV8State.value();
                         isBatch = true;
                     } else {
-                        prevV8StateStr = torrent_node_lib::findV8State(address.getBinaryString(), leveldbV8);
+                        prevV8State = torrent_node_lib::findV8State(address.getBinaryString(), leveldbV8);
                         isBatch = false;
                     }
-                    const V8State prevV8State = V8State::deserialize(prevV8StateStr);
                     return std::make_pair(isBatch, prevV8State);
                 };
                 
@@ -255,13 +252,11 @@ std::optional<size_t> WorkerScript::getInitBlockNumber() const {
 }
 
 V8Details WorkerScript::getContractDetails(const Address &contractAddress) const {
-    const std::string result = findV8DetailsAddress(contractAddress.getBinaryString(), leveldbV8);
-    return V8Details::deserialize(result);
+    return findV8DetailsAddress(contractAddress.getBinaryString(), leveldbV8);
 }
 
 V8Code WorkerScript::getContractCode(const Address &contractAddress) const {
-    const std::string codeString = findV8CodeAddress(contractAddress.toBdString(), leveldbV8);
-    return V8Code::deserialize(codeString);
+    return findV8CodeAddress(contractAddress.toBdString(), leveldbV8);
 }
 
 }

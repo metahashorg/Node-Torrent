@@ -455,7 +455,7 @@ int64_t BalanceInfo::calcBalance() {
     return balance.received() - balance.spent();
 }
 
-int64_t BalanceInfo::calcBalanceWithoutDelegate() {
+int64_t BalanceInfo::calcBalanceWithoutDelegate() const {
     return balance.received() - balance.spent() + (delegated.has_value() ? (delegated->delegate.delegate() - delegated->delegate.undelegate()) : 0);
 }
 
@@ -501,6 +501,10 @@ void BalanceInfo::serialize(std::vector<char>& buffer) const {
 
 BalanceInfo BalanceInfo::deserialize(const std::string& raw) {
     BalanceInfo result;
+    
+    if (raw.empty()) {
+        return result;
+    }
     
     size_t from = 0;
     const size_t received = deserializeInt<size_t>(raw, from);

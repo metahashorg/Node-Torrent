@@ -52,13 +52,13 @@ public:
 
     void addToken(const std::string &address, const Token &value);
     
-    std::optional<std::string> findToken(const std::string &address);
+    std::optional<Token> findToken(const std::string &address);
     
     void removeToken(const std::string &address);
     
     void addV8State(const std::string &v8Address, const V8State &v8State);
     
-    std::optional<std::string> findV8State(const std::string &v8Address) const;
+    std::optional<V8State> findV8State(const std::string &v8Address) const;
     
     void addV8Details(const std::string &v8Address, const V8Details &v8Details);
     
@@ -66,7 +66,7 @@ public:
     
     std::vector<char> addDelegateKey(const std::string &delegatePair, const DelegateState &value, size_t counter);
     
-    std::optional<std::string> findDelegateKey(const std::vector<char> &delegateKey) const;
+    std::optional<DelegateState> findDelegateKey(const std::vector<char> &delegateKey) const;
     
     void removeDelegateKey(const std::vector<char> &delegateKey);
     
@@ -74,7 +74,7 @@ public:
     
     void addDelegateHelper(const std::string &delegatePair, const DelegateStateHelper &value);
     
-    std::optional<std::string> findDelegateHelper(const std::string &delegatePair) const;
+    std::optional<DelegateStateHelper> findDelegateHelper(const std::string &delegatePair) const;
     
     void addNodeTestLastResults(const std::string &address, const BestNodeTest &result);
     
@@ -145,6 +145,9 @@ public:
     template<class Key>
     std::vector<std::string> findKey(const Key &keyFrom, const Key &keyTo, size_t from = 0, size_t count = 0) const;
     
+    template<class Value, class Key>
+    std::vector<Value> findKey2(const Key &keyFrom, const Key &keyTo, size_t from = 0, size_t count = 0) const;
+    
     std::vector<std::pair<std::string, std::string>> findKey2(const std::string &keyFrom, const std::string &keyTo, size_t from = 0, size_t count = 0) const;
     
     template<class Key>
@@ -153,6 +156,12 @@ public:
     template<class Key>
     std::string findOneValueWithoutCheck(const Key &key) const;
     
+    template<class Value, class Key>
+    std::optional<Value> findOneValueWithoutCheck2(const Key &key) const;
+    
+    template<class Value, class Key>
+    Value findOneValueWithoutCheck3(const Key &key) const;
+        
     std::pair<std::string, std::string> findFirstOf(const std::string &key, const std::unordered_set<std::string> &excluded) const;
     
     void addBatch(leveldb::WriteBatch &batch);
@@ -186,21 +195,21 @@ void saveTransactionStatus(const std::string &txHash, const TransactionStatus &v
 
 void saveVersionDb(const std::string &value, LevelDb &leveldb);
 
-std::string findBlockMetadata(const LevelDb &leveldb);
+BlocksMetadata findBlockMetadata(const LevelDb &leveldb);
 
-std::vector<std::string> findAddress(const std::string &address, const LevelDb &leveldb, size_t from, size_t count);
+std::vector<AddressInfo> findAddress(const std::string &address, const LevelDb &leveldb, size_t from, size_t count);
 
-std::vector<std::string> findAddressStatus(const std::string &address, const LevelDb &leveldb);
+std::vector<TransactionStatus> findAddressStatus(const std::string &address, const LevelDb &leveldb);
 
-std::string findBalance(const std::string &address, const LevelDb &leveldb);
+BalanceInfo findBalance(const std::string &address, const LevelDb &leveldb);
 
-std::string findTx(const std::string &txHash, const LevelDb &leveldb);
+std::optional<TransactionInfo> findTx(const std::string &txHash, const LevelDb &leveldb);
 
-std::string findToken(const std::string &address, const LevelDb &leveldb);
+Token findToken(const std::string &address, const LevelDb &leveldb);
 
-std::string findTxStatus(const std::string &txHash, const LevelDb &leveldb);
+std::optional<TransactionStatus> findTxStatus(const std::string &txHash, const LevelDb &leveldb);
 
-std::pair<std::string, std::string> findDelegateKey(const std::string &delegatePair, const LevelDb &leveldb, const std::unordered_set<std::string> &excluded);
+std::pair<std::string, DelegateState> findDelegateKey(const std::string &delegatePair, const LevelDb &leveldb, const std::unordered_set<std::string> &excluded);
 
 std::unordered_map<CroppedFileName, FileInfo> getAllFiles(const LevelDb &leveldb);
 
@@ -208,13 +217,13 @@ std::set<std::string> getAllBlocks(const LevelDb &leveldb);
 
 std::string findModules(const LevelDb &leveldb);
 
-std::string findMainBlock(const LevelDb &leveldb);
+MainBlockInfo findMainBlock(const LevelDb &leveldb);
 
-std::string findScriptBlock(const LevelDb &leveldb);
+ScriptBlockInfo findScriptBlock(const LevelDb &leveldb);
 
-std::string findV8State(const std::string &v8Address, LevelDb &leveldb);
+V8State findV8State(const std::string &v8Address, LevelDb &leveldb);
 
-std::string findDelegateHelper(const std::string &delegatePair, LevelDb &leveldb);
+std::optional<DelegateStateHelper> findDelegateHelper(const std::string &delegatePair, LevelDb &leveldb);
 
 std::string makeKeyDelegatePair(const std::string &keyFrom, const std::string &keyTo);
 
@@ -222,39 +231,39 @@ std::string getSecondOnKeyDelegatePair(const std::string &keyFrom, const std::st
 
 std::vector<std::pair<std::string, std::string>> findAllDelegatedPairKeys(const std::string &keyFrom, const LevelDb &leveldb);
 
-std::string findV8DetailsAddress(const std::string &address, const LevelDb &leveldb);
+V8Details findV8DetailsAddress(const std::string &address, const LevelDb &leveldb);
 
-std::string findV8CodeAddress(const std::string &address, const LevelDb &leveldb);
+V8Code findV8CodeAddress(const std::string &address, const LevelDb &leveldb);
 
-std::string findCommonBalance(const LevelDb &leveldb);
+CommonBalance findCommonBalance(const LevelDb &leveldb);
 
 std::string findVersionDb(const LevelDb &leveldb);
 
-std::string findNodeStatBlock(const LevelDb &leveldb);
+NodeStatBlockInfo findNodeStatBlock(const LevelDb &leveldb);
 
-std::string findNodeStatCount(const std::string &address, size_t dayNumber, const LevelDb &leveldb);
+NodeTestCount findNodeStatCount(const std::string &address, size_t dayNumber, const LevelDb &leveldb);
 
-std::string findNodeStatsCount(size_t dayNumber, const LevelDb &leveldb);
+NodeTestCount findNodeStatsCount(size_t dayNumber, const LevelDb &leveldb);
 
-std::string findNodeStatLastResults(const std::string &address, const LevelDb &leveldb);
+BestNodeTest findNodeStatLastResults(const std::string &address, const LevelDb &leveldb);
 
-std::string findNodeStatLastTrust(const std::string &address, const LevelDb &leveldb);
+NodeTestTrust findNodeStatLastTrust(const std::string &address, const LevelDb &leveldb);
 
-std::string findNodeStatRps(const std::string &address, size_t dayNumber, const LevelDb &leveldb);
+NodeRps findNodeStatRps(const std::string &address, size_t dayNumber, const LevelDb &leveldb);
 
-std::string findNodeStatDayNumber(const LevelDb &leveldb);
+NodeTestDayNumber findNodeStatDayNumber(const LevelDb &leveldb);
 
-std::pair<size_t, std::string> findNodeStatCountLast(const std::string &address, const LevelDb &leveldb);
+NodeTestCount findNodeStatCountLast(const std::string &address, const LevelDb &leveldb);
 
-std::pair<size_t, std::string> findNodeStatsCountLast(const LevelDb &leveldb);
+NodeTestCount findNodeStatsCountLast(const LevelDb &leveldb);
 
-std::string findAllTestedNodesForDay(size_t day, const LevelDb &leveldb);
+AllTestedNodes findAllTestedNodesForDay(size_t day, const LevelDb &leveldb);
 
-std::pair<size_t, std::string> findAllTestedNodesForLastDay(const LevelDb &leveldb);
+AllTestedNodes findAllTestedNodesForLastDay(const LevelDb &leveldb);
 
-std::string findForgingSumsAll(const LevelDb &leveldb);
+ForgingSums findForgingSumsAll(const LevelDb &leveldb);
 
-std::string findAllNodes(const LevelDb &leveldb);
+AllNodes findAllNodes(const LevelDb &leveldb);
 
 }
 
