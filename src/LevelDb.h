@@ -111,12 +111,13 @@ public:
 private:
     
     template<class Key, class Value>
-    void addKey(const Key &key, const Value &value, bool isSave=false);
+    void addKeyInternal(const Key &key, const Value &value, bool isSave=false);
     
     template<class Key, class Value>
-    void addKey2(const Key &key, const Value &value, bool isSave=false);
+    void addKey(const Key &key, const Value &value, bool isSave=false);
     
-    std::optional<std::vector<char>> findValueInBatch(const std::vector<char> &key) const;
+    template<class Value>
+    std::optional<Value> findValueInBatch(const std::vector<char> &key) const;
     
     void removeValue(const std::vector<char> &key, bool isSave=true);
     
@@ -146,21 +147,18 @@ public:
     std::vector<std::string> findKey(const Key &keyFrom, const Key &keyTo, size_t from = 0, size_t count = 0) const;
     
     template<class Value, class Key>
-    std::vector<Value> findKey2(const Key &keyFrom, const Key &keyTo, size_t from = 0, size_t count = 0) const;
+    std::vector<Value> findKeyValue(const Key &keyFrom, const Key &keyTo, size_t from = 0, size_t count = 0) const;
     
     std::vector<std::pair<std::string, std::string>> findKey2(const std::string &keyFrom, const std::string &keyTo, size_t from = 0, size_t count = 0) const;
-    
-    template<class Key>
-    std::string findOneValue(const Key &key) const;
     
     template<class Key>
     std::string findOneValueWithoutCheck(const Key &key) const;
     
     template<class Value, class Key>
-    std::optional<Value> findOneValueWithoutCheck2(const Key &key) const;
+    std::optional<Value> findOneValueWithoutCheckOpt(const Key &key) const;
     
     template<class Value, class Key>
-    Value findOneValueWithoutCheck3(const Key &key) const;
+    Value findOneValueWithoutCheckValue(const Key &key) const;
         
     std::pair<std::string, std::string> findFirstOf(const std::string &key, const std::unordered_set<std::string> &excluded) const;
     
