@@ -272,7 +272,8 @@ std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, s
         const size_t blocksInPart = std::min(countBlocksInBatch, blocksHashs.size() - i * countBlocksInBatch);
         
         if (blocksInPart == 1) {
-            advancedLoadsBlocksDumps[blocksHashs[i]] = parseDumpBlockBinary(responses[i], isCompress);
+            CHECK(beginBlock < blocksHashs.size(), "Incorrect answer");
+            advancedLoadsBlocksDumps[blocksHashs[beginBlock]] = parseDumpBlockBinary(responses[i], isCompress);
         } else {
             const std::vector<std::string> blocks = parseDumpBlocksBinary(responses[i], isCompress);
             CHECK(blocks.size() == blocksInPart, "Incorrect answer");
