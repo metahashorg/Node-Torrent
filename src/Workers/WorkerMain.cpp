@@ -694,9 +694,11 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddress(const Address &address
 
 void WorkerMain::readTransactionInFile(TransactionInfo& tx) const {
     IfStream file;
+    const std::string hash = tx.hash;
     openFile(file, getFullPath(tx.filePos.fileNameRelative, folderBlocks));
     const bool res = readOneTransactionInfo(file, tx.filePos.pos, tx, false);
     CHECK(res, "Incorrect read transaction info");
+    CHECK(hash == tx.hash, "Incorrect transaction");
 }
 
 std::optional<TransactionInfo> WorkerMain::findTransaction(const std::string &txHash) const {
@@ -709,6 +711,7 @@ std::optional<TransactionInfo> WorkerMain::findTransaction(const std::string &tx
             return std::nullopt;
         }
         TransactionInfo txInfo = found.value();
+        txInfo.hash = txHash;
         readTransactionInFile(txInfo);
         return txInfo;
     } else {
