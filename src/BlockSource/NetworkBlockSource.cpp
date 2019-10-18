@@ -1,13 +1,15 @@
 #include "NetworkBlockSource.h"
 
 #include "utils/FileSystem.h"
-#include "GetNewBlocksFromServers.h"
 #include "log.h"
 #include "check.h"
-#include "PrivateKey.h"
-#include "BlockchainRead.h"
-#include "BlockInfo.h"
 #include "parallel_for.h"
+#include "convertStrings.h"
+
+#include "BlockInfo.h"
+#include "BlockchainRead.h"
+#include "GetNewBlocksFromServers.h"
+#include "PrivateKey.h"
 
 using namespace common;
 
@@ -97,7 +99,9 @@ bool NetworkBlockSource::process(BlockInfo &bi, std::string &binaryDump) {
             }
             CHECK(pair.second.dump.size() == pair.second.header.blockSize, "binaryDump.size() == nextBlockHeader.blockSize");
             pair.second.bi.header.filePos.fileNameRelative = getBasename(pair.second.header.fileName);
+            const std::vector<unsigned char> hashBlockForRequest = fromHex(pair.second.header.hash);
             readNextBlockInfo(pair.second.dump.data(), pair.second.dump.data() + pair.second.dump.size(), 0, pair.second.bi, isValidate, saveAllTx, 0, 0);
+            CHECK(pair.second.bi.header.hash == hashBlockForRequest, "Incorrect block dump");
         } catch (...) {
             pair.second.exception = std::current_exception();
         }

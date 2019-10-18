@@ -404,7 +404,7 @@ static void readBlockTxs(const char *begin_pos, const char *end_pos, size_t posI
     bi.header.hash.assign(block_hash.cbegin(), block_hash.cend());
     
     std::array<unsigned char, 32> txs_hash = get_double_sha256((unsigned char *)cur_pos, std::distance(cur_pos, end_pos));
-    CHECK(std::vector<unsigned char>(txs_hash.begin(), txs_hash.end()) == bi.header.txsHash, "Incorrect txs hash");
+    CHECK(bi.header.txsHash.size() == txs_hash.size() && std::equal(txs_hash.begin(), txs_hash.end(), bi.header.txsHash.begin()), "Incorrect txs hash");
     
     SizeTransactinType tx_size = 0;
     size_t txIndex = 0;
