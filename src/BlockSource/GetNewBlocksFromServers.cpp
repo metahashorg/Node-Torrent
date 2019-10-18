@@ -237,9 +237,9 @@ std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, s
     const auto makeQsAndPost = [&blocksHashs, isSign, countBlocksInBatch=this->countBlocksInBatch, isCompress=this->isCompress](size_t number) {
         CHECK(blocksHashs.size() > number * countBlocksInBatch, "Incorrect number");
         const size_t beginBlock = number * countBlocksInBatch;
-        const size_t countBlocks = std::min(countBlocksInBatch, blocksHashs.size() - number * countBlocksInBatch);
+        const size_t countBlocks = std::min(countBlocksInBatch, blocksHashs.size() - beginBlock);
         if (countBlocks == 1) {
-            return std::make_pair("get-dump-block-by-hash", "{\"id\":1,\"params\":{\"hash\": \"" + blocksHashs[number] + "\" , \"isHex\": false, " + 
+            return std::make_pair("get-dump-block-by-hash", "{\"id\":1,\"params\":{\"hash\": \"" + blocksHashs[beginBlock] + "\" , \"isHex\": false, " + 
                 "\"isSign\": " + (isSign ? "true" : "false") + 
                 ", \"compress\": " + (isCompress ? "true" : "false") + 
                 "}}");
@@ -269,7 +269,7 @@ std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, s
     
     for (size_t i = 0; i < responses.size(); i++) {
         const size_t beginBlock = i * countBlocksInBatch;
-        const size_t blocksInPart = std::min(countBlocksInBatch, blocksHashs.size() - i * countBlocksInBatch);
+        const size_t blocksInPart = std::min(countBlocksInBatch, blocksHashs.size() - beginBlock);
         
         if (blocksInPart == 1) {
             CHECK(beginBlock < blocksHashs.size(), "Incorrect answer");
