@@ -52,28 +52,7 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
     const rapidjson::ParseResult pr = doc.Parse((const char*)(tx.data.data()), tx.data.size());
     CHECK(pr, "rapidjson parse error. Data: " + std::string(tx.data.begin(), tx.data.end()));
     
-    if (doc.HasMember("method") && doc["method"].IsString() && doc["method"].GetString() == std::string("proxy_load_results")) {
-        const Address &testerAddress = tx.fromAddress;
-        
-        const auto &paramsJson = get<JsonObject>(doc, "params");
-        const std::string serverAddress = get<std::string>(paramsJson, "mhaddr");
-        const std::string ip = get<std::string>(paramsJson, "ip");
-        uint64_t rps = std::stoull(get<std::string>(paramsJson, "rps"));
-        bool success = true;
-        if (paramsJson.HasMember("success") && paramsJson["success"].IsString()) {
-            const std::string successStr = paramsJson["success"].GetString();
-            success = successStr == "true";
-        }
-        if (!success) {
-            rps = 0;
-        }
-        std::string geo;
-        if (paramsJson.HasMember("geo") && paramsJson["geo"].IsString()) {
-            geo = paramsJson["geo"].GetString();
-        }
-        
-        return NodeTestResult(serverAddress, testerAddress, "Proxy", tx.data, ip, geo, rps, success, true);
-    } else if (doc.HasMember("method") && doc["method"].IsString() && doc["method"].GetString() == std::string("mhAddNodeCheckResult")) {
+    if (doc.HasMember("method") && doc["method"].IsString() && doc["method"].GetString() == std::string("mhAddNodeCheckResult")) {
         const Address &testerAddress = tx.fromAddress;
         
         const auto &paramsJson = get<JsonObject>(doc, "params");
@@ -173,20 +152,6 @@ static void processRegisterTransaction(const TransactionInfo &tx, AllNodes &allN
                 if (doc.HasMember("method") && doc["method"].IsString()) {
                     const std::string method = doc["method"].GetString();
                     if (method == "mh-noderegistration") {
-                        if (doc.HasMember("params") && doc["params"].IsObject()) {
-                            const auto &params = doc["params"];
-                            if (params.HasMember("host") && params["host"].IsString() && params.HasMember("name") && params["name"].IsString()) {
-                                const std::string host = params["host"].GetString();
-                                const std::string name = params["name"].GetString();
-                                std::string type;
-                                if (params.HasMember("type") && params["type"].IsString()) {
-                                    type = params["type"].GetString();
-                                }
-                                //LOGINFO << "Node register found " << host;
-                                allNodes.nodes[host] = AllNodesNode(name, type);
-                            }
-                        }
-                    } else if (method == "mhRegisterNode") {
                         if (doc.HasMember("params") && doc["params"].IsObject()) {
                             const auto &params = doc["params"];
                             if (params.HasMember("host") && params["host"].IsString() && params.HasMember("name") && params["name"].IsString()) {
