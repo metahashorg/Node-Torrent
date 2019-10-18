@@ -103,7 +103,7 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
         if (countBlocks != 1) {
             return std::make_pair("get-blocks", "{\"id\":1,\"params\":{\"beginBlock\": " + std::to_string(beginBlock) + ", \"countBlocks\": " + std::to_string(countBlocks) + ", \"type\": \"forP2P\", \"direction\": \"forward\"}}");
         } else {
-            return std::make_pair("get-block-by-number", "{\"id\":1,\"params\":{\"number\": " + std::to_string(blockNum + number) + ", \"type\": \"forP2P\"}}");
+            return std::make_pair("get-block-by-number", "{\"id\":1,\"params\":{\"number\": " + std::to_string(beginBlock) + ", \"type\": \"forP2P\"}}");
         }
     };
     
@@ -148,7 +148,9 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
                 advancedLoadsBlocksHeaders.emplace_back(currBlockNum + j, blocks[j]);
             }
         } else {
-            advancedLoadsBlocksHeaders.emplace_back(currBlockNum, parseBlockHeader(answer[i]));
+            const MinimumBlockHeader header = parseBlockHeader(answer[i]);
+            CHECK(header.number == currBlockNum, "Incorrect block number in answer: " + std::to_string(header.number) + " " + std::to_string(currBlockNum));
+            advancedLoadsBlocksHeaders.emplace_back(currBlockNum, header);
         }
     }
     
