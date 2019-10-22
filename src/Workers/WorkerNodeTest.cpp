@@ -31,7 +31,7 @@ WorkerNodeTest::WorkerNodeTest(const BlockChain &blockchain, const std::string &
     , folderBlocks(folderBlocks)
     , leveldbNodeTest(leveldbOptNodeTest.writeBufSizeMb, leveldbOptNodeTest.isBloomFilter, leveldbOptNodeTest.isChecks, leveldbOptNodeTest.folderName, leveldbOptNodeTest.lruCacheMb)
 {
-    const NodeStatBlockInfo lastScriptBlock = findNodeStatBlock(leveldbNodeTest);
+    const NodeStatBlockInfo lastScriptBlock = leveldbNodeTest.findNodeStatBlock();
     initializeScriptBlockNumber = lastScriptBlock.blockNumber;
 }
 
@@ -88,7 +88,7 @@ static void processTestTransaction(const TransactionInfo &tx, std::unordered_map
         if (nodeTestResult != std::nullopt) {
             auto found = lastNodesTests.find(nodeTestResult->serverAddress);
             if (found == lastNodesTests.end()) {
-                BestNodeTest lastNodeTest = findNodeStatLastResults(nodeTestResult->serverAddress, leveldbNodeTest);
+                BestNodeTest lastNodeTest = leveldbNodeTest.findNodeStatLastResults(nodeTestResult->serverAddress);
                 if (lastNodeTest.tests.empty()) {
                     lastNodeTest = BestNodeTest(false);
                 }
@@ -183,7 +183,7 @@ void WorkerNodeTest::work() {
             }
             BlockInfo &bi = *biSP;
             
-            const NodeStatBlockInfo lastScriptBlock = findNodeStatBlock(leveldbNodeTest);
+            const NodeStatBlockInfo lastScriptBlock = leveldbNodeTest.findNodeStatBlock();
             const std::vector<unsigned char> &prevHash = lastScriptBlock.blockHash;
 
             if (bi.header.blockNumber.value() <= lastScriptBlock.blockNumber) {
@@ -194,7 +194,7 @@ void WorkerNodeTest::work() {
             
             CHECK(prevHash.empty() || prevHash == bi.header.prevHash, "Incorrect prev hash. Expected " + toHex(prevHash) + ", received " + toHex(bi.header.prevHash));
 
-            const size_t currDay = findNodeStatDayNumber(leveldbNodeTest).dayNumber;
+            const size_t currDay = leveldbNodeTest.findNodeStatDayNumber().dayNumber;
                         
             Batch batchStates;
             
@@ -221,18 +221,18 @@ void WorkerNodeTest::work() {
             }
             
             for (const auto &[address, count]: countTests) {
-                const NodeTestCount oldNodeStat = findNodeStatCount(address, currDay, leveldbNodeTest);
+                const NodeTestCount oldNodeStat = leveldbNodeTest.findNodeStatCount(address, currDay);
                 const NodeTestCount currNodeStat = count + oldNodeStat;
                 batchStates.addNodeTestCountForDay(address, currNodeStat, currDay);
             }
             for (const auto &[address, rps]: nodesRps) {
-                const NodeRps oldNodeRps = findNodeStatRps(address, currDay, leveldbNodeTest);
+                const NodeRps oldNodeRps = leveldbNodeTest.findNodeStatRps(address, currDay);
                 NodeRps currNodeRps = oldNodeRps;
                 currNodeRps.rps.insert(currNodeRps.rps.end(), rps.rps.begin(), rps.rps.end());
                 batchStates.addNodeTestRpsForDay(address, currNodeRps, currDay);
             }
             if (allTests.countAll != 0) {
-                const NodeTestCount oldNodeStats = findNodeStatsCount(currDay, leveldbNodeTest);
+                const NodeTestCount oldNodeStats = leveldbNodeTest.findNodeStatsCount(currDay);
                 const NodeTestCount currNodesStats = oldNodeStats + allTests;
                 batchStates.addNodeTestCounstForDay(currNodesStats, currDay);
             }
@@ -240,13 +240,13 @@ void WorkerNodeTest::work() {
                 batchStates.addNodeTestLastResults(serverAddress, res);
             }
             if (!allNodesForDay.nodes.empty()) {
-                AllTestedNodes allNodesForDayOld = findAllTestedNodesForDay(currDay, leveldbNodeTest);
+                AllTestedNodes allNodesForDayOld = leveldbNodeTest.findAllTestedNodesForDay(currDay);
                 allNodesForDayOld.plus(allNodesForDay);
                 allNodesForDayOld.day = currDay;
                 batchStates.addAllTestedNodesForDay(allNodesForDayOld, currDay);
             }
             if (!allNodes.nodes.empty()) {
-                AllNodes allNodesOld = findAllNodes(leveldbNodeTest);
+                AllNodes allNodesOld = leveldbNodeTest.findAllNodes();
                 allNodesOld.plus(allNodes);
                 batchStates.addAllNodes(allNodesOld);
             }
@@ -302,14 +302,14 @@ NodeTestResult readNodeTestTransaction(const BestNodeElement &nodeTestElement, s
 }
 
 std::pair<size_t, NodeTestResult> WorkerNodeTest::getLastNodeTestResult(const std::string &address) const {
-    const BestNodeTest lastNodeTests = findNodeStatLastResults(address, leveldbNodeTest);
+    const BestNodeTest lastNodeTests = leveldbNodeTest.findNodeStatLastResults(address);
     const size_t lastTimestamp = blockchain.getLastBlock().timestamp;
 
     BestNodeElement nodeTestElement = lastNodeTests.getMax(getLastBlockDay());
     
     NodeTestResult nodeTestResult = readNodeTestTransaction(nodeTestElement, lastNodeTests.day, folderBlocks);
        
-    const NodeRps nodeRps = findNodeStatRps(address, nodeTestResult.day, leveldbNodeTest);
+    const NodeRps nodeRps = leveldbNodeTest.findNodeStatRps(address, nodeTestResult.day);
     
     if (!nodeRps.rps.empty()) {
         const uint64_t avgRps = findAvg(nodeRps.rps);
@@ -320,27 +320,27 @@ std::pair<size_t, NodeTestResult> WorkerNodeTest::getLastNodeTestResult(const st
 }
 
 std::pair<size_t, NodeTestTrust> WorkerNodeTest::getLastNodeTestTrust(const std::string &address) const {
-    const NodeTestTrust result = findNodeStatLastTrust(address, leveldbNodeTest);
+    const NodeTestTrust result = leveldbNodeTest.findNodeStatLastTrust(address);
     const size_t lastTimestamp = blockchain.getLastBlock().timestamp;
     return std::make_pair(lastTimestamp, result);
 }
 
 NodeTestCount WorkerNodeTest::getLastDayNodeTestCount(const std::string &address) const {
-    return findNodeStatCountLast(address, leveldbNodeTest);
+    return leveldbNodeTest.findNodeStatCountLast(address);
 }
 
 NodeTestCount WorkerNodeTest::getLastDayNodesTestsCount() const {
-    return findNodeStatsCountLast(leveldbNodeTest);
+    return leveldbNodeTest.findNodeStatsCountLast();
 }
 
 std::vector<std::pair<std::string, NodeTestExtendedStat>> WorkerNodeTest::filterLastNodes(size_t countTests) const {
-    const AllTestedNodes allNodesForDay = findAllTestedNodesForLastDay(leveldbNodeTest);
+    const AllTestedNodes allNodesForDay = leveldbNodeTest.findAllTestedNodesForLastDay();
     const size_t lastBlockDay = getLastBlockDay();
     std::vector<std::pair<std::string, NodeTestExtendedStat>> result;
     for (const std::string &node: allNodesForDay.nodes) {
-        const NodeTestCount nodeTestCount = findNodeStatCount(node, allNodesForDay.day, leveldbNodeTest);
+        const NodeTestCount nodeTestCount = leveldbNodeTest.findNodeStatCount(node, allNodesForDay.day);
         
-        const BestNodeTest lastNodeTests = findNodeStatLastResults(node, leveldbNodeTest);
+        const BestNodeTest lastNodeTests = leveldbNodeTest.findNodeStatLastResults(node);
         const BestNodeElement nodeTestElement = lastNodeTests.getMax(lastBlockDay);
         const NodeTestResult nodeTestResult = readNodeTestTransaction(nodeTestElement, lastNodeTests.day, folderBlocks);
         
@@ -354,10 +354,10 @@ std::vector<std::pair<std::string, NodeTestExtendedStat>> WorkerNodeTest::filter
 
 std::pair<int, size_t> WorkerNodeTest::calcNodeRaiting(const std::string &address, size_t countTests) const {
     CHECK(countTests != 0, "Incorrect countTests parameter");
-    const AllTestedNodes allNodesForDay = findAllTestedNodesForLastDay(leveldbNodeTest);
+    const AllTestedNodes allNodesForDay = leveldbNodeTest.findAllTestedNodesForLastDay();
     std::vector<std::pair<std::string, uint64_t>> avgs;
     for (const std::string &node: allNodesForDay.nodes) {
-        const NodeRps nodeRps = findNodeStatRps(node, allNodesForDay.day, leveldbNodeTest);
+        const NodeRps nodeRps = leveldbNodeTest.findNodeStatRps(node, allNodesForDay.day);
         if (nodeRps.rps.size() >= countTests) {
             const uint64_t median = findAvg(nodeRps.rps);
             avgs.emplace_back(node, median);
@@ -411,12 +411,12 @@ std::pair<int, size_t> WorkerNodeTest::calcNodeRaiting(const std::string &addres
 }
 
 size_t WorkerNodeTest::getLastBlockDay() const {
-    const size_t currDay = findNodeStatDayNumber(leveldbNodeTest).dayNumber;
+    const size_t currDay = leveldbNodeTest.findNodeStatDayNumber().dayNumber;
     return currDay;
 }
 
 std::map<std::string, AllNodesNode> WorkerNodeTest::getAllNodes() const {
-    const AllNodes allNodes = findAllNodes(leveldbNodeTest);
+    const AllNodes allNodes = leveldbNodeTest.findAllNodes();
     return allNodes.nodes;
 }
 

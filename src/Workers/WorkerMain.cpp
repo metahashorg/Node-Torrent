@@ -34,7 +34,7 @@ WorkerMain::WorkerMain(const std::string &folderBlocks, LevelDb &leveldb, AllCac
     , users(users)
     , usersMut(usersMut)
 {    
-    const MainBlockInfo oldMetadata = findMainBlock(leveldb);
+    const MainBlockInfo oldMetadata = leveldb.findMainBlock();
     countVal.store(oldMetadata.countVal);
     
     lastSavedBlock = oldMetadata.blockNumber;
@@ -78,7 +78,7 @@ std::optional<TransactionStatus> WorkerMain::calcTransactionStatusDelegate(const
             dState = foundValue.value();
             batch.removeDelegateKey(delegateKeyS);
         } else {
-            const auto &[key, value] = findDelegateKey(delegateKey, leveldb, batch.getDeletedDelegate());
+            const auto &[key, value] = leveldb.findDelegateKey(delegateKey, batch.getDeletedDelegate());
             if (!key.empty()) {
                 CHECK(!value.hash.empty(), "Incorrect delegated value");
                 dState = value;
@@ -200,7 +200,7 @@ void WorkerMain::processTokenOperation(const Address &token, Batch &txsBatch, co
         tokenInfo = tokenStr1.value();
         txsBatch.removeToken(token.toBdString());
     } else {
-        tokenInfo = findToken(token.toBdString(), leveldb);
+        tokenInfo = leveldb.findToken(token.toBdString());
     }
        
     if (tokenInfo.type.empty()) {
@@ -284,7 +284,7 @@ void WorkerMain::validateStateBlock(const BlockInfo &bi) const {
             continue;
         }
         
-        const BalanceInfo balance = findBalance(address.toBdString(), leveldb);
+        const BalanceInfo balance = leveldb.findBalance(address.toBdString());
         
         std::vector<std::pair<Address, DelegateState>> delegateStates = getDelegateStates(address);
         std::stable_sort(delegateStates.begin(), delegateStates.end(), [](const auto &pair1, const auto &pair2) {
@@ -346,7 +346,7 @@ void WorkerMain::worker() {
                         
             const std::string attributeTxStatusCache = std::to_string(bi.header.blockNumber.value());
             
-            const MainBlockInfo oldMetadata = findMainBlock(leveldb);
+            const MainBlockInfo oldMetadata = leveldb.findMainBlock();
             const std::vector<unsigned char> prevHash = oldMetadata.blockHash;
             
             if (bi.header.blockNumber.value() <= oldMetadata.blockNumber) {
@@ -357,7 +357,7 @@ void WorkerMain::worker() {
             
             bi.times.timeBeginSaveBlock = ::now();
             
-            CommonBalance commonBalance = findCommonBalance(leveldb);
+            CommonBalance commonBalance = leveldb.findCommonBalance();
             const bool updateCommonBalance = commonBalance.blockNumber < bi.header.blockNumber.value();
             
             Batch batch;
@@ -465,7 +465,7 @@ void WorkerMain::worker() {
             
             if (bi.header.isForgingBlock()) {
                 ForgingSums fs = makeForgingSums(bi);
-                const ForgingSums oldForgingSums = findForgingSumsAll(leveldb);
+                const ForgingSums oldForgingSums = leveldb.findForgingSumsAll();
                 fs += oldForgingSums;
                 batch.addAllForgedSums(fs);
             }
@@ -474,7 +474,7 @@ void WorkerMain::worker() {
                 parallelFor(countThreads, balances.begin(), balances.end(), [this, &batch, &bi](auto balanceIter){
                     BalanceInfo &currBalance = balanceIter.second;
                     const std::string &address = balanceIter.first;
-                    const BalanceInfo oldBalance = findBalance(address, leveldb);
+                    const BalanceInfo oldBalance = leveldb.findBalance(address);
                     if (oldBalance.blockNumber < bi.header.blockNumber.value()) {
                         const BalanceInfo newBalance = oldBalance + currBalance;
                         if (newBalance.received() < newBalance.spent()) { 
@@ -561,7 +561,7 @@ std::vector<TransactionInfo> WorkerMain::readTxs(const std::vector<AddressInfo> 
 
 std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const Address& address, size_t from, size_t count, size_t limitTxs) const {
     const size_t countLimited = std::min((count == 0 ? limitTxs + 10 : count), limitTxs + 10);
-    const std::vector<AddressInfo> foundResults = findAddress(address.toBdString(), leveldb, from, countLimited);
+    const std::vector<AddressInfo> foundResults = leveldb.findAddress(address.toBdString(), from, countLimited);
     CHECK(foundResults.size() < limitTxs, "Too many transactions in history. Please, request a history with chunks");
     
     std::vector<TransactionInfo> txs = readTxs(foundResults);
@@ -608,7 +608,7 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const A
     const size_t countLimited = std::min((count == 0 ? limitTxs + 10 : count), limitTxs + 10);
     std::vector<TransactionInfo> result;
     while (true) {
-        const std::vector<AddressInfo> foundResults = findAddress(address.toBdString(), leveldb, from, countLimited - result.size());
+        const std::vector<AddressInfo> foundResults = leveldb.findAddress(address.toBdString(), from, countLimited - result.size());
         if (foundResults.empty()) {
             break;
         }
@@ -633,7 +633,7 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const A
 }
 
 std::vector<TransactionStatus> WorkerMain::getStatusesForAddress(const Address& address) const {
-    return findAddressStatus(address.toBdString(), leveldb);
+    return leveldb.findAddressStatus(address.toBdString());
 }
 
 std::vector<TransactionInfo> WorkerMain::getTransactionsFillCache(const Address &address, size_t from, size_t count, size_t limitTxs) const {
@@ -706,7 +706,7 @@ std::optional<TransactionInfo> WorkerMain::findTransaction(const std::string &tx
     
     const std::optional<TransactionInfo> cache = caches.txsCache.getValue(txHash);
     if (!cache.has_value()) {
-        const std::optional<TransactionInfo> found = findTx(txHash, leveldb);
+        const std::optional<TransactionInfo> found = leveldb.findTx(txHash);
         if (!found.has_value()) {
             return std::nullopt;
         }
@@ -723,7 +723,7 @@ void WorkerMain::fillStatusTransaction(TransactionInfo &info) const {
     if (info.isStatusNeed()) {
         const std::optional<TransactionStatus> cacheStatus = caches.txsStatusCache.getValue(info.hash);
         if (!cacheStatus.has_value()) {
-            const std::optional<TransactionStatus> foundStatus = findTxStatus(info.hash, leveldb);
+            const std::optional<TransactionStatus> foundStatus = leveldb.findTxStatus(info.hash);
             if (foundStatus.has_value()) {
                 info.status = foundStatus.value();
             }
@@ -748,7 +748,7 @@ std::optional<TransactionInfo> WorkerMain::getTransaction(const std::string &txH
 
 BalanceInfo WorkerMain::readBalance(const Address& address) const {
     const std::string &addressStr = address.toBdString();
-    return findBalance(addressStr, leveldb);
+    return leveldb.findBalance(addressStr);
 }
 
 BalanceInfo WorkerMain::getBalance(const Address &address) const {
@@ -801,7 +801,7 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
 
 
 std::vector<std::pair<Address, DelegateState>> WorkerMain::getDelegateStates(const Address &fromAddress) const {
-    const std::vector<std::pair<std::string, std::string>> result = findAllDelegatedPairKeys(fromAddress.getBinaryString(), leveldb);
+    const std::vector<std::pair<std::string, std::string>> result = leveldb.findAllDelegatedPairKeys(fromAddress.getBinaryString());
     std::vector<std::pair<Address, DelegateState>> r;
     r.reserve(result.size());
     std::transform(result.begin(), result.end(), std::back_inserter(r), [&fromAddress](const std::pair<std::string, std::string> &element) {
@@ -813,7 +813,7 @@ std::vector<std::pair<Address, DelegateState>> WorkerMain::getDelegateStates(con
 }
 
 CommonBalance WorkerMain::commonBalance() const {
-    return torrent_node_lib::findCommonBalance(leveldb);
+    return leveldb.findCommonBalance();
 }
 
 ForgingSums WorkerMain::getForgingSumForLastBlock(size_t blockIndent) const {
@@ -846,11 +846,11 @@ ForgingSums WorkerMain::getForgingSumForLastBlock(size_t blockIndent) const {
 }
 
 ForgingSums WorkerMain::getForgingSumAll() const {
-    return findForgingSumsAll(leveldb);
+    return leveldb.findForgingSumsAll();
 }
 
 Token WorkerMain::getTokenInfo(const Address &address) const {
-    return findToken(address.toBdString(), leveldb);
+    return leveldb.findToken(address.toBdString());
 }
 
 std::vector<TransactionInfo> WorkerMain::getLastTxs() const {

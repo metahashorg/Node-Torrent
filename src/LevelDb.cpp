@@ -87,6 +87,8 @@ thread_local std::vector<char> Batch::bufferKey;
 
 thread_local std::vector<char> Batch::bufferValue;
 
+thread_local std::vector<char> LevelDb::bufferKey;
+
 LevelDb::LevelDb(long unsigned int writeBufSizeMb, bool isBloomFilter, bool isChecks, std::string_view folderName, size_t lruCacheMb) {
     createDirectories(std::string(folderName));
     options.block_cache = leveldb::NewLRUCache(lruCacheMb * 1024 * 1024);
@@ -188,9 +190,13 @@ std::string LevelDb::findOneValueInternal(const Key& key, bool isCheck) const {
     return value;
 }
 
-std::pair<std::string, std::string> LevelDb::findFirstOf(const std::string& key, const std::unordered_set<std::string> &excluded) const {
+static bool beginWith(const std::string &first, const std::vector<char> &second) {
+    return first.size() >= second.size() && std::equal(second.begin(), second.end(), first.begin());
+}
+
+std::pair<std::string, std::string> LevelDb::findFirstOf(const std::vector<char>& key, const std::unordered_set<std::string> &excluded) const {
     std::unique_ptr<leveldb::Iterator> it(db->NewIterator(leveldb::ReadOptions()));
-    for (it->Seek(key); it->Valid(); it->Next()) {
+    for (it->Seek(leveldb::Slice(key.data(), key.size())); it->Valid(); it->Next()) {
         const std::string &keyResult = it->key().ToString();
         if (beginWith(keyResult, key)) {
             if (excluded.find(keyResult) != excluded.end()) {
@@ -306,10 +312,6 @@ void Batch::addBlockMetadata(const BlocksMetadata& value) {
 void Batch::addFileMetadata(const CroppedFileName &fileName, const FileInfo& value) {
     makeKey(bufferKey, FILE_PREFIX, fileName.str());
     addKey(bufferKey, value);
-}
-
-void saveModules(const std::string& modules, LevelDb& leveldb) {
-    leveldb.saveValue(MODULES_KEY, modules, true);
 }
 
 void Batch::addMainBlock(const MainBlockInfo &value) {
@@ -452,66 +454,66 @@ void Batch::addNodeStatBlock(const NodeStatBlockInfo &value) {
     addKey(NODE_STAT_BLOCK_NUMBER_PREFIX, value);
 }
 
-std::vector<AddressInfo> findAddress(const std::string &address, const LevelDb &leveldb, size_t from, size_t count) {
+void LevelDb::saveModules(const std::string& modules) {
+    saveValue(MODULES_KEY, modules, true);
+}
+
+std::vector<AddressInfo> LevelDb::findAddress(const std::string &address, size_t from, size_t count) const {
     std::vector<char> keyPrefix;
     makeKey(keyPrefix, ADDRESS_PREFIX, address);
     std::vector<char> keyBegin = keyPrefix;
     keyBegin.emplace_back(ADDRESS_POSTFIX);
     std::vector<char> keyEnd = keyPrefix;
     keyEnd.emplace_back(ADDRESS_POSTFIX + 1);
-    return leveldb.findKeyValue<AddressInfo>(keyBegin, keyEnd, from, count);
+    return findKeyValue<AddressInfo>(keyBegin, keyEnd, from, count);
 }
 
-std::vector<TransactionStatus> findAddressStatus(const std::string& address, const LevelDb& leveldb) { // TODO придумать, как не читать все записи
+std::vector<TransactionStatus> LevelDb::findAddressStatus(const std::string& address) const { // TODO придумать, как не читать все записи
     std::vector<char> keyPrefix;
     makeKey(keyPrefix, ADDRESS_STATUS_PREFIX, address);
     std::vector<char> keyBegin = keyPrefix;
     keyBegin.emplace_back(ADDRESS_POSTFIX);
     std::vector<char> keyEnd = keyPrefix;
     keyEnd.emplace_back(ADDRESS_POSTFIX + 1);
-    return leveldb.findKeyValue<TransactionStatus>(keyBegin, keyEnd, 0, 0);
+    return findKeyValue<TransactionStatus>(keyBegin, keyEnd, 0, 0);
 }
 
-BalanceInfo findBalance(const std::string &address, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, BALANCE_PREFIX, address);
-    return leveldb.findOneValueWithoutCheckValue<BalanceInfo>(key);
+BalanceInfo LevelDb::findBalance(const std::string &address) const {
+    makeKey(bufferKey, BALANCE_PREFIX, address);
+    return findOneValueWithoutCheckValue<BalanceInfo>(bufferKey);
 }
 
-std::optional<TransactionInfo> findTx(const std::string& txHash, const LevelDb& leveldb) {
-    std::vector<char> key;
-    makeKey(key, TRANSACTION_PREFIX, txHash);
-    return leveldb.findOneValueWithoutCheckOpt<TransactionInfo>(key);
+std::optional<TransactionInfo> LevelDb::findTx(const std::string& txHash) const {
+    makeKey(bufferKey, TRANSACTION_PREFIX, txHash);
+    return findOneValueWithoutCheckOpt<TransactionInfo>(bufferKey);
 }
 
-Token findToken(const std::string &address, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, TOKEN_PREFIX, address);
-    return leveldb.findOneValueWithoutCheckValue<Token>(key);
+Token LevelDb::findToken(const std::string &address) const {
+    makeKey(bufferKey, TOKEN_PREFIX, address);
+    return findOneValueWithoutCheckValue<Token>(bufferKey);
 }
 
-std::optional<TransactionStatus> findTxStatus(const std::string& txHash, const LevelDb& leveldb) {
-    std::vector<char> key;
-    makeKey(key, TRANSACTION_STATUS_PREFIX, txHash);
-    return leveldb.findOneValueWithoutCheckOpt<TransactionStatus>(key);
+std::optional<TransactionStatus> LevelDb::findTxStatus(const std::string& txHash) const {
+    makeKey(bufferKey, TRANSACTION_STATUS_PREFIX, txHash);
+    return findOneValueWithoutCheckOpt<TransactionStatus>(bufferKey);
 }
 
-std::pair<std::string, DelegateState> findDelegateKey(const std::string &delegatePair, const LevelDb &leveldb, const std::unordered_set<std::string> &excluded) {
-    const std::string key = DELEGATE_PREFIX + delegatePair + DELEGATE_POSTFIX;
-    const auto result = leveldb.findFirstOf(key, excluded);
+std::pair<std::string, DelegateState> LevelDb::findDelegateKey(const std::string &delegatePair, const std::unordered_set<std::string> &excluded) const {
+    makeKey(bufferKey, DELEGATE_PREFIX, delegatePair, DELEGATE_POSTFIX);
+    const auto result = findFirstOf(bufferKey, excluded);
     return std::make_pair(result.first, DelegateState::deserialize(result.second));
 }
 
-BlocksMetadata findBlockMetadata(const LevelDb& leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<BlocksMetadata>(KEY_BLOCK_METADATA);
+BlocksMetadata LevelDb::findBlockMetadata() const {
+    return findOneValueWithoutCheckValue<BlocksMetadata>(KEY_BLOCK_METADATA);
 }
 
-std::unordered_map<CroppedFileName, FileInfo> getAllFiles(const LevelDb &leveldb) {
+std::unordered_map<CroppedFileName, FileInfo> LevelDb::getAllFiles() const {
     const std::string &from = FILE_PREFIX;
     std::string to = from.substr(0, from.size() - 1);
     to += (char)(from.back() + 1);
     
-    const std::vector<FileInfo> found = leveldb.findKeyValue<FileInfo>(from, to);
+    const std::vector<FileInfo> found = findKeyValue<FileInfo>(from, to);
     
     std::unordered_map<CroppedFileName, FileInfo> result;
     
@@ -522,23 +524,22 @@ std::unordered_map<CroppedFileName, FileInfo> getAllFiles(const LevelDb &leveldb
     return result;
 }
 
-std::set<std::string> getAllBlocks(const LevelDb &leveldb) {
+std::set<std::string> LevelDb::getAllBlocks() const {
     const std::string &from = BLOCK_PREFIX;
     std::string to = from.substr(0, from.size() - 1);
     to += (char)(from.back() + 1);
     
-    const std::vector<std::string> res = leveldb.findKey(from, to);
+    const std::vector<std::string> res = findKey(from, to);
     return std::set<std::string>(res.begin(), res.end());
 }
 
-void saveTransactionStatus(const std::string& txHash, const TransactionStatus& value, LevelDb &leveldb) {
-    std::vector<char> buffer;
-    makeKey(buffer, TRANSACTION_STATUS_PREFIX, txHash);
+void LevelDb::saveTransactionStatus(const std::string& txHash, const TransactionStatus& value) {
+    makeKey(bufferKey, TRANSACTION_STATUS_PREFIX, txHash);
     
     std::vector<char> bufferValue;
     value.serialize(bufferValue);
     
-    leveldb.saveValue(buffer, bufferValue);
+    saveValue(bufferKey, bufferValue);
 }
 
 std::string makeAddressStatusKey(const std::string &address, const std::string &txHash) {
@@ -546,129 +547,120 @@ std::string makeAddressStatusKey(const std::string &address, const std::string &
     return key;
 }
 
-void saveAddressStatus(const std::string& addressAndHash, const TransactionStatus& value, LevelDb& leveldb) {
+void LevelDb::saveAddressStatus(const std::string& addressAndHash, const TransactionStatus& value) {
     std::vector<char> buffer;
     value.serialize(buffer);
-    leveldb.saveValue(addressAndHash, buffer);
+    saveValue(addressAndHash, buffer);
 }
 
-void saveVersionDb(const std::string &value, LevelDb &leveldb) {
-    leveldb.saveValue(VERSION_DB, value);
+void LevelDb::saveVersionDb(const std::string &value) {
+    saveValue(VERSION_DB, value);
 }
 
-std::string findModules(const LevelDb &leveldb) {
-    return leveldb.findOneValueWithoutCheck(MODULES_KEY);
+std::string LevelDb::findModules() const {
+    return findOneValueWithoutCheck(MODULES_KEY);
 }
 
-MainBlockInfo findMainBlock(const LevelDb &leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<MainBlockInfo>(MAIN_BLOCK_NUMBER_PREFIX);
+MainBlockInfo LevelDb::findMainBlock() const {
+    return findOneValueWithoutCheckValue<MainBlockInfo>(MAIN_BLOCK_NUMBER_PREFIX);
 }
 
-ScriptBlockInfo findScriptBlock(const LevelDb& leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<ScriptBlockInfo>(SCRIPT_BLOCK_NUMBER_PREFIX);
+ScriptBlockInfo LevelDb::findScriptBlock() const {
+    return findOneValueWithoutCheckValue<ScriptBlockInfo>(SCRIPT_BLOCK_NUMBER_PREFIX);
 }
 
-V8State findV8State(const std::string& v8Address, LevelDb& leveldb) {
-    std::vector<char> key;
-    makeKey(key, V8_STATE_PREFIX, v8Address);
-    return leveldb.findOneValueWithoutCheckValue<V8State>(key);
+V8State LevelDb::findV8State(const std::string& v8Address) const {
+    makeKey(bufferKey, V8_STATE_PREFIX, v8Address);
+    return findOneValueWithoutCheckValue<V8State>(bufferKey);
 }
 
-std::vector<std::pair<std::string, std::string>> findAllDelegatedPairKeys(const std::string &keyFrom, const LevelDb &leveldb) {
+std::vector<std::pair<std::string, std::string>> LevelDb::findAllDelegatedPairKeys(const std::string &keyFrom) const {
     CHECK(!keyFrom.empty(), "Incorrect delegatePair");
     const std::string keyF = DELEGATE_PREFIX + keyFrom + DELEGATE_KEY_PAIR_DELIMITER;
     const std::string keyTo = DELEGATE_PREFIX + keyFrom + char(DELEGATE_KEY_PAIR_DELIMITER + 1);
-    return leveldb.findKey2(keyF, keyTo);
+    return findKey2(keyF, keyTo);
 }
 
-V8Details findV8DetailsAddress(const std::string &address, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, V8_DETAILS_PREFIX, address);
-    return leveldb.findOneValueWithoutCheckValue<V8Details>(key);
+V8Details LevelDb::findV8DetailsAddress(const std::string &address) const {
+    makeKey(bufferKey, V8_DETAILS_PREFIX, address);
+    return findOneValueWithoutCheckValue<V8Details>(bufferKey);
 }
 
-V8Code findV8CodeAddress(const std::string &address, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, V8_CODE_PREFIX, address);
-    return leveldb.findOneValueWithoutCheckValue<V8Code>(key);
+V8Code LevelDb::findV8CodeAddress(const std::string &address) const {
+    makeKey(bufferKey, V8_CODE_PREFIX, address);
+    return findOneValueWithoutCheckValue<V8Code>(bufferKey);
 }
 
-CommonBalance findCommonBalance(const LevelDb &leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<CommonBalance>(COMMON_BALANCE_KEY);
+CommonBalance LevelDb::findCommonBalance() const {
+    return findOneValueWithoutCheckValue<CommonBalance>(COMMON_BALANCE_KEY);
 }
 
-std::string findVersionDb(const LevelDb &leveldb) {
-    return leveldb.findOneValueWithoutCheck(VERSION_DB);
+std::string LevelDb::findVersionDb() const {
+    return findOneValueWithoutCheck(VERSION_DB);
 }
 
-NodeStatBlockInfo findNodeStatBlock(const LevelDb& leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<NodeStatBlockInfo>(NODE_STAT_BLOCK_NUMBER_PREFIX);
+NodeStatBlockInfo LevelDb::findNodeStatBlock() const {
+    return findOneValueWithoutCheckValue<NodeStatBlockInfo>(NODE_STAT_BLOCK_NUMBER_PREFIX);
 }
 
-NodeTestCount findNodeStatCount(const std::string &address, size_t dayNumber, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    return leveldb.findOneValueWithoutCheckValue<NodeTestCount>(key);
+NodeTestCount LevelDb::findNodeStatCount(const std::string &address, size_t dayNumber) const {
+    makeKey(bufferKey, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX, SerializerInt(-dayNumber));
+    return findOneValueWithoutCheckValue<NodeTestCount>(bufferKey);
 }
 
-NodeTestCount findNodeStatsCount(size_t dayNumber, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, NODE_STATS_COUNT_PREFIX, NODE_STATS_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    return leveldb.findOneValueWithoutCheckValue<NodeTestCount>(key);
+NodeTestCount LevelDb::findNodeStatsCount(size_t dayNumber) const {
+    makeKey(bufferKey, NODE_STATS_COUNT_PREFIX, NODE_STATS_COUNT_POSTFIX, SerializerInt(-dayNumber));
+    return findOneValueWithoutCheckValue<NodeTestCount>(bufferKey);
 }
 
-BestNodeTest findNodeStatLastResults(const std::string &address, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, NODE_STAT_RESULT_PREFIX, address);
-    return leveldb.findOneValueWithoutCheckValue<BestNodeTest>(key);
+BestNodeTest LevelDb::findNodeStatLastResults(const std::string &address) const {
+    makeKey(bufferKey, NODE_STAT_RESULT_PREFIX, address);
+    return findOneValueWithoutCheckValue<BestNodeTest>(bufferKey);
 }
 
-NodeTestTrust findNodeStatLastTrust(const std::string &address, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, NODE_STAT_TRUST_PREFIX, address);
-    return leveldb.findOneValueWithoutCheckValue<NodeTestTrust>(key);
+NodeTestTrust LevelDb::findNodeStatLastTrust(const std::string &address) const {
+    makeKey(bufferKey, NODE_STAT_TRUST_PREFIX, address);
+    return findOneValueWithoutCheckValue<NodeTestTrust>(bufferKey);
 }
 
-NodeRps findNodeStatRps(const std::string &address, size_t dayNumber, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, NODE_STAT_RPS_PREFIX, address, NODE_STAT_RPS_POSTFIX, SerializerInt(-dayNumber));
-    return leveldb.findOneValueWithoutCheckValue<NodeRps>(key);
+NodeRps LevelDb::findNodeStatRps(const std::string &address, size_t dayNumber) const {
+    makeKey(bufferKey, NODE_STAT_RPS_PREFIX, address, NODE_STAT_RPS_POSTFIX, SerializerInt(-dayNumber));
+    return findOneValueWithoutCheckValue<NodeRps>(bufferKey);
 }
 
-NodeTestDayNumber findNodeStatDayNumber(const LevelDb &leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<NodeTestDayNumber>(NODE_STAT_DAY_NUMBER);
+NodeTestDayNumber LevelDb::findNodeStatDayNumber() const {
+    return findOneValueWithoutCheckValue<NodeTestDayNumber>(NODE_STAT_DAY_NUMBER);
 }
 
-NodeTestCount findNodeStatCountLast(const std::string &address, const LevelDb &leveldb) {
-    const std::string prefixKey = NODE_STAT_COUNT_PREFIX + address + NODE_STAT_COUNT_POSTFIX;
-    const auto &[key, value] = leveldb.findFirstOf(prefixKey, {});
+NodeTestCount LevelDb::findNodeStatCountLast(const std::string &address) const {
+    makeKey(bufferKey, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX);
+    const auto &[key, value] = findFirstOf(bufferKey, {});
     return NodeTestCount::deserialize(value);
 }
 
-NodeTestCount findNodeStatsCountLast(const LevelDb &leveldb) {
-    const std::string prefixKey = NODE_STATS_COUNT_PREFIX + NODE_STAT_COUNT_POSTFIX;
-    const auto &[key, value] = leveldb.findFirstOf(prefixKey, {});
+NodeTestCount LevelDb::findNodeStatsCountLast() const {
+    makeKey(bufferKey, NODE_STATS_COUNT_PREFIX, NODE_STAT_COUNT_POSTFIX);
+    const auto &[key, value] = findFirstOf(bufferKey, {});
     return NodeTestCount::deserialize(value);
 }
 
-AllTestedNodes findAllTestedNodesForDay(size_t day, const LevelDb &leveldb) {
-    std::vector<char> key;
-    makeKey(key, NODES_TESTED_STATS_ALL_DAY, NODES_TESTED_STATS_ALL_DAY_POSTFIX, SerializerInt(-day));
-    return leveldb.findOneValueWithoutCheckValue<AllTestedNodes>(key);
+AllTestedNodes LevelDb::findAllTestedNodesForDay(size_t day) const {
+    makeKey(bufferKey, NODES_TESTED_STATS_ALL_DAY, NODES_TESTED_STATS_ALL_DAY_POSTFIX, SerializerInt(-day));
+    return findOneValueWithoutCheckValue<AllTestedNodes>(bufferKey);
 }
 
-AllTestedNodes findAllTestedNodesForLastDay(const LevelDb &leveldb) {
-    const std::string prefixKey = NODES_TESTED_STATS_ALL_DAY + NODE_STAT_COUNT_POSTFIX;
-    const auto &[key, value] = leveldb.findFirstOf(prefixKey, {});
+AllTestedNodes LevelDb::findAllTestedNodesForLastDay() const {
+    makeKey(bufferKey, NODES_TESTED_STATS_ALL_DAY, NODE_STAT_COUNT_POSTFIX);
+    const auto &[key, value] = findFirstOf(bufferKey, {});
     return AllTestedNodes::deserialize(value);
 }
 
-ForgingSums findForgingSumsAll(const LevelDb &leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<ForgingSums>(FORGING_SUMS_ALL);
+ForgingSums LevelDb::findForgingSumsAll() const {
+    return findOneValueWithoutCheckValue<ForgingSums>(FORGING_SUMS_ALL);
 }
 
-AllNodes findAllNodes(const LevelDb &leveldb) {
-    return leveldb.findOneValueWithoutCheckValue<AllNodes>(NODES_STATS_ALL);
+AllNodes LevelDb::findAllNodes() const {
+    return findOneValueWithoutCheckValue<AllNodes>(NODES_STATS_ALL);
 }
 
 }

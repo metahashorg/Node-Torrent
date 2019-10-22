@@ -20,7 +20,7 @@ WorkerScript::WorkerScript(LevelDb &leveldb, const LevelDbOptions &leveldbOptScr
     , modules(modules)
     , caches(caches)
 {
-    const ScriptBlockInfo lastScriptBlock = findScriptBlock(leveldbV8);
+    const ScriptBlockInfo lastScriptBlock = leveldbV8.findScriptBlock();
     initializeScriptBlockNumber = lastScriptBlock.blockNumber;
 }
 
@@ -47,7 +47,7 @@ void WorkerScript::work() {
             }
             BlockInfo &bi = *biSP;
             
-            const ScriptBlockInfo lastScriptBlock = findScriptBlock(leveldbV8);
+            const ScriptBlockInfo lastScriptBlock = leveldbV8.findScriptBlock();
             const std::vector<unsigned char> &prevHash = lastScriptBlock.blockHash;            
 
             if (bi.header.blockNumber.value() <= lastScriptBlock.blockNumber) {
@@ -84,7 +84,7 @@ void WorkerScript::work() {
                         prevV8State = findV8State.value();
                         isBatch = true;
                     } else {
-                        prevV8State = torrent_node_lib::findV8State(address.getBinaryString(), leveldbV8);
+                        prevV8State = leveldbV8.findV8State(address.getBinaryString());
                         isBatch = false;
                     }
                     return std::make_pair(isBatch, prevV8State);
@@ -197,7 +197,7 @@ void WorkerScript::work() {
                         
                         if (modules[MODULE_ADDR_TXS]) {                           
                             const std::string addressAndHash = makeAddressStatusKey(addrString, tx.hash);
-                            torrent_node_lib::saveAddressStatus(addressAndHash, status, leveldb); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
+                            leveldb.saveAddressStatus(addressAndHash, status); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
                         }
                     };
                     
@@ -212,7 +212,7 @@ void WorkerScript::work() {
                     
                     if (modules[MODULE_TXS]) {
                         caches.txsStatusCache.addValue(txStatus.transaction, attributeTxStatusCache, txStatus);
-                        torrent_node_lib::saveTransactionStatus(txStatus.transaction, txStatus, leveldb); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
+                        leveldb.saveTransactionStatus(txStatus.transaction, txStatus); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
                     }
                 }
             }
@@ -252,11 +252,11 @@ std::optional<size_t> WorkerScript::getInitBlockNumber() const {
 }
 
 V8Details WorkerScript::getContractDetails(const Address &contractAddress) const {
-    return findV8DetailsAddress(contractAddress.getBinaryString(), leveldbV8);
+    return leveldbV8.findV8DetailsAddress(contractAddress.getBinaryString());
 }
 
 V8Code WorkerScript::getContractCode(const Address &contractAddress) const {
-    return findV8CodeAddress(contractAddress.toBdString(), leveldbV8);
+    return leveldbV8.findV8CodeAddress(contractAddress.toBdString());
 }
 
 }

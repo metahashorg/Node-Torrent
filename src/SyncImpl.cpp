@@ -111,7 +111,7 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
         batch.addBlockHeader(bi.header.hash, bi.header);
     }
     
-    const BlocksMetadata metadata = findBlockMetadata(leveldb);
+    const BlocksMetadata metadata = leveldb.findBlockMetadata();
     BlocksMetadata newMetadata;
     newMetadata.prevBlockHash = bi.header.prevHash;
     if (metadata.prevBlockHash == bi.header.prevHash) {
@@ -134,28 +134,28 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
 }
 
 void SyncImpl::initialize() {
-    const std::string modulesStr = findModules(leveldb);
+    const std::string modulesStr = leveldb.findModules();
     if (!modulesStr.empty()) {
         const Modules oldModules(modulesStr);
         CHECK(modules == oldModules, "Modules changed in this database");
     } else {
-        saveModules(modules.to_string(), leveldb);
+        leveldb.saveModules(modules.to_string());
     }
     
-    const std::string versionDb = findVersionDb(leveldb);
+    const std::string versionDb = leveldb.findVersionDb();
     if (!versionDb.empty()) {
         CHECK(versionDb == VERSION_DB, "Version database not matches");
     } else {
-        saveVersionDb(VERSION_DB, leveldb);
+        leveldb.saveVersionDb(VERSION_DB);
     }
     
-    const BlocksMetadata metadata = findBlockMetadata(leveldb);
+    const BlocksMetadata metadata = leveldb.findBlockMetadata();
     
     getBlockAlgorithm->initialize();
     
     blockchain.clear();
     
-    const std::set<std::string> blocksRaw = getAllBlocks(leveldb);
+    const std::set<std::string> blocksRaw = leveldb.getAllBlocks();
     for (const std::string &blockRaw: blocksRaw) {
         const BlockHeader bh = BlockHeader::deserialize(blockRaw);
         blockchain.addWithoutCalc(bh);

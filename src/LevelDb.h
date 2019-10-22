@@ -130,11 +130,88 @@ private:
 };
 
 class LevelDb {
+    friend void addBatch(Batch& batch, LevelDb& leveldb);
 public:
        
     LevelDb(size_t writeBufSizeMb, bool isBloomFilter, bool isChecks, std::string_view folderName, size_t lruCacheMb);
     
     ~LevelDb();
+    
+public:
+    
+    void saveModules(const std::string &modules);
+    
+    void saveAddressStatus(const std::string &addressAndHash, const TransactionStatus &value);
+    
+    void saveTransactionStatus(const std::string &txHash, const TransactionStatus &value);
+    
+    void saveVersionDb(const std::string &value);
+    
+    BlocksMetadata findBlockMetadata() const;
+    
+    std::vector<AddressInfo> findAddress(const std::string &address, size_t from, size_t count) const;
+    
+    std::vector<TransactionStatus> findAddressStatus(const std::string &address) const;
+    
+    BalanceInfo findBalance(const std::string &address) const;
+    
+    std::optional<TransactionInfo> findTx(const std::string &txHash) const;
+    
+    Token findToken(const std::string &address) const;
+    
+    std::optional<TransactionStatus> findTxStatus(const std::string &txHash) const;
+    
+    std::pair<std::string, DelegateState> findDelegateKey(const std::string &delegatePair, const std::unordered_set<std::string> &excluded) const;
+    
+    std::unordered_map<CroppedFileName, FileInfo> getAllFiles() const;
+    
+    std::set<std::string> getAllBlocks() const;
+    
+    std::string findModules() const;
+    
+    MainBlockInfo findMainBlock() const;
+    
+    ScriptBlockInfo findScriptBlock() const;
+    
+    V8State findV8State(const std::string &v8Address) const;
+    
+    std::vector<std::pair<std::string, std::string>> findAllDelegatedPairKeys(const std::string &keyFrom) const;
+    
+    V8Details findV8DetailsAddress(const std::string &address) const;
+    
+    V8Code findV8CodeAddress(const std::string &address) const;
+    
+    CommonBalance findCommonBalance() const;
+    
+    std::string findVersionDb() const;
+    
+    NodeStatBlockInfo findNodeStatBlock() const;
+    
+    NodeTestCount findNodeStatCount(const std::string &address, size_t dayNumber) const;
+    
+    NodeTestCount findNodeStatsCount(size_t dayNumber) const;
+    
+    BestNodeTest findNodeStatLastResults(const std::string &address) const;
+    
+    NodeTestTrust findNodeStatLastTrust(const std::string &address) const;
+    
+    NodeRps findNodeStatRps(const std::string &address, size_t dayNumber) const;
+    
+    NodeTestDayNumber findNodeStatDayNumber() const;
+    
+    NodeTestCount findNodeStatCountLast(const std::string &address) const;
+    
+    NodeTestCount findNodeStatsCountLast() const;
+    
+    AllTestedNodes findAllTestedNodesForDay(size_t day) const;
+    
+    AllTestedNodes findAllTestedNodesForLastDay() const;
+    
+    ForgingSums findForgingSumsAll() const;
+    
+    AllNodes findAllNodes() const;
+    
+private:
     
     template<class Key, class Value>
     void saveValue(const Key &key, const Value &value, bool isSync = false);
@@ -156,7 +233,7 @@ public:
     template<class Value, class Key>
     Value findOneValueWithoutCheckValue(const Key &key) const;
         
-    std::pair<std::string, std::string> findFirstOf(const std::string &key, const std::unordered_set<std::string> &excluded) const;
+    std::pair<std::string, std::string> findFirstOf(const std::vector<char> &key, const std::unordered_set<std::string> &excluded) const;
     
     void addBatch(leveldb::WriteBatch &batch);
         
@@ -175,87 +252,17 @@ private:
     leveldb::DB* db;
     leveldb::Options options;
     
+    thread_local static std::vector<char> bufferKey;
+    
 };
 
 void addBatch(Batch &batch, LevelDb &leveldb);
 
-void saveModules(const std::string &modules, LevelDb& leveldb);
-
 std::string makeAddressStatusKey(const std::string &address, const std::string &txHash);
-
-void saveAddressStatus(const std::string &addressAndHash, const TransactionStatus &value, LevelDb &leveldb);
-
-void saveTransactionStatus(const std::string &txHash, const TransactionStatus &value, LevelDb &leveldb);
-
-void saveVersionDb(const std::string &value, LevelDb &leveldb);
-
-BlocksMetadata findBlockMetadata(const LevelDb &leveldb);
-
-std::vector<AddressInfo> findAddress(const std::string &address, const LevelDb &leveldb, size_t from, size_t count);
-
-std::vector<TransactionStatus> findAddressStatus(const std::string &address, const LevelDb &leveldb);
-
-BalanceInfo findBalance(const std::string &address, const LevelDb &leveldb);
-
-std::optional<TransactionInfo> findTx(const std::string &txHash, const LevelDb &leveldb);
-
-Token findToken(const std::string &address, const LevelDb &leveldb);
-
-std::optional<TransactionStatus> findTxStatus(const std::string &txHash, const LevelDb &leveldb);
-
-std::pair<std::string, DelegateState> findDelegateKey(const std::string &delegatePair, const LevelDb &leveldb, const std::unordered_set<std::string> &excluded);
-
-std::unordered_map<CroppedFileName, FileInfo> getAllFiles(const LevelDb &leveldb);
-
-std::set<std::string> getAllBlocks(const LevelDb &leveldb);
-
-std::string findModules(const LevelDb &leveldb);
-
-MainBlockInfo findMainBlock(const LevelDb &leveldb);
-
-ScriptBlockInfo findScriptBlock(const LevelDb &leveldb);
-
-V8State findV8State(const std::string &v8Address, LevelDb &leveldb);
 
 std::string makeKeyDelegatePair(const std::string &keyFrom, const std::string &keyTo);
 
 std::string getSecondOnKeyDelegatePair(const std::string &keyFrom, const std::string &delegateKeyPair);
-
-std::vector<std::pair<std::string, std::string>> findAllDelegatedPairKeys(const std::string &keyFrom, const LevelDb &leveldb);
-
-V8Details findV8DetailsAddress(const std::string &address, const LevelDb &leveldb);
-
-V8Code findV8CodeAddress(const std::string &address, const LevelDb &leveldb);
-
-CommonBalance findCommonBalance(const LevelDb &leveldb);
-
-std::string findVersionDb(const LevelDb &leveldb);
-
-NodeStatBlockInfo findNodeStatBlock(const LevelDb &leveldb);
-
-NodeTestCount findNodeStatCount(const std::string &address, size_t dayNumber, const LevelDb &leveldb);
-
-NodeTestCount findNodeStatsCount(size_t dayNumber, const LevelDb &leveldb);
-
-BestNodeTest findNodeStatLastResults(const std::string &address, const LevelDb &leveldb);
-
-NodeTestTrust findNodeStatLastTrust(const std::string &address, const LevelDb &leveldb);
-
-NodeRps findNodeStatRps(const std::string &address, size_t dayNumber, const LevelDb &leveldb);
-
-NodeTestDayNumber findNodeStatDayNumber(const LevelDb &leveldb);
-
-NodeTestCount findNodeStatCountLast(const std::string &address, const LevelDb &leveldb);
-
-NodeTestCount findNodeStatsCountLast(const LevelDb &leveldb);
-
-AllTestedNodes findAllTestedNodesForDay(size_t day, const LevelDb &leveldb);
-
-AllTestedNodes findAllTestedNodesForLastDay(const LevelDb &leveldb);
-
-ForgingSums findForgingSumsAll(const LevelDb &leveldb);
-
-AllNodes findAllNodes(const LevelDb &leveldb);
 
 }
 

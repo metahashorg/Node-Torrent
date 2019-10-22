@@ -17,7 +17,7 @@ FileBlockSource::FileBlockSource(LevelDb &leveldb, const std::string &folderPath
 {}
 
 void FileBlockSource::initialize() {
-    allFiles = getAllFiles(leveldb);
+    allFiles = leveldb.getAllFiles();
 }
 
 std::pair<bool, size_t> FileBlockSource::doProcess(size_t countBlocks) {
