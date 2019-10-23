@@ -496,8 +496,26 @@ std::string genCountBlockJson(const RequestId &requestId, size_t countBlocks, bo
     return jsonToString(doc, isFormat);
 }
 
-std::string preLoadBlocksJson(size_t countBlocks) {
-    return serializeInt(size_t(0)) + serializeInt(size_t(0)) + serializeInt(countBlocks);
+std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version) {
+    CHECK(bh.size() == blocks.size(), "Incorrect parameter blocks");
+    
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    rapidjson::Value vals(rapidjson::kArrayType);
+    for (size_t i = 0; i < bh.size(); i++) {
+        const BlockHeader &b  = bh[i];
+        
+        if (b.blockNumber == 0) {
+            return genErrorResponse(requestId, -32603, "Incorrect block number: 0. Genesis block begin with number 1");
+        }
+        vals.PushBack(blockHeaderToJson(b, {}, allocator, BlockTypeInfo::ForP2P, version), allocator);
+    }
+    doc.AddMember("result", vals, allocator);
+    const std::string blockHeaders = jsonToString(doc, false);
+    
+    const std::string blocksStr = genDumpBlocksBinary(blocks, isCompress);
+        
+    return serializeInt(blockHeaders.size()) + serializeInt(blocksStr.size()) + serializeInt(countBlocks) + blockHeaders + blocksStr;
 }
 
 std::string genBlockDumpJson(const RequestId &requestId, const std::string &blockDump, bool isFormat) {

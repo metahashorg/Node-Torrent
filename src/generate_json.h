@@ -72,7 +72,7 @@ std::string blockInfoToJson(const RequestId &requestId, const torrent_node_lib::
 
 std::string genCountBlockJson(const RequestId &requestId, size_t countBlocks, bool isFormat, const JsonVersion &version);
 
-std::string preLoadBlocksJson(size_t countBlocks);
+std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version);
 
 std::string genBlockDumpJson(const RequestId &requestId, const std::string &blockDump, bool isFormat);
 

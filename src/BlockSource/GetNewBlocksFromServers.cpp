@@ -75,12 +75,14 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
     return response;
 }
 
-GetNewBlocksFromServer::LastBlockPreLoadResponse GetNewBlocksFromServer::preLoadBlocks(size_t currentBlock) const {
-    std::optional<size_t> lastBlock;
+GetNewBlocksFromServer::LastBlockPreLoadResponse GetNewBlocksFromServer::preLoadBlocks(size_t currentBlock, bool isSign) const {   
+    const size_t PRELOAD_BLOCKS = 5;
+    const size_t MAX_BLOCK_SIZE = 100000;
+    
     std::string error;
-    std::vector<std::string> serversSave;
     std::mutex mut;
-    const BroadcastResult function = [&lastBlock, &error, &mut, &serversSave](const std::string &server, const std::string &result, const std::optional<CurlException> &curlException) {
+    LastBlockPreLoadResponse answer;
+    const BroadcastResult function = [&error, &mut, &answer](const std::string &server, const std::string &result, const std::optional<CurlException> &curlException) {
         if (curlException.has_value()) {
             std::lock_guard<std::mutex> lock(mut);
             error = curlException.value().message;
@@ -105,16 +107,27 @@ GetNewBlocksFromServer::LastBlockPreLoadResponse GetNewBlocksFromServer::preLoad
             const size_t sizeBlocks = deserializeInt<size_t>(result, pos);
             const size_t countBlocks = deserializeInt<size_t>(result, pos);
             
+            CHECK(pos + sizeHeaders <= result.size(), "Incorrect response");
+            const std::string blockHeaders = result.substr(pos, sizeHeaders);
+            pos += sizeHeaders;
+            CHECK(pos + sizeBlocks <= result.size(), "Incorrect response");
+            const std::string blockDumps = result.substr(pos, sizeBlocks);
+            pos += sizeBlocks;
+            CHECK(pos == result.size(), "Incorrect response");
+            
             std::lock_guard<std::mutex> lock(mut);
-            if (!lastBlock.has_value()) {
-                lastBlock = 0;
+            if (!answer.lastBlock.has_value()) {
+                answer.lastBlock = 0;
             }
-            if (lastBlock < countBlocks) {
-                lastBlock = countBlocks;
-                serversSave.clear();
-                serversSave.emplace_back(server);
-            } else if (lastBlock == countBlocks) {
-                serversSave.emplace_back(server);
+            if (answer.lastBlock < countBlocks) {
+                answer.lastBlock = countBlocks;
+                answer.servers.clear();
+                answer.servers.emplace_back(server);
+                
+                answer.blockHeaders = blockHeaders;
+                answer.blocksDumps = blockDumps;
+            } else if (answer.lastBlock == countBlocks) {
+                answer.servers.emplace_back(server);
             }
         } catch (const exception &e) {
             std::lock_guard<std::mutex> lock(mut);
@@ -122,21 +135,34 @@ GetNewBlocksFromServer::LastBlockPreLoadResponse GetNewBlocksFromServer::preLoad
         }
     };
     
-    p2p.broadcast("pre-load", "{\"id\": 1, \"params\": {\"currentBlock\": " + std::to_string(currentBlock) + ", \"compress\": " + (isCompress ? "true" : "false") + "}}", "", function);
+    p2p.broadcast("pre-load", "{\"id\": 1, \"params\": {\"currentBlock\": " + std::to_string(currentBlock) + ", \"compress\": " + (isCompress ? "true" : "false") + ", \"sign\": " + (isSign ? "true" : "false") + ", \"preLoad\": " + std::to_string(PRELOAD_BLOCKS) + ", \"maxBlockSize\": " + std::to_string(MAX_BLOCK_SIZE) + "}}", "", function);
     
-    LastBlockPreLoadResponse response;
-    if (lastBlock.has_value()) {
-        response.lastBlock = lastBlock.value();
-        response.servers = serversSave;
-    } else {
-        response.error = error;
+    if (!answer.lastBlock.has_value()) {
+        answer.error = error;
     }
-    return response;
+    return answer;
 }
 
 void GetNewBlocksFromServer::clearAdvanced() {
     advancedLoadsBlocksHeaders.clear();
     advancedLoadsBlocksDumps.clear();
+}
+
+void GetNewBlocksFromServer::addPreLoadBlocks(size_t fromBlock, const std::string &blockHeadersStr, const std::string &blockDumpsStr) {
+    try {
+        const std::vector<MinimumBlockHeader> blocksHeaders = parseBlocksHeader(blockHeadersStr);
+        const std::vector<std::string> blocksDumps = parseDumpBlocksBinary(blockDumpsStr, isCompress);
+        CHECK(blocksHeaders.size() == blocksDumps.size(), "Not equals count block headers and dumps");
+        
+        for (size_t j = 0; j < blocksHeaders.size(); j++) {
+            CHECK(blocksHeaders[j].number == fromBlock + j, "Incorrect block number in answer: " + std::to_string(blocksHeaders[j].number) + " " + std::to_string(fromBlock + j));
+            advancedLoadsBlocksHeaders.emplace_back(fromBlock + j, blocksHeaders[j]);
+            
+            advancedLoadsBlocksDumps[blocksHeaders[j].hash] = blocksDumps[j];
+        }
+    } catch (const exception &e) {
+        LOGWARN << "Dont added preload blocks " << e;
+    }
 }
 
 MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers) {

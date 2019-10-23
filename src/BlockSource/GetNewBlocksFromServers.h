@@ -18,8 +18,11 @@ public:
     
     struct LastBlockPreLoadResponse {
         std::vector<std::string> servers;
-        size_t lastBlock;
+        std::optional<size_t> lastBlock;
         std::optional<std::string> error;
+        
+        std::string blockHeaders;
+        std::string blocksDumps;
     };
     
 public:
@@ -41,7 +44,9 @@ public:
         
     LastBlockResponse getLastBlock() const;
         
-    LastBlockPreLoadResponse preLoadBlocks(size_t currentBlock) const;
+    LastBlockPreLoadResponse preLoadBlocks(size_t currentBlock, bool isSign) const;
+    
+    void addPreLoadBlocks(size_t fromBlock, const std::string &blockHeadersStr, const std::string &blockDumpsStr);
     
     MinimumBlockHeader getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers);
     

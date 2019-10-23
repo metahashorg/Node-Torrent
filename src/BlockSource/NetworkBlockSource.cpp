@@ -34,20 +34,23 @@ void NetworkBlockSource::initialize() {
 std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
     nextBlockToRead = countBlocks + 1;
     
+    advancedBlocks.clear();
+    getterBlocks.clearAdvanced();
+    
     if (!isPreLoad) {
         const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
         CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
         lastBlockInBlockchain = lastBlock.lastBlock;
         servers = lastBlock.servers;
     } else {
-        const GetNewBlocksFromServer::LastBlockPreLoadResponse lastBlock = getterBlocks.preLoadBlocks(countBlocks);
+        const GetNewBlocksFromServer::LastBlockPreLoadResponse lastBlock = getterBlocks.preLoadBlocks(countBlocks, isVerifySign);
         CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
-        lastBlockInBlockchain = lastBlock.lastBlock;
+        CHECK(lastBlock.lastBlock.has_value(), "Last block not setted");
+        lastBlockInBlockchain = lastBlock.lastBlock.value();
         servers = lastBlock.servers;
+        
+        getterBlocks.addPreLoadBlocks(nextBlockToRead, lastBlock.blockHeaders, lastBlock.blocksDumps);
     }
-
-    advancedBlocks.clear();
-    getterBlocks.clearAdvanced();
     
     return std::make_pair(lastBlockInBlockchain >= nextBlockToRead, lastBlockInBlockchain);
 }

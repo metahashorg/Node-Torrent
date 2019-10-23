@@ -64,6 +64,7 @@ const static size_t MAX_BATCH_TXS = 10000;
 const static size_t MAX_BATCH_BALANCES = 10000;
 const static size_t MAX_HISTORY_SIZE = 10000;
 const static size_t MAX_BATCH_DUMPS = 1000;
+const static size_t MAX_PRELOAD_BLOCKS = 10;
 
 const static int HTTP_STATUS_OK = 200;
 const static int HTTP_STATUS_METHOD_NOT_ALLOWED = 405;
@@ -504,12 +505,32 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
         } else if (func == PRE_LOAD_BLOCKS) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             
-            //const size_t currentBlock = get<int>(jsonParams, "currentBlock");
-            //const bool isCompress = get<bool>(jsonParams, "compress");
+            const size_t currentBlock = get<int>(jsonParams, "currentBlock");
+            const bool isCompress = get<bool>(jsonParams, "compress");
+            const bool isSign = get<bool>(jsonParams, "sign");
+            const size_t preLoadBlocks = get<int>(jsonParams, "preLoad");
+            const size_t maxBlockSize = get<int>(jsonParams, "maxBlockSize");
+            
+            CHECK(preLoadBlocks <= MAX_PRELOAD_BLOCKS, "Incorrect preload parameter");
             
             const size_t countBlocks = sync.getBlockchain().countBlocks();
             
-            response = preLoadBlocksJson(countBlocks);
+            std::vector<torrent_node_lib::BlockHeader> bhs;
+            std::vector<std::string> blocks;
+            if (countBlocks <= currentBlock + preLoadBlocks + MAX_PRELOAD_BLOCKS / 2) {
+                for (size_t i = currentBlock + 1; i < std::min(currentBlock + 1 + preLoadBlocks, countBlocks + 1); i++) {
+                    const BlockHeader &bh = sync.getBlockchain().getBlock(i);
+                    CHECK(bh.blockNumber.has_value(), "block " + to_string(i) + " not found");
+                    if (bh.blockSize > maxBlockSize) {
+                        break;
+                    }
+                    
+                    bhs.emplace_back(bh);
+                    blocks.emplace_back(sync.getBlockDump(bh, 0, std::numeric_limits<size_t>::max(), false, isSign));
+                }
+            }
+            
+            response = preLoadBlocksJson(requestId, countBlocks, bhs, blocks, isCompress, jsonVersion);
         } else if (func == GET_ADDRESS_DELEGATIONS) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             
