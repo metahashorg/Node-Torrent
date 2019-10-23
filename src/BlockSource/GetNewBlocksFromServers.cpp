@@ -232,7 +232,7 @@ std::pair<std::string, std::string> GetNewBlocksFromServer::makeRequestForDumpBl
 
 std::pair<std::string, std::string> GetNewBlocksFromServer::makeRequestForDumpBlockSign(const std::string &blockHash, size_t fromByte, size_t toByte) {
     const static std::string QS = "get-dump-block-by-hash";
-    const std::string post = "{\"id\":1,\"params\":{\"hash\": \"" + blockHash + "\" , \"fromByte\": " + std::to_string(fromByte) + ", \"toByte\": " + std::to_string(toByte) + "\", \"isHex\": false, \"isSign\": true, " + 
+    const std::string post = "{\"id\":1,\"params\":{\"hash\": \"" + blockHash + "\" , \"fromByte\": " + std::to_string(fromByte) + ", \"toByte\": " + std::to_string(toByte) + ", \"isHex\": false, \"isSign\": true, " + 
     "\"compress\": " + "false" + 
     "}}"; // TODO если isHex true, нужно менять код ниже
     return std::make_pair(QS, post);
