@@ -38,6 +38,7 @@ const static std::string GET_BLOCK_BY_NUMBER = "get-block-by-number";
 const static std::string GET_BLOCKS = "get-blocks";
 const static std::string GET_LAST_TXS = "get-last-txs";
 const static std::string GET_COUNT_BLOCKS = "get-count-blocks";
+const static std::string PRE_LOAD_BLOCKS = "pre-load";
 const static std::string GET_DUMP_BLOCK_BY_HASH = "get-dump-block-by-hash";
 const static std::string GET_DUMP_BLOCK_BY_NUMBER = "get-dump-block-by-number";
 const static std::string GET_DUMPS_BLOCKS_BY_HASH = "get-dumps-blocks-by-hash";
@@ -500,6 +501,15 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const size_t countBlocks = sync.getBlockchain().countBlocks();
             
             response = genCountBlockJson(requestId, countBlocks, isFormatJson, jsonVersion);
+        } else if (func == PRE_LOAD_BLOCKS) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+            
+            //const size_t currentBlock = get<int>(jsonParams, "currentBlock");
+            //const bool isCompress = get<bool>(jsonParams, "compress");
+            
+            const size_t countBlocks = sync.getBlockchain().countBlocks();
+            
+            response = preLoadBlocksJson(countBlocks);
         } else if (func == GET_ADDRESS_DELEGATIONS) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             

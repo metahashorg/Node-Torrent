@@ -15,7 +15,13 @@ public:
         size_t lastBlock;
         std::optional<std::string> error;
     };
-        
+    
+    struct LastBlockPreLoadResponse {
+        std::vector<std::string> servers;
+        size_t lastBlock;
+        std::optional<std::string> error;
+    };
+    
 public:
     
     static std::pair<std::string, std::string> makeRequestForDumpBlock(const std::string &blockHash, size_t fromByte, size_t toByte);
@@ -35,6 +41,8 @@ public:
         
     LastBlockResponse getLastBlock() const;
         
+    LastBlockPreLoadResponse preLoadBlocks(size_t currentBlock) const;
+    
     MinimumBlockHeader getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers);
     
     MinimumBlockHeader getBlockHeaderWithoutAdvanceLoad(size_t blockNum, const std::string &server) const;

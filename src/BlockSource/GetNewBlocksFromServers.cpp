@@ -13,6 +13,8 @@ using namespace std::placeholders;
 #include "log.h"
 #include "jsonUtils.h"
 
+#include "utils/serialize.h"
+
 using namespace common;
 
 namespace torrent_node_lib {
@@ -64,6 +66,65 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
     p2p.broadcast("get-count-blocks", "{\"id\": 1}", "", function);
     
     LastBlockResponse response;
+    if (lastBlock.has_value()) {
+        response.lastBlock = lastBlock.value();
+        response.servers = serversSave;
+    } else {
+        response.error = error;
+    }
+    return response;
+}
+
+GetNewBlocksFromServer::LastBlockPreLoadResponse GetNewBlocksFromServer::preLoadBlocks(size_t currentBlock) const {
+    std::optional<size_t> lastBlock;
+    std::string error;
+    std::vector<std::string> serversSave;
+    std::mutex mut;
+    const BroadcastResult function = [&lastBlock, &error, &mut, &serversSave](const std::string &server, const std::string &result, const std::optional<CurlException> &curlException) {
+        if (curlException.has_value()) {
+            std::lock_guard<std::mutex> lock(mut);
+            error = curlException.value().message;
+            return;
+        }
+        
+        try {
+            if (result.size() <= 320) {
+                rapidjson::Document doc;
+                const rapidjson::ParseResult pr = doc.Parse(result.c_str());
+                if (pr) {
+                    CHECK(doc.HasMember("error") && !doc["error"].IsNull(), "Unknown response");
+                    
+                    std::lock_guard<std::mutex> lock(mut);
+                    error = jsonToString(doc["error"], false);
+                    return;
+                }
+            }
+
+            size_t pos = 0;
+            const size_t sizeHeaders = deserializeInt<size_t>(result, pos);
+            const size_t sizeBlocks = deserializeInt<size_t>(result, pos);
+            const size_t countBlocks = deserializeInt<size_t>(result, pos);
+            
+            std::lock_guard<std::mutex> lock(mut);
+            if (!lastBlock.has_value()) {
+                lastBlock = 0;
+            }
+            if (lastBlock < countBlocks) {
+                lastBlock = countBlocks;
+                serversSave.clear();
+                serversSave.emplace_back(server);
+            } else if (lastBlock == countBlocks) {
+                serversSave.emplace_back(server);
+            }
+        } catch (const exception &e) {
+            std::lock_guard<std::mutex> lock(mut);
+            error = e;
+        }
+    };
+    
+    p2p.broadcast("pre-load", "{\"id\": 1, \"params\": {\"currentBlock\": " + std::to_string(currentBlock) + ", \"compress\": " + (isCompress ? "true" : "false") + "}}", "", function);
+    
+    LastBlockPreLoadResponse response;
     if (lastBlock.has_value()) {
         response.lastBlock = lastBlock.value();
         response.servers = serversSave;

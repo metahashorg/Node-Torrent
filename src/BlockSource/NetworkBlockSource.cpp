@@ -17,12 +17,13 @@ namespace torrent_node_lib {
 
 const static size_t COUNT_ADVANCED_BLOCKS = 8;
     
-NetworkBlockSource::NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign) 
+NetworkBlockSource::NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad) 
     : getterBlocks(maxAdvancedLoadBlocks, countBlocksInBatch, p2p, isCompress)
     , folderPath(folderPath)
     , saveAllTx(saveAllTx)
     , isValidate(isValidate)
     , isVerifySign(isVerifySign)
+    , isPreLoad(isPreLoad)
 {}
 
 
@@ -32,10 +33,18 @@ void NetworkBlockSource::initialize() {
 
 std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
     nextBlockToRead = countBlocks + 1;
-    const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
-    CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
-    lastBlockInBlockchain = lastBlock.lastBlock;
-    servers = lastBlock.servers;
+    
+    if (!isPreLoad) {
+        const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
+        CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
+        lastBlockInBlockchain = lastBlock.lastBlock;
+        servers = lastBlock.servers;
+    } else {
+        const GetNewBlocksFromServer::LastBlockPreLoadResponse lastBlock = getterBlocks.preLoadBlocks(countBlocks);
+        CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
+        lastBlockInBlockchain = lastBlock.lastBlock;
+        servers = lastBlock.servers;
+    }
 
     advancedBlocks.clear();
     getterBlocks.clearAdvanced();

@@ -496,6 +496,10 @@ std::string genCountBlockJson(const RequestId &requestId, size_t countBlocks, bo
     return jsonToString(doc, isFormat);
 }
 
+std::string preLoadBlocksJson(size_t countBlocks) {
+    return serializeInt(size_t(0)) + serializeInt(size_t(0)) + serializeInt(countBlocks);
+}
+
 std::string genBlockDumpJson(const RequestId &requestId, const std::string &blockDump, bool isFormat) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();

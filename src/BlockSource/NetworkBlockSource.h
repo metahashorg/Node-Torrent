@@ -20,7 +20,7 @@ class P2P;
 class NetworkBlockSource final: public BlockSource, common::no_copyable, common::no_moveable {
 public:
     
-    NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign);
+    NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad);
     
     void initialize() override;
     
@@ -61,6 +61,8 @@ private:
     
     const bool isVerifySign;
   
+    const bool isPreLoad;
+    
     std::map<size_t, AdvancedBlock> advancedBlocks;
     
 };
