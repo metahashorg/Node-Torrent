@@ -70,6 +70,7 @@ set(LIBRARY_SOURCES
     BlockSource/GetNewBlocksFromServers.cpp
     BlockSource/FileBlockSource.cpp
     BlockSource/NetworkBlockSource.cpp
+    BlockSource/get_new_blocks_messages.cpp
 
     Address.cpp
     BlockInfo.cpp

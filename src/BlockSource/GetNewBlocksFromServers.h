@@ -31,7 +31,7 @@ public:
     
     static std::pair<std::string, std::string> makeRequestForDumpBlockSign(const std::string &blockHash, size_t fromByte, size_t toByte);
     
-    static ResponseParse parseDumpBlockResponse(const std::string &result, size_t fromByte, size_t toByte);
+    static ResponseParse parseDumpBlockResponse(bool manyBlocks, bool isSign, bool isCompress, const std::string &result, size_t fromByte, size_t toByte);
     
 public:
     

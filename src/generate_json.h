@@ -11,7 +11,6 @@ class Address;
 struct TransactionInfo;
 struct BlockHeader;
 struct BlockInfo;
-struct MinimumBlockHeader;
 struct BalanceInfo;
 struct DelegateState;
 struct V8Details;
@@ -103,13 +102,5 @@ std::string genTestSignStringJson(const RequestId &requestId, const std::string 
 std::string genDumpBlockBinary(const std::string &block, bool isCompress);
 
 std::string genDumpBlocksBinary(const std::vector<std::string> &blocks, bool isCompress);
-
-std::string parseDumpBlockBinary(const std::string &response, bool isCompress);
-
-std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool isCompress);
-
-torrent_node_lib::MinimumBlockHeader parseBlockHeader(const std::string &response);
-
-std::vector<torrent_node_lib::MinimumBlockHeader> parseBlocksHeader(const std::string &response);
 
 #endif // GENERATE_JSON_H_

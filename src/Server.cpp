@@ -507,7 +507,7 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             
             const size_t currentBlock = get<int>(jsonParams, "currentBlock");
             const bool isCompress = get<bool>(jsonParams, "compress");
-            const bool isSign = get<bool>(jsonParams, "sign");
+            const bool isSign = get<bool>(jsonParams, "isSign");
             const size_t preLoadBlocks = get<int>(jsonParams, "preLoad");
             const size_t maxBlockSize = get<int>(jsonParams, "maxBlockSize");
             
