@@ -103,4 +103,6 @@ std::string genDumpBlockBinary(const std::string &block, bool isCompress);
 
 std::string genDumpBlocksBinary(const std::vector<std::string> &blocks, bool isCompress);
 
+std::string genRandomAddressesJson(const RequestId &requestId, const std::vector<torrent_node_lib::Address> &addresses, bool isFormat);
+
 #endif // GENERATE_JSON_H_

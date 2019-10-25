@@ -18,12 +18,29 @@
 
 #include <rapidjson/document.h>
 
+#include <random>
+
 using namespace common;
 
 namespace torrent_node_lib {
-
+   
 static const Address ZERO_ADDRESS("0x00000000000000000000000000000000000000000000000000");
+
+template<class RandomIt, class URBG>
+inline void partial_shuffle(RandomIt first, RandomIt middle, RandomIt last, URBG&& g) {
+    typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
+    typedef std::uniform_int_distribution<diff_t> distr_t;
+    typedef typename distr_t::param_type param_t;
     
+    distr_t D;
+    diff_t n = last - first;
+    diff_t to = middle - first;
+    for (diff_t i = 0; i < to; ++i) {
+        using std::swap;
+        swap(first[i], first[D(g, param_t(i, n - 1))]);
+    }
+}
+
 WorkerMain::WorkerMain(const std::string &folderBlocks, LevelDb &leveldb, AllCaches &caches, BlockChain &blockchain, const std::set<Address> &users, std::mutex &usersMut, int countThreads, bool validateState)
     : folderBlocks(folderBlocks)
     , leveldb(leveldb)
@@ -856,6 +873,24 @@ Token WorkerMain::getTokenInfo(const Address &address) const {
 std::vector<TransactionInfo> WorkerMain::getLastTxs() const {
     std::lock_guard<std::mutex> lock(lastTxsMut);
     return lastTxs;
+}
+
+std::vector<Address> WorkerMain::getRandomAddresses(size_t countAddresses) const {
+    const BlockHeader bh = blockchain.getLastStateBlock();
+    BlockInfo bi = getFullBlock(bh, 0, std::numeric_limits<size_t>::max());
+    std::vector<TransactionInfo> &txs = bi.txs;
+    
+    std::random_device rd;
+    std::mt19937 g(rd());
+    
+    auto begin = txs.begin() + bi.header.countSignTx;
+    auto middle = begin + std::min(countAddresses, (size_t)std::distance(begin, txs.end()));
+    partial_shuffle(begin, middle, txs.end(), g);
+    
+    std::vector<Address> result;
+    std::transform(begin, middle, std::back_inserter(result), std::mem_fn(&TransactionInfo::toAddress));
+    
+    return result;
 }
 
 }

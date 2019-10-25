@@ -138,6 +138,10 @@ BlockInfo Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
     return bi;
 }
 
+std::vector<Address> Sync::getRandomAddresses(size_t countAddresses) const {
+    return impl->getRandomAddresses(countAddresses);
+}
+
 Sync::~Sync() = default;
 
 }

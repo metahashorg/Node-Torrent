@@ -78,6 +78,8 @@ public:
 
     Token getTokenInfo(const Address &address) const;
     
+    std::vector<Address> getRandomAddresses(size_t countAddresses) const;
+    
 private:
     
     void worker();

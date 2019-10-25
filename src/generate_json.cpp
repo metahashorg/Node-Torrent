@@ -763,3 +763,17 @@ std::string genDumpBlocksBinary(const std::vector<std::string> &blocks, bool isC
         return compress(res);
     }
 }
+
+std::string genRandomAddressesJson(const RequestId &requestId, const std::vector<torrent_node_lib::Address> &addresses, bool isFormat) {
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    addIdToResponse(requestId, doc, allocator);
+    rapidjson::Value nodesJson(rapidjson::kArrayType);
+    for (const Address &address: addresses) {
+        nodesJson.PushBack(strToJson(address.calcHexString(), allocator), allocator);
+    }
+    rapidjson::Value resultJson(rapidjson::kObjectType);
+    resultJson.AddMember("addresses", nodesJson, allocator);
+    doc.AddMember("result", resultJson, allocator);
+    return jsonToString(doc, isFormat);
+}

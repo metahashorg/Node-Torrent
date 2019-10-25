@@ -105,6 +105,8 @@ public:
     
     bool verifyTechnicalAddressSign(const std::string &binary, const std::vector<unsigned char> &signature, const std::vector<unsigned char> &pubkey) const;
     
+    std::vector<Address> getRandomAddresses(size_t countAddresses) const;
+    
 private:
     
     std::unique_ptr<SyncImpl> impl;

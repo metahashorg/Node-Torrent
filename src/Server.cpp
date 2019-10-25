@@ -58,6 +58,7 @@ const static std::string GET_LAST_NODE_STAT_COUNT = "get-last-node-stat-count";
 const static std::string GET_LAST_NODES_STATS_RESULT = "get-last-nodes-stats-count";
 const static std::string GET_ALL_LAST_NODES_RESULT = "get-all-last-nodes-count";
 const static std::string GET_NODE_RAITING = "get-nodes-raiting";
+const static std::string GET_RANDOM_ADDRESSES = "get-random-addresses";
 
 const static int64_t MAX_BATCH_BLOCKS = 1000;
 const static size_t MAX_BATCH_TXS = 10000;
@@ -616,6 +617,14 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const auto result = sync.calcNodeRaiting(addressString, countTests);
             const size_t lastBlockDay = sync.getLastBlockDay();
             response = genNodesRaitingJson(requestId, addressString, result.first, result.second, lastBlockDay, isFormatJson, jsonVersion);
+        } else if (func == GET_RANDOM_ADDRESSES) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+            
+            const size_t countAddresses = get<size_t>(jsonParams, "count_addresses");
+            
+            const auto result = sync.getRandomAddresses(countAddresses);
+            
+            response = genRandomAddressesJson(requestId, result, isFormatJson);
         } else {
             throwUserErr("Incorrect func " + func);
         }

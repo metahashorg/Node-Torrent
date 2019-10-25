@@ -522,4 +522,9 @@ size_t SyncImpl::getLastBlockDay() const {
     return nodeTestWorker->getLastBlockDay();
 }
 
+std::vector<Address> SyncImpl::getRandomAddresses(size_t countAddresses) const {
+    CHECK(mainWorker != nullptr, "Main worker not initialized");
+    return mainWorker->getRandomAddresses(countAddresses);
+}
+
 }
