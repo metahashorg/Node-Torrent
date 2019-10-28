@@ -26,7 +26,7 @@ using namespace common;
 
 namespace torrent_node_lib {
     
-const static std::string VERSION_DB = "v4.4";
+const static std::string VERSION_DB = "v4.5";
     
 bool isInitialized = false;
 
@@ -42,7 +42,6 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
     if (getterBlocksOpt.isValidate) {
         CHECK(!getterBlocksOpt.getBlocksFromFile, "validate and get_blocks_from_file options not compatible");
     }
-    CHECK(!modules[MODULE_USERS] || !getterBlocksOpt.getBlocksFromFile, "Options saveOnlyUsers and getBlocksFromFile not compatible");
     
     if (getterBlocksOpt.getBlocksFromFile) {
         isSaveBlockToFiles = false;
@@ -50,8 +49,7 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
     } else {
         CHECK(getterBlocksOpt.p2p != nullptr, "p2p nullptr");
         isSaveBlockToFiles = modules[MODULE_BLOCK_RAW];
-        const bool isSaveAllTx = modules[MODULE_USERS];
-        getBlockAlgorithm = std::make_unique<NetworkBlockSource>(folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, isSaveAllTx, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign);
+        getBlockAlgorithm = std::make_unique<NetworkBlockSource>(folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, true, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign, getterBlocksOpt.isPreLoad);
     }
         
     if (!signKeyName.empty()) {
@@ -91,12 +89,6 @@ SyncImpl::~SyncImpl() {
     }
 }
 
-void SyncImpl::addUsers(const std::set<Address>& addresses) {
-    CHECK(modules[MODULE_USERS], "saveOnlyUsers not set");
-    std::lock_guard<std::mutex> lock(usersMut);
-    users.insert(addresses.begin(), addresses.end());
-}
-
 void SyncImpl::saveTransactions(BlockInfo& bi, const std::string &binaryDump, bool saveBlockToFile) {
     if (!saveBlockToFile) {
         return;
@@ -105,55 +97,21 @@ void SyncImpl::saveTransactions(BlockInfo& bi, const std::string &binaryDump, bo
     const std::string &fileName = bi.header.filePos.fileNameRelative;
     CHECK(!fileName.empty(), "File name not set");
     
-    if (!modules[MODULE_USERS]) {
-        const size_t currPos = saveBlockToFileBinary(getFullPath(fileName, folderBlocks), binaryDump);
-        bi.header.filePos.pos = currPos;
-        for (TransactionInfo &tx : bi.txs) {
-            tx.filePos.fileNameRelative = fileName;
-            tx.filePos.pos += currPos;
-        }
-    } else {
-        std::ofstream file;
-        
-        openFile(file, getFullPath(fileName, folderBlocks));
-        for (TransactionInfo &tx: bi.txs) {
-            if (tx.isSaveToBd) {
-                const size_t filePos = saveTransactionToFile(file, tx.allRawTx);
-                
-                tx.filePos.fileNameRelative = fileName;
-                tx.filePos.pos = filePos;
-            }
-            tx.allRawTx.clear();
-            tx.allRawTx.shrink_to_fit();
-        }
-    }   
-}
-
-void SyncImpl::filterTransactionsToSave(BlockInfo& bi) {
-    std::unique_lock<std::mutex> lock(usersMut);
-    const std::set<Address> copyUsers = users;
-    lock.unlock();
-    for (TransactionInfo &tx: bi.txs) {
-        if (!modules[MODULE_USERS]) {
-            tx.isSaveToBd = true;
-        } else if (modules[MODULE_USERS] && (copyUsers.find(tx.fromAddress) != copyUsers.end() || copyUsers.find(tx.toAddress) != copyUsers.end())) {
-            tx.isSaveToBd = true;
-        } else if (modules[MODULE_USERS] && tx.isSignBlockTx) {
-            tx.isSaveToBd = true;
-        } else {
-            tx.isSaveToBd = false;
-        }
+    const size_t currPos = saveBlockToFileBinary(getFullPath(fileName, folderBlocks), binaryDump);
+    bi.header.filePos.pos = currPos;
+    for (TransactionInfo &tx : bi.txs) {
+        tx.filePos.fileNameRelative = fileName;
+        tx.filePos.pos += currPos;
     }
 }
 
 void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     Batch batch;
     if (modules[MODULE_BLOCK]) {
-        batch.addBlockHeader(bi.header.hash, bi.header.serialize());
+        batch.addBlockHeader(bi.header.hash, bi.header);
     }
     
-    const std::string blockMetadata = findBlockMetadata(leveldb);
-    const BlocksMetadata metadata = BlocksMetadata::deserialize(blockMetadata);
+    const BlocksMetadata metadata = leveldb.findBlockMetadata();
     BlocksMetadata newMetadata;
     newMetadata.prevBlockHash = bi.header.prevHash;
     if (metadata.prevBlockHash == bi.header.prevHash) {
@@ -165,40 +123,39 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     } else {
         newMetadata.blockHash = bi.header.hash;
     }
-    batch.addBlockMetadata(newMetadata.serialize());
+    batch.addBlockMetadata(newMetadata);
     
     FileInfo fi;
     fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
     fi.filePos.pos = bi.header.endBlockPos();
-    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi.serialize());
+    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
     
     addBatch(batch, leveldb);
 }
 
 void SyncImpl::initialize() {
-    const std::string modulesStr = findModules(leveldb);
+    const std::string modulesStr = leveldb.findModules();
     if (!modulesStr.empty()) {
         const Modules oldModules(modulesStr);
         CHECK(modules == oldModules, "Modules changed in this database");
     } else {
-        saveModules(modules.to_string(), leveldb);
+        leveldb.saveModules(modules.to_string());
     }
     
-    const std::string versionDb = findVersionDb(leveldb);
+    const std::string versionDb = leveldb.findVersionDb();
     if (!versionDb.empty()) {
         CHECK(versionDb == VERSION_DB, "Version database not matches");
     } else {
-        saveVersionDb(VERSION_DB, leveldb);
+        leveldb.saveVersionDb(VERSION_DB);
     }
     
-    const std::string blockMetadata = findBlockMetadata(leveldb);
-    const BlocksMetadata metadata = BlocksMetadata::deserialize(blockMetadata);
+    const BlocksMetadata metadata = leveldb.findBlockMetadata();
     
     getBlockAlgorithm->initialize();
     
     blockchain.clear();
     
-    const std::set<std::string> blocksRaw = getAllBlocks(leveldb);
+    const std::set<std::string> blocksRaw = leveldb.getAllBlocks();
     for (const std::string &blockRaw: blocksRaw) {
         const BlockHeader bh = BlockHeader::deserialize(blockRaw);
         blockchain.addWithoutCalc(bh);
@@ -262,7 +219,6 @@ std::vector<Worker*> SyncImpl::makeWorkers() {
                 LOGWARN << "Dont get existing block " << "Unknown";
                 getBlockAlgorithm->getExistingBlock(bh, *bi, *blockDump);
             }
-            filterTransactionsToSave(*bi);
             for (Worker* &worker: workers) {
                 if (worker->getInitBlockNumber().has_value() && worker->getInitBlockNumber() < blockNumber) { // TODO добавить сюда поле getToBlockNumberRetry
                     worker->process(bi, blockDump);
@@ -296,6 +252,8 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     break;
                 }
                 
+                Timer tt2;
+                
                 if (prevBi == nullptr) {
                     CHECK(prevDump == nullptr, "Ups");
                     prevBi = nextBi;
@@ -307,7 +265,8 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                 } else {
                     if (isValidate) {
                         const auto &thisHashFromHex = prevBi->header.hash;
-                        for (const TransactionInfo &tx: nextBi->txs) {
+                        for (size_t i = 0; i < nextBi->header.countSignTx; i++) {
+                            const TransactionInfo &tx = nextBi->txs[i];
                             if (tx.isSignBlockTx) {
                                 CHECK(thisHashFromHex == tx.data, "Block signatures not confirmed");
                             }
@@ -318,7 +277,6 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     }
                 }
                 
-                filterTransactionsToSave(*prevBi);
                 saveTransactions(*prevBi, *prevDump, isSaveBlockToFiles);
                 
                 const size_t currentBlockNum = blockchain.addBlock(prevBi->header);
@@ -327,19 +285,14 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                 
                 for (TransactionInfo &tx: prevBi->txs) {
                     tx.blockNumber = prevBi->header.blockNumber.value();
-                    
-                    if (tx.fromAddress.isInitialWallet()) {
-                        prevBi->txsStatistic.countInitTxs++;
-                    } else {
-                        prevBi->txsStatistic.countTransferTxs++;
-                    }
                 }
                 
                 tt.stop();
+                tt2.stop();
                 
                 prevBi->times.timeEndGetBlock = ::now();
                 
-                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << prevBi->txs.size() << ". Time ms " << tt.countMs() << " current block " << toHex(prevBi->header.hash) << ". Parent hash " << toHex(prevBi->header.prevHash);
+                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << prevBi->txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(prevBi->header.hash) << ". Parent hash " << toHex(prevBi->header.prevHash);
                 
                 for (Worker* worker: workers) {
                     worker->process(prevBi, prevDump);
@@ -414,7 +367,7 @@ BalanceInfo SyncImpl::getBalance(const Address &address) const {
 }
 
 std::string SyncImpl::getBlockDump(const BlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
-    CHECK(modules[MODULE_BLOCK] && modules[MODULE_BLOCK_RAW] && !modules[MODULE_USERS], "modules " + MODULE_BLOCK_STR + " " + MODULE_BLOCK_RAW_STR + " not set");
+    CHECK(modules[MODULE_BLOCK] && modules[MODULE_BLOCK_RAW], "modules " + MODULE_BLOCK_STR + " " + MODULE_BLOCK_RAW_STR + " not set");
        
     const std::optional<std::shared_ptr<std::string>> cache = caches.blockDumpCache.getValue(common::HashedString(bh.hash.data(), bh.hash.size()));
     std::string res;
@@ -567,6 +520,11 @@ size_t SyncImpl::getLastBlockDay() const {
     CHECK(modules[MODULE_NODE_TEST], "Module " + MODULE_NODE_TEST_STR + " not set");
     CHECK(nodeTestWorker != nullptr, "node test worker not init");
     return nodeTestWorker->getLastBlockDay();
+}
+
+std::vector<Address> SyncImpl::getRandomAddresses(size_t countAddresses) const {
+    CHECK(mainWorker != nullptr, "Main worker not initialized");
+    return mainWorker->getRandomAddresses(countAddresses);
 }
 
 }

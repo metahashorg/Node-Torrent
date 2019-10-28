@@ -403,11 +403,15 @@ static void readBlockTxs(const char *begin_pos, const char *end_pos, size_t posI
     std::array<unsigned char, 32> block_hash = get_double_sha256((unsigned char *)begin_pos, std::distance(begin_pos, end_pos));
     bi.header.hash.assign(block_hash.cbegin(), block_hash.cend());
     
+    std::array<unsigned char, 32> txs_hash = get_double_sha256((unsigned char *)cur_pos, std::distance(cur_pos, end_pos));
+    CHECK(bi.header.txsHash.size() == txs_hash.size() && std::equal(txs_hash.begin(), txs_hash.end(), bi.header.txsHash.begin()), "Incorrect txs hash");
+    
     SizeTransactinType tx_size = 0;
     size_t txIndex = 0;
     PrevTransactionSignHelper prevTransactionSignBlockHelper;
     prevTransactionSignBlockHelper.isFirst = true;
     prevTransactionSignBlockHelper.isPrevSign = true;
+    size_t countSignTxs = 0;
     do {
         TransactionInfo txInfo;
         txInfo.filePos.pos = cur_pos - begin_pos + posInFile + offsetBeginBlock;
@@ -429,10 +433,15 @@ static void readBlockTxs(const char *begin_pos, const char *end_pos, size_t posI
         prevTransactionSignBlockHelper.prevTxData = txInfo.data;
         prevTransactionSignBlockHelper.isFirst = false;
         
+        if (txInfo.isSignBlockTx) {
+            countSignTxs++;
+        }
+        
         txIndex++;
     } while (tx_size > 0);
     if (countTx == 0) {
         bi.header.countTxs = bi.txs.size();
+        bi.header.countSignTx = countSignTxs;
     }
     if (!bi.txs.empty()) {
         const TransactionInfo &tx = bi.txs.front();

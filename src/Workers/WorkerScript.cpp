@@ -20,8 +20,7 @@ WorkerScript::WorkerScript(LevelDb &leveldb, const LevelDbOptions &leveldbOptScr
     , modules(modules)
     , caches(caches)
 {
-    const std::string lastScriptBlockStr = findScriptBlock(leveldbV8);
-    const ScriptBlockInfo lastScriptBlock = ScriptBlockInfo::deserialize(lastScriptBlockStr);
+    const ScriptBlockInfo lastScriptBlock = leveldbV8.findScriptBlock();
     initializeScriptBlockNumber = lastScriptBlock.blockNumber;
 }
 
@@ -48,8 +47,7 @@ void WorkerScript::work() {
             }
             BlockInfo &bi = *biSP;
             
-            const std::string lastScriptBlockStr = findScriptBlock(leveldbV8);
-            const ScriptBlockInfo lastScriptBlock = ScriptBlockInfo::deserialize(lastScriptBlockStr);
+            const ScriptBlockInfo lastScriptBlock = leveldbV8.findScriptBlock();
             const std::vector<unsigned char> &prevHash = lastScriptBlock.blockHash;            
 
             if (bi.header.blockNumber.value() <= lastScriptBlock.blockNumber) {
@@ -80,25 +78,20 @@ void WorkerScript::work() {
                                
                 const auto findV8StateF = [this, &batchStates](const Address &address) {
                     const auto findV8State = batchStates.findV8State(address.getBinaryString());
-                    std::string prevV8StateStr;
+                    V8State prevV8State;
                     bool isBatch;
                     if (findV8State.has_value()) {
-                        prevV8StateStr = findV8State.value();
+                        prevV8State = findV8State.value();
                         isBatch = true;
                     } else {
-                        prevV8StateStr = torrent_node_lib::findV8State(address.getBinaryString(), leveldbV8);
+                        prevV8State = leveldbV8.findV8State(address.getBinaryString());
                         isBatch = false;
                     }
-                    const V8State prevV8State = V8State::deserialize(prevV8StateStr);
                     return std::make_pair(isBatch, prevV8State);
                 };
                 
                 for (const TransactionInfo &tx: bi.txs) {
                     if (!tx.scriptInfo.has_value()) {
-                        continue;
-                    }
-                    
-                    if (!tx.isSaveToBd) {
                         continue;
                     }
                     
@@ -130,18 +123,18 @@ void WorkerScript::work() {
                             LOGDEBUG << "error status exist on tx " << toHex(tx.hash.begin(), tx.hash.end());
                             status.isScriptError = true;
                             const V8Details v8Details(prevV8State.details, "status exist on tx");
-                            batchStates.addV8Details(status.compiledContractAddress.toBdString(), v8Details.serialize());
+                            batchStates.addV8Details(status.compiledContractAddress.toBdString(), v8Details);
                         } else if (compileState.errorType != V8State::ErrorType::OK) {
                             LOGINFO << "Error script " << toHex(tx.hash.begin(), tx.hash.end()) << " " << compileState.errorMessage;
                             LOGDEBUG << "Error script " << toHex(tx.hash.begin(), tx.hash.end()) << " " << compileState.errorMessage;
                             const V8Details v8Details(prevV8State.details, compileState.errorMessage);
-                            batchStates.addV8Details(status.compiledContractAddress.toBdString(), v8Details.serialize());
+                            batchStates.addV8Details(status.compiledContractAddress.toBdString(), v8Details);
                         } else {
-                            batchStates.addV8State(status.compiledContractAddress.toBdString(), compileState.serialize());
+                            batchStates.addV8State(status.compiledContractAddress.toBdString(), compileState);
                             const V8Details v8Details(compileState.details, "");
-                            batchStates.addV8Details(status.compiledContractAddress.toBdString(), v8Details.serialize());
+                            batchStates.addV8Details(status.compiledContractAddress.toBdString(), v8Details);
                             V8Code v8Code(tx.data);
-                            batchStates.addV8Code(status.compiledContractAddress.toBdString(), v8Code.serialize());
+                            batchStates.addV8Code(status.compiledContractAddress.toBdString(), v8Code);
                         }
                     } else if (tx.scriptInfo->type == TransactionInfo::ScriptInfo::ScriptType::run || tx.scriptInfo->type == TransactionInfo::ScriptInfo::ScriptType::pay) {
                         const Address &contractAddress = tx.toAddress;
@@ -167,11 +160,11 @@ void WorkerScript::work() {
                             LOGINFO << "Error script " << toHex(tx.hash.begin(), tx.hash.end()) << " " << runState.errorMessage;
                             LOGDEBUG << "Error script " << toHex(tx.hash.begin(), tx.hash.end()) << " " << runState.errorMessage;
                             const V8Details v8Details(prevState.details, runState.errorMessage);
-                            batchStates.addV8Details(contractAddress.toBdString(), v8Details.serialize());
+                            batchStates.addV8Details(contractAddress.toBdString(), v8Details);
                         } else {
-                            batchStates.addV8State(contractAddress.toBdString(), runState.serialize());
+                            batchStates.addV8State(contractAddress.toBdString(), runState);
                             const V8Details v8Details(runState.details, "");
-                            batchStates.addV8Details(contractAddress.toBdString(), v8Details.serialize());
+                            batchStates.addV8Details(contractAddress.toBdString(), v8Details);
                         }
                     } else if (tx.scriptInfo->type == TransactionInfo::ScriptInfo::ScriptType::unknown) {
                         const Address &contractAddress = tx.toAddress;
@@ -190,7 +183,7 @@ void WorkerScript::work() {
                         LOGINFO << "Error script " << toHex(tx.hash.begin(), tx.hash.end()) << " " << runState.errorMessage;
                         LOGDEBUG << "Error script " << toHex(tx.hash.begin(), tx.hash.end()) << " " << runState.errorMessage;
                         const V8Details v8Details(prevState.details, runState.errorMessage);
-                        batchStates.addV8Details(contractAddress.toBdString(), v8Details.serialize());
+                        batchStates.addV8Details(contractAddress.toBdString(), v8Details);
                     } else {
                         throwErr("Unknown type scriptInfo");
                     }
@@ -203,10 +196,8 @@ void WorkerScript::work() {
                         const std::string &addrString = address.toBdString();
                         
                         if (modules[MODULE_ADDR_TXS]) {                           
-                            std::vector<char> buffer;
-                            status.serialize(buffer);
                             const std::string addressAndHash = makeAddressStatusKey(addrString, tx.hash);
-                            torrent_node_lib::saveAddressStatus(addressAndHash, buffer, leveldb); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
+                            leveldb.saveAddressStatus(addressAndHash, status); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
                         }
                     };
                     
@@ -221,14 +212,12 @@ void WorkerScript::work() {
                     
                     if (modules[MODULE_TXS]) {
                         caches.txsStatusCache.addValue(txStatus.transaction, attributeTxStatusCache, txStatus);
-                        std::vector<char> buffer;
-                        txStatus.serialize(buffer);
-                        torrent_node_lib::saveTransactionStatus(txStatus.transaction, buffer, leveldb); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
+                        leveldb.saveTransactionStatus(txStatus.transaction, txStatus); // Здесь сохраняем не в batch, так как другой тред может начать перезаписывать кэши                           
                     }
                 }
             }
             
-            batchStates.addScriptBlock(ScriptBlockInfo(bi.header.blockNumber.value(), bi.header.hash, 0).serialize());
+            batchStates.addScriptBlock(ScriptBlockInfo(bi.header.blockNumber.value(), bi.header.hash, 0));
             
             addBatch(batchStates, leveldbV8);
             
@@ -263,13 +252,11 @@ std::optional<size_t> WorkerScript::getInitBlockNumber() const {
 }
 
 V8Details WorkerScript::getContractDetails(const Address &contractAddress) const {
-    const std::string result = findV8DetailsAddress(contractAddress.getBinaryString(), leveldbV8);
-    return V8Details::deserialize(result);
+    return leveldbV8.findV8DetailsAddress(contractAddress.getBinaryString());
 }
 
 V8Code WorkerScript::getContractCode(const Address &contractAddress) const {
-    const std::string codeString = findV8CodeAddress(contractAddress.toBdString(), leveldbV8);
-    return V8Code::deserialize(codeString);
+    return leveldbV8.findV8CodeAddress(contractAddress.toBdString());
 }
 
 }

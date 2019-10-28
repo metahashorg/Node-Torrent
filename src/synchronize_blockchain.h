@@ -56,8 +56,6 @@ public:
 public:
     
     void synchronize(int countThreads);
-
-    void addUsers(const std::set<Address> &addresses);
     
     std::vector<TransactionInfo> getTxsForAddress(const Address &address, size_t from, size_t count, size_t limitTxs) const;
 
@@ -106,6 +104,8 @@ public:
     std::string signTestString(const std::string &str, bool isHex) const;
     
     bool verifyTechnicalAddressSign(const std::string &binary, const std::vector<unsigned char> &signature, const std::vector<unsigned char> &pubkey) const;
+    
+    std::vector<Address> getRandomAddresses(size_t countAddresses) const;
     
 private:
     

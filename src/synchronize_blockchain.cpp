@@ -72,10 +72,6 @@ void Sync::synchronize(int countThreads) {
     impl->synchronize(countThreads);
 }
 
-void Sync::addUsers(const std::set<Address>& addresses) {
-    impl->addUsers(addresses);
-}
-
 const BlockChainReadInterface & Sync::getBlockchain() const {
     return impl->getBlockchain();
 }
@@ -140,6 +136,10 @@ BlockInfo Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
     BlockInfo bi;
     readNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), 0, bi, isValidate, true, 0, 0);
     return bi;
+}
+
+std::vector<Address> Sync::getRandomAddresses(size_t countAddresses) const {
+    return impl->getRandomAddresses(countAddresses);
 }
 
 Sync::~Sync() = default;

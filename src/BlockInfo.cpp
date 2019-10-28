@@ -77,7 +77,6 @@ FilePosition FilePosition::deserialize(const std::string& raw) {
 }
 
 void TransactionInfo::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     CHECK(blockNumber != 0, "block number not setted");
     
     filePos.serialize(buffer);
@@ -177,7 +176,6 @@ void TransactionStatus::parseVarint(const std::string &raw, size_t &fromPos, siz
 }
 
 void TransactionStatus::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     serializeInt<uint8_t>(isSuccess, buffer);
     serializeInt<size_t>(blockNumber, buffer);
     serializeString(transaction, buffer);
@@ -206,7 +204,6 @@ TransactionStatus TransactionStatus::deserialize(const std::string& raw) {
 }
 
 void Token::serialize(std::vector<char> &buffer) const {
-    buffer.clear();
     serializeString(type, buffer);
     serializeString(owner.toBdString(), buffer);
     serializeInt<unsigned int>(decimals, buffer);
@@ -239,7 +236,6 @@ Token Token::deserialize(const std::string &raw) {
 }
 
 void AddressInfo::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     CHECK(blockNumber != 0, "AddressInfo not initialized");
     
     filePos.serialize(buffer);
@@ -459,7 +455,7 @@ int64_t BalanceInfo::calcBalance() {
     return balance.received() - balance.spent();
 }
 
-int64_t BalanceInfo::calcBalanceWithoutDelegate() {
+int64_t BalanceInfo::calcBalanceWithoutDelegate() const {
     return balance.received() - balance.spent() + (delegated.has_value() ? (delegated->delegate.delegate() - delegated->delegate.undelegate()) : 0);
 }
 
@@ -470,7 +466,6 @@ BalanceInfo operator+(const BalanceInfo &first, const BalanceInfo &second) {
 }
 
 void BalanceInfo::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     serializeInt<size_t>(balance.received(), buffer);
     serializeInt<size_t>(balance.spent(), buffer);
     serializeInt<size_t>(countReceived, buffer);
@@ -506,6 +501,10 @@ void BalanceInfo::serialize(std::vector<char>& buffer) const {
 
 BalanceInfo BalanceInfo::deserialize(const std::string& raw) {
     BalanceInfo result;
+    
+    if (raw.empty()) {
+        return result;
+    }
     
     size_t from = 0;
     const size_t received = deserializeInt<size_t>(raw, from);
@@ -556,7 +555,6 @@ BalanceInfo BalanceInfo::deserialize(const std::string& raw) {
 }
 
 void CommonBalance::serialize(std::vector<char>& buffer) const {
-    buffer.clear();
     serializeInt<size_t>(money, buffer);
     serializeInt<size_t>(blockNumber, buffer);
 }
@@ -620,6 +618,7 @@ std::string BlockHeader::serialize() const {
     res += serializeInt<uint64_t>(blockType);
     res += serializeInt<size_t>(timestamp);
     res += serializeInt<size_t>(countTxs);
+    res += serializeInt<size_t>(countSignTx);
     
     res += serializeString(std::string(senderSign.begin(), senderSign.end()));
     res += serializeString(std::string(senderPubkey.begin(), senderPubkey.end()));
@@ -642,6 +641,7 @@ BlockHeader BlockHeader::deserialize(const std::string& raw) {
     result.blockType = deserializeInt<uint64_t>(raw, from);
     result.timestamp = deserializeInt<size_t>(raw, from);
     result.countTxs = deserializeInt<size_t>(raw, from);
+    result.countSignTx = deserializeInt<size_t>(raw, from);
     
     const std::string senderSign = deserializeString(raw, from);
     result.senderSign = std::vector<unsigned char>(senderSign.begin(), senderSign.end());
@@ -736,22 +736,6 @@ DelegateState DelegateState::deserialize(const std::string &raw) {
     size_t from = 0;
     state.value = deserializeInt<size_t>(raw, from);
     state.hash = deserializeString(raw, from);
-    return state;
-}
-
-void DelegateStateHelper::serialize(std::vector<char> &buffer) const {
-    CHECK(blockNumber != 0, "DelegateStateHelper not initialized");
-    serializeInt<size_t>(blockNumber, buffer);
-}
-
-DelegateStateHelper DelegateStateHelper::deserialize(const std::string &raw) {
-    DelegateStateHelper state;
-    if (raw.empty()) {
-        return state;
-    }
-    
-    size_t from = 0;
-    state.blockNumber = deserializeInt<size_t>(raw, from);
     return state;
 }
 

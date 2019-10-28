@@ -18,12 +18,29 @@
 
 #include <rapidjson/document.h>
 
+#include <random>
+
 using namespace common;
 
 namespace torrent_node_lib {
-
+   
 static const Address ZERO_ADDRESS("0x00000000000000000000000000000000000000000000000000");
+
+template<class RandomIt, class URBG>
+inline void partial_shuffle(RandomIt first, RandomIt middle, RandomIt last, URBG&& g) {
+    typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
+    typedef std::uniform_int_distribution<diff_t> distr_t;
+    typedef typename distr_t::param_type param_t;
     
+    distr_t D;
+    diff_t n = last - first;
+    diff_t to = middle - first;
+    for (diff_t i = 0; i < to; ++i) {
+        using std::swap;
+        swap(first[i], first[D(g, param_t(i, n - 1))]);
+    }
+}
+
 WorkerMain::WorkerMain(const std::string &folderBlocks, LevelDb &leveldb, AllCaches &caches, BlockChain &blockchain, const std::set<Address> &users, std::mutex &usersMut, int countThreads, bool validateState)
     : folderBlocks(folderBlocks)
     , leveldb(leveldb)
@@ -34,8 +51,7 @@ WorkerMain::WorkerMain(const std::string &folderBlocks, LevelDb &leveldb, AllCac
     , users(users)
     , usersMut(usersMut)
 {    
-    const std::string oldBlockMetadata = findMainBlock(leveldb);
-    const MainBlockInfo oldMetadata = MainBlockInfo::deserialize(oldBlockMetadata);
+    const MainBlockInfo oldMetadata = leveldb.findMainBlock();
     countVal.store(oldMetadata.countVal);
     
     lastSavedBlock = oldMetadata.blockNumber;
@@ -58,48 +74,34 @@ std::optional<TransactionStatus> WorkerMain::calcTransactionStatusDelegate(const
     
     TransactionStatus txStatus(tx.hash, blockNumber);
     const std::string &delegateKey = makeKeyDelegatePair(tx.fromAddress.getBinaryString(), tx.toAddress.getBinaryString());
-    
-    const std::optional<std::string> foundDelegateHelper = batch.findDelegateHelper(delegateKey);
-    if (!foundDelegateHelper.has_value()) {
-        const std::string foundDelegateHelperInBase = findDelegateHelper(delegateKey, leveldb);
-        if (!foundDelegateHelperInBase.empty()) {
-            const DelegateStateHelper delegateHelper = DelegateStateHelper::deserialize(foundDelegateHelperInBase);
-            if (delegateHelper.blockNumber >= blockNumber) {
-                return std::nullopt;
-            }
-        }
-    }
-    
+       
     if (tx.delegate.value().isDelegate) {
         txStatus.isSuccess = !tx.isIntStatusNotSuccess();
         txStatus.status = TransactionStatus::Delegate();
         
         if (txStatus.isSuccess) {
             const DelegateState dState(tx.delegate.value().value, tx.hash);
-            std::vector<char> serializedState;
-            dState.serialize(serializedState);
-            const auto resultKey = batch.addDelegateKey(delegateKey, serializedState, countVal.get());
+            const auto resultKey = batch.addDelegateKey(delegateKey, dState, countVal.get());
             delegateCache[delegateKey].push(resultKey);
         }
     } else {
         txStatus.isSuccess = true;
-        std::string val;
+        DelegateState dState;
         if (!delegateCache[delegateKey].empty()) {
             const auto delegateKeyS = delegateCache[delegateKey].top();
             delegateCache[delegateKey].pop();
-            const std::optional<std::string> foundValue = batch.findDelegateKey(delegateKeyS);
-            CHECK(foundValue.has_value() && !foundValue.value().empty(), "Incorrect batch delegate");
-            val = foundValue.value();
+            const std::optional<DelegateState> foundValue = batch.findDelegateKey(delegateKeyS);
+            CHECK(foundValue.has_value() && !foundValue.value().hash.empty(), "Incorrect batch delegate");
+            dState = foundValue.value();
             batch.removeDelegateKey(delegateKeyS);
         } else {
-            const auto &[key, value] = findDelegateKey(delegateKey, leveldb, batch.getDeletedDelegate());
+            const auto &[key, value] = leveldb.findDelegateKey(delegateKey, batch.getDeletedDelegate());
             if (!key.empty()) {
-                CHECK(!value.empty(), "Incorrect delegated value");
-                val = value;
+                CHECK(!value.hash.empty(), "Incorrect delegated value");
+                dState = value;
                 batch.removeDelegateKey(std::vector<char>(key.begin(), key.end()));
             }
         }
-        const DelegateState dState = DelegateState::deserialize(val);
         txStatus.status = TransactionStatus::UnDelegate(dState.value, dState.hash);
         if (!dState.hash.empty()) {
             //LOGDEBUG << "Remove delegate " << dState.value << " " << toHex(dState.hash.begin(), dState.hash.end());
@@ -107,11 +109,6 @@ std::optional<TransactionStatus> WorkerMain::calcTransactionStatusDelegate(const
             //LOGDEBUG << "Remove zero delegate";
         }
     }
-    
-    const DelegateStateHelper delegateHelper(blockNumber);
-    std::vector<char> delegateHelperBuf;
-    delegateHelper.serialize(delegateHelperBuf);
-    batch.addDelegateHelper(delegateKey, delegateHelperBuf);
     
     return txStatus;
 }
@@ -133,27 +130,23 @@ static ForgingSums makeForgingSums(const BlockInfo &bi) {
     return result;
 }
 
-void WorkerMain::saveTransactionStatus(const TransactionStatus &txStatus, std::vector<char> &buffer, Batch &txsBatch, const std::string &attributeTxStatusCache) {
-    txStatus.serialize(buffer);
-    txsBatch.addTransactionStatus(txStatus.transaction, buffer);
+void WorkerMain::saveTransactionStatus(const TransactionStatus &txStatus, Batch &txsBatch, const std::string &attributeTxStatusCache) {
+    txsBatch.addTransactionStatus(txStatus.transaction, txStatus);
     caches.txsStatusCache.addValue(txStatus.transaction, attributeTxStatusCache, txStatus);
 }
 
-void WorkerMain::saveTransaction(const TransactionInfo &tx, Batch &txsBatch, std::vector<char> &buffer) {
-    tx.serialize(buffer);
-    txsBatch.addTransaction(tx.hash, buffer);
+void WorkerMain::saveTransaction(const TransactionInfo &tx, Batch &txsBatch) {
+    txsBatch.addTransaction(tx.hash, tx);
 }
 
-void WorkerMain::saveAddressTransaction(const TransactionInfo &tx, const Address &address, std::vector<char> &buffer, Batch &batch) {
+void WorkerMain::saveAddressTransaction(const TransactionInfo &tx, const Address &address, Batch &batch) {
     AddressInfo addrInfo(tx.filePos.pos, tx.filePos.fileNameRelative, tx.blockNumber, tx.blockIndex);
-    addrInfo.serialize(buffer);
-    batch.addAddress(address.toBdString(), buffer, countVal.get());
+    batch.addAddress(address.toBdString(), addrInfo, countVal.get());
 }
 
-void WorkerMain::saveAddressStatus(const TransactionStatus &status, const Address &address, std::vector<char> &buffer, Batch &batch) {
-    status.serialize(buffer);
+void WorkerMain::saveAddressStatus(const TransactionStatus &status, const Address &address, Batch &batch) {
     const std::string addressAndHash = makeAddressStatusKey(address.toBdString(), status.transaction);
-    batch.addAddressStatus(addressAndHash, buffer);
+    batch.addAddressStatus(addressAndHash, status);
 }
 
 void WorkerMain::saveAddressBalance(const TransactionInfo &tx, const Address &address, std::unordered_map<std::string, BalanceInfo> &balances, bool isForging) {
@@ -218,26 +211,22 @@ void WorkerMain::saveAddressBalanceMoveToken(const TransactionInfo &tx, std::uno
 }
 
 void WorkerMain::processTokenOperation(const Address &token, Batch &txsBatch, const std::function<Token(Token token)> &process) {
-    const std::optional<std::string> tokenStr1 = txsBatch.findToken(token.toBdString());
-    std::string res;
+    const std::optional<Token> tokenStr1 = txsBatch.findToken(token.toBdString());
+    Token tokenInfo;
     if (tokenStr1.has_value()) {
-        res = tokenStr1.value();
+        tokenInfo = tokenStr1.value();
         txsBatch.removeToken(token.toBdString());
     } else {
-        res = findToken(token.toBdString(), leveldb);
+        tokenInfo = leveldb.findToken(token.toBdString());
     }
-    
-    Token tokenInfo = Token::deserialize(res);
-    
+       
     if (tokenInfo.type.empty()) {
         return;
     }
     
     const Token newToken = process(tokenInfo);
     
-    std::vector<char> buffer;
-    newToken.serialize(buffer);
-    txsBatch.addToken(token.toBdString(), buffer);
+    txsBatch.addToken(token.toBdString(), newToken);
 }
 
 void WorkerMain::changeTokenOwner(const TransactionInfo &tx, Batch &txsBatch) {
@@ -300,19 +289,6 @@ std::optional<TransactionStatus> WorkerMain::getInstantDelegateStatus(const Tran
     }
 }
 
-bool WorkerMain::checkAddressToSave(const TransactionInfo& tx, const Address& address) const {
-    if (!tx.isSaveToBd) {
-        return false;
-    }
-    if (modules[MODULE_USERS]) {
-        std::lock_guard<std::mutex> lock(usersMut);
-        if (users.find(address) == users.end()) {
-            return false;
-        }
-    }
-    return true;
-}
-
 void WorkerMain::validateStateBlock(const BlockInfo &bi) const {
     if (!validateState) {
         return;
@@ -325,11 +301,7 @@ void WorkerMain::validateStateBlock(const BlockInfo &bi) const {
             continue;
         }
         
-        const std::string balanceString = findBalance(address.toBdString(), leveldb);
-        BalanceInfo balance;
-        if (!balanceString.empty()) {
-            balance = BalanceInfo::deserialize(balanceString);
-        }
+        const BalanceInfo balance = leveldb.findBalance(address.toBdString());
         
         std::vector<std::pair<Address, DelegateState>> delegateStates = getDelegateStates(address);
         std::stable_sort(delegateStates.begin(), delegateStates.end(), [](const auto &pair1, const auto &pair2) {
@@ -391,8 +363,7 @@ void WorkerMain::worker() {
                         
             const std::string attributeTxStatusCache = std::to_string(bi.header.blockNumber.value());
             
-            const std::string oldBlockMetadata = findMainBlock(leveldb);
-            const MainBlockInfo oldMetadata = MainBlockInfo::deserialize(oldBlockMetadata);
+            const MainBlockInfo oldMetadata = leveldb.findMainBlock();
             const std::vector<unsigned char> prevHash = oldMetadata.blockHash;
             
             if (bi.header.blockNumber.value() <= oldMetadata.blockNumber) {
@@ -403,8 +374,7 @@ void WorkerMain::worker() {
             
             bi.times.timeBeginSaveBlock = ::now();
             
-            std::string commonBalanceStr = findCommonBalance(leveldb);
-            CommonBalance commonBalance = CommonBalance::deserialize(commonBalanceStr);
+            CommonBalance commonBalance = leveldb.findCommonBalance();
             const bool updateCommonBalance = commonBalance.blockNumber < bi.header.blockNumber.value();
             
             Batch batch;
@@ -412,13 +382,8 @@ void WorkerMain::worker() {
             std::unordered_map<std::string, BalanceInfo> balances;
             if (bi.header.isForgingBlock() || bi.header.isSimpleBlock()) {
                 for (const TransactionInfo &tx: bi.txs) {                   
-                    static thread_local std::vector<char> buffer;
                     const auto toLeveldb = [this, &bi](const Address &address, const TransactionInfo &tx, Batch &batch, std::unordered_map<std::string, BalanceInfo> &balances, const std::optional<TransactionStatus> &statusDelegate) {
                         if (address.isInitialWallet()) {
-                            return;
-                        }
-                        
-                        if (!checkAddressToSave(tx, address)) {
                             return;
                         }
                         
@@ -427,10 +392,10 @@ void WorkerMain::worker() {
                         }
                             
                         if (modules[MODULE_ADDR_TXS]) {
-                            saveAddressTransaction(tx, address, buffer, batch); // TODO Действия по заполнению кэша должны производиться только в основном потоке
+                            saveAddressTransaction(tx, address, batch); // TODO Действия по заполнению кэша должны производиться только в основном потоке
                             
                             if (statusDelegate.has_value()) {
-                                saveAddressStatus(statusDelegate.value(), address, buffer, batch);
+                                saveAddressStatus(statusDelegate.value(), address, batch);
                             }
                         }
                         
@@ -452,57 +417,52 @@ void WorkerMain::worker() {
                         }
                         
                         if (modules[MODULE_TXS]) {
-                            if (tx.isSaveToBd) {
-                                saveTransaction(tx, batch, buffer);
-                                
-                                if (txStatusDelegate.has_value()) {
-                                    saveTransactionStatus(txStatusDelegate.value(), buffer, batch, attributeTxStatusCache);
-                                }
-                                
-                                if (tx.tokenInfo.has_value()) {
-                                    if (!tx.isIntStatusNotSuccess()) {
-                                        if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
-                                            const TransactionInfo::TokenInfo::Create &createToken = std::get<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info);
-                                            
-                                            Token token;
-                                            token.type = createToken.type;
-                                            token.allValue = createToken.value;
-                                            token.beginValue = createToken.value;
-                                            token.decimals = createToken.decimals;
-                                            token.emission = createToken.emission;
-                                            token.name = createToken.name;
-                                            token.owner = createToken.owner;
-                                            token.symbol = createToken.symbol;
-                                            token.txHash = tx.hash;
-                                            
-                                            token.serialize(buffer);
-                                            batch.addToken(tx.toAddress.toBdString(), buffer);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeOwner>(tx.tokenInfo->info)) {
-                                            changeTokenOwner(tx, batch);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeEmission>(tx.tokenInfo->info)) {
-                                            changeTokenEmission(tx, batch);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
-                                            changeTokenValue(tx, batch);
-                                        } else if (std::holds_alternative<TransactionInfo::TokenInfo::MoveTokens>(tx.tokenInfo->info)) {
-                                            // empty
-                                        } else {
-                                            throwErr("Unknown token type");
-                                        }
+                            saveTransaction(tx, batch);
+                            
+                            if (txStatusDelegate.has_value()) {
+                                saveTransactionStatus(txStatusDelegate.value(), batch, attributeTxStatusCache);
+                            }
+                            
+                            if (tx.tokenInfo.has_value()) {
+                                if (!tx.isIntStatusNotSuccess()) {
+                                    if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
+                                        const TransactionInfo::TokenInfo::Create &createToken = std::get<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info);
+                                        
+                                        Token token;
+                                        token.type = createToken.type;
+                                        token.allValue = createToken.value;
+                                        token.beginValue = createToken.value;
+                                        token.decimals = createToken.decimals;
+                                        token.emission = createToken.emission;
+                                        token.name = createToken.name;
+                                        token.owner = createToken.owner;
+                                        token.symbol = createToken.symbol;
+                                        token.txHash = tx.hash;
+                                        
+                                        batch.addToken(tx.toAddress.toBdString(), token);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeOwner>(tx.tokenInfo->info)) {
+                                        changeTokenOwner(tx, batch);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeEmission>(tx.tokenInfo->info)) {
+                                        changeTokenEmission(tx, batch);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                        changeTokenValue(tx, batch);
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::MoveTokens>(tx.tokenInfo->info)) {
+                                        // empty
+                                    } else {
+                                        throwErr("Unknown token type");
                                     }
                                 }
                             }
                         }
                         
                         if (modules[MODULE_BALANCE]) {
-                            if (tx.isSaveToBd) {
-                                if (tx.tokenInfo.has_value()) {
-                                    if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
-                                        saveAddressBalanceCreateToken(tx, balances);
-                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
-                                        saveAddressBalanceAddToken(tx, balances);
-                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
-                                        saveAddressBalanceMoveToken(tx, balances);
-                                    }
+                            if (tx.tokenInfo.has_value()) {
+                                if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
+                                    saveAddressBalanceCreateToken(tx, balances);
+                                } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                    saveAddressBalanceAddToken(tx, balances);
+                                } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                    saveAddressBalanceMoveToken(tx, balances);
                                 }
                             }
                         }
@@ -522,40 +482,31 @@ void WorkerMain::worker() {
             
             if (bi.header.isForgingBlock()) {
                 ForgingSums fs = makeForgingSums(bi);
-                const std::string oldForgingSumsStr = findForgingSumsAll(leveldb);
-                const ForgingSums oldForgingSums = ForgingSums::deserialize(oldForgingSumsStr);
+                const ForgingSums oldForgingSums = leveldb.findForgingSumsAll();
                 fs += oldForgingSums;
-                batch.addAllForgedSums(fs.serialize());
+                batch.addAllForgedSums(fs);
             }
             
             if (modules[MODULE_BALANCE]) {
                 parallelFor(countThreads, balances.begin(), balances.end(), [this, &batch, &bi](auto balanceIter){
-                    static thread_local std::vector<char> buffer;
                     BalanceInfo &currBalance = balanceIter.second;
                     const std::string &address = balanceIter.first;
-                    const std::string oldBalanceString = findBalance(address, leveldb);
-                    BalanceInfo oldBalance;
-                    if (!oldBalanceString.empty()) {
-                        oldBalance = BalanceInfo::deserialize(oldBalanceString);
-                    }
+                    const BalanceInfo oldBalance = leveldb.findBalance(address);
                     if (oldBalance.blockNumber < bi.header.blockNumber.value()) {
                         const BalanceInfo newBalance = oldBalance + currBalance;
                         if (newBalance.received() < newBalance.spent()) { 
                             LOGWARN << "Incorrect balance " + toHex(address.begin(), address.end());
                         }
-                        newBalance.serialize(buffer);
-                        batch.addBalance(address, buffer);
+                        batch.addBalance(address, newBalance);
                     }
                 });
             }
             
             if (modules[MODULE_BLOCK]) {
-                std::vector<char> commonBalanceVect;
-                commonBalance.serialize(commonBalanceVect);
-                batch.addCommonBalance(commonBalanceVect);
+                batch.addCommonBalance(commonBalance);
             }
                         
-            batch.addMainBlock(MainBlockInfo(bi.header.blockNumber.value(), bi.header.hash, countVal.load()).serialize());
+            batch.addMainBlock(MainBlockInfo(bi.header.blockNumber.value(), bi.header.hash, countVal.load()));
             
             addBatch(batch, leveldb);
             
@@ -601,13 +552,11 @@ std::optional<size_t> WorkerMain::getInitBlockNumber() const {
     return lastSavedBlock;
 }
 
-std::vector<TransactionInfo> WorkerMain::readTxs(const std::vector<std::string> &foundResults) const {
+std::vector<TransactionInfo> WorkerMain::readTxs(const std::vector<AddressInfo> &foundResults) const {
     std::vector<TransactionInfo> txs;
     std::string currFileName;
     IfStream file;
-    for (const std::string &foundResult: foundResults) {
-        const AddressInfo addressInfo = AddressInfo::deserialize(foundResult);
-        
+    for (const AddressInfo &addressInfo: foundResults) {      
         if (addressInfo.filePos.fileNameRelative != currFileName) {
             closeFile(file);
             openFile(file, getFullPath(addressInfo.filePos.fileNameRelative, folderBlocks));
@@ -629,7 +578,7 @@ std::vector<TransactionInfo> WorkerMain::readTxs(const std::vector<std::string> 
 
 std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const Address& address, size_t from, size_t count, size_t limitTxs) const {
     const size_t countLimited = std::min((count == 0 ? limitTxs + 10 : count), limitTxs + 10);
-    const std::vector<std::string> foundResults = findAddress(address.toBdString(), leveldb, from, countLimited);
+    const std::vector<AddressInfo> foundResults = leveldb.findAddress(address.toBdString(), from, countLimited);
     CHECK(foundResults.size() < limitTxs, "Too many transactions in history. Please, request a history with chunks");
     
     std::vector<TransactionInfo> txs = readTxs(foundResults);
@@ -676,7 +625,7 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const A
     const size_t countLimited = std::min((count == 0 ? limitTxs + 10 : count), limitTxs + 10);
     std::vector<TransactionInfo> result;
     while (true) {
-        const std::vector<std::string> foundResults = findAddress(address.toBdString(), leveldb, from, countLimited - result.size());
+        const std::vector<AddressInfo> foundResults = leveldb.findAddress(address.toBdString(), from, countLimited - result.size());
         if (foundResults.empty()) {
             break;
         }
@@ -701,13 +650,7 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const A
 }
 
 std::vector<TransactionStatus> WorkerMain::getStatusesForAddress(const Address& address) const {
-    const std::vector<std::string> foundStatus = findAddressStatus(address.toBdString(), leveldb);
-    std::vector<TransactionStatus> statuses;
-    for (const std::string &foundStat: foundStatus) {
-        const TransactionStatus status = TransactionStatus::deserialize(foundStat);
-        statuses.emplace_back(status);
-    }
-    return statuses;
+    return leveldb.findAddressStatus(address.toBdString());
 }
 
 std::vector<TransactionInfo> WorkerMain::getTransactionsFillCache(const Address &address, size_t from, size_t count, size_t limitTxs) const {
@@ -768,9 +711,11 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddress(const Address &address
 
 void WorkerMain::readTransactionInFile(TransactionInfo& tx) const {
     IfStream file;
+    const std::string hash = tx.hash;
     openFile(file, getFullPath(tx.filePos.fileNameRelative, folderBlocks));
     const bool res = readOneTransactionInfo(file, tx.filePos.pos, tx, false);
     CHECK(res, "Incorrect read transaction info");
+    CHECK(hash == tx.hash, "Incorrect transaction");
 }
 
 std::optional<TransactionInfo> WorkerMain::findTransaction(const std::string &txHash) const {
@@ -778,11 +723,12 @@ std::optional<TransactionInfo> WorkerMain::findTransaction(const std::string &tx
     
     const std::optional<TransactionInfo> cache = caches.txsCache.getValue(txHash);
     if (!cache.has_value()) {
-        const std::string found = findTx(txHash, leveldb);
-        if (found.empty()) {
+        const std::optional<TransactionInfo> found = leveldb.findTx(txHash);
+        if (!found.has_value()) {
             return std::nullopt;
         }
-        TransactionInfo txInfo = TransactionInfo::deserialize(found);
+        TransactionInfo txInfo = found.value();
+        txInfo.hash = txHash;
         readTransactionInFile(txInfo);
         return txInfo;
     } else {
@@ -794,10 +740,9 @@ void WorkerMain::fillStatusTransaction(TransactionInfo &info) const {
     if (info.isStatusNeed()) {
         const std::optional<TransactionStatus> cacheStatus = caches.txsStatusCache.getValue(info.hash);
         if (!cacheStatus.has_value()) {
-            const std::string foundStatus = findTxStatus(info.hash, leveldb);
-            if (!foundStatus.empty()) {
-                TransactionStatus status = TransactionStatus::deserialize(foundStatus);
-                info.status = status;
+            const std::optional<TransactionStatus> foundStatus = leveldb.findTxStatus(info.hash);
+            if (foundStatus.has_value()) {
+                info.status = foundStatus.value();
             }
         } else {
             info.status = cacheStatus.value();
@@ -820,12 +765,7 @@ std::optional<TransactionInfo> WorkerMain::getTransaction(const std::string &txH
 
 BalanceInfo WorkerMain::readBalance(const Address& address) const {
     const std::string &addressStr = address.toBdString();
-    const std::string balanceString = findBalance(addressStr, leveldb);
-    if (balanceString.empty()) {
-        return BalanceInfo();
-    }
-    BalanceInfo balance = BalanceInfo::deserialize(balanceString);
-    return balance;
+    return leveldb.findBalance(addressStr);
 }
 
 BalanceInfo WorkerMain::getBalance(const Address &address) const {
@@ -846,10 +786,9 @@ BalanceInfo WorkerMain::getBalance(const Address &address) const {
 }
 
 BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const {
-    CHECK(modules[MODULE_BLOCK_RAW] && !modules[MODULE_USERS], "module " + MODULE_BLOCK_RAW_STR + " not set");
+    CHECK(modules[MODULE_BLOCK_RAW], "module " + MODULE_BLOCK_RAW_STR + " not set");
     
     BlockInfo bi;
-    bi.header = bh;
     if (bh.blockNumber == 0) {
         return bi;
     }
@@ -867,6 +806,8 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
         readNextBlockInfo(element->data(), element->data() + element->size(), bh.filePos.pos, bi, true, false, beginTx, countTx);
     }
     
+    bi.header = bh;
+    
     for (TransactionInfo &tx: bi.txs) {
         tx.blockNumber = bi.header.blockNumber.value();
         fillStatusTransaction(tx);
@@ -877,7 +818,7 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
 
 
 std::vector<std::pair<Address, DelegateState>> WorkerMain::getDelegateStates(const Address &fromAddress) const {
-    const std::vector<std::pair<std::string, std::string>> result = findAllDelegatedPairKeys(fromAddress.getBinaryString(), leveldb);
+    const std::vector<std::pair<std::string, std::string>> result = leveldb.findAllDelegatedPairKeys(fromAddress.getBinaryString());
     std::vector<std::pair<Address, DelegateState>> r;
     r.reserve(result.size());
     std::transform(result.begin(), result.end(), std::back_inserter(r), [&fromAddress](const std::pair<std::string, std::string> &element) {
@@ -889,8 +830,7 @@ std::vector<std::pair<Address, DelegateState>> WorkerMain::getDelegateStates(con
 }
 
 CommonBalance WorkerMain::commonBalance() const {
-    const std::string commonBalanceString = torrent_node_lib::findCommonBalance(leveldb);
-    return CommonBalance::deserialize(commonBalanceString);
+    return leveldb.findCommonBalance();
 }
 
 ForgingSums WorkerMain::getForgingSumForLastBlock(size_t blockIndent) const {
@@ -923,18 +863,34 @@ ForgingSums WorkerMain::getForgingSumForLastBlock(size_t blockIndent) const {
 }
 
 ForgingSums WorkerMain::getForgingSumAll() const {
-    const std::string foundForgingSums = findForgingSumsAll(leveldb);
-    return ForgingSums::deserialize(foundForgingSums);
+    return leveldb.findForgingSumsAll();
 }
 
 Token WorkerMain::getTokenInfo(const Address &address) const {
-    const std::string tokenString = findToken(address.toBdString(), leveldb);
-    return Token::deserialize(tokenString);
+    return leveldb.findToken(address.toBdString());
 }
 
 std::vector<TransactionInfo> WorkerMain::getLastTxs() const {
     std::lock_guard<std::mutex> lock(lastTxsMut);
     return lastTxs;
+}
+
+std::vector<Address> WorkerMain::getRandomAddresses(size_t countAddresses) const {
+    const BlockHeader bh = blockchain.getLastStateBlock();
+    BlockInfo bi = getFullBlock(bh, 0, std::numeric_limits<size_t>::max());
+    std::vector<TransactionInfo> &txs = bi.txs;
+    
+    std::random_device rd;
+    std::mt19937 g(rd());
+    
+    auto begin = txs.begin() + bi.header.countSignTx;
+    auto middle = begin + std::min(countAddresses, (size_t)std::distance(begin, txs.end()));
+    partial_shuffle(begin, middle, txs.end(), g);
+    
+    std::vector<Address> result;
+    std::transform(begin, middle, std::back_inserter(result), std::mem_fn(&TransactionInfo::toAddress));
+    
+    return result;
 }
 
 }

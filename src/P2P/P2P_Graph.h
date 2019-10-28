@@ -3,11 +3,15 @@
 
 #include "P2P.h"
 
+#include "P2P_Impl.h"
+
 #include <vector>
 
 #include "utils/Graph.h"
 
 #include "curlWrapper.h"
+
+#include "LimitArray.h"
 
 using GraphString = Graph<std::string>;
 
@@ -22,9 +26,9 @@ public:
      */
     void broadcast(const std::string &qs, const std::string &postData, const std::string &header, const torrent_node_lib::BroadcastResult &callback) const override;
     
-    std::string request(size_t responseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const override;
+    std::string request(size_t responseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) override;
        
-    std::vector<std::string> requests(size_t countRequests, const torrent_node_lib::MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const override;
+    std::vector<std::string> requests(size_t countRequests, const torrent_node_lib::MakeQsAndPostFunction2 &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) override;
     
     std::string runOneRequest(const std::string &server, const std::string &qs, const std::string &postData, const std::string &header) const override;
    
@@ -32,21 +36,23 @@ public:
     
 private:
     
-    std::vector<std::reference_wrapper<const Server>> getServersList(const Server &server) const;
+    size_t getMaxServersCount(const std::string &srvr) const;
     
-    std::string request(const common::Curl::CurlInstance &curl, const std::string &qs, const std::string &postData, const std::string &header, const std::string &server) const;
-    
-    std::vector<std::string> requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers) const;
+    std::vector<torrent_node_lib::P2P_Impl::ThreadDistribution> getServersList(const std::string &server, size_t countSegments) const;
+        
+    std::vector<std::string> requestImpl(size_t responseSize, size_t minResponseSize, bool isPrecisionSize, const torrent_node_lib::MakeQsAndPostFunction &makeQsAndPost, const std::string &header, const torrent_node_lib::ResponseParseFunction &responseParse, const std::vector<std::string> &hintsServers); 
     
 private:
+    
+    torrent_node_lib::P2P_Impl p2p;
     
     GraphString graph;
     
     const GraphString::Element *parent;
     
-    size_t countConnections;
+    common::CurlInstance curlBroadcast;
     
-    std::vector<common::Curl::CurlInstance> curls;
+    size_t countConnections;
     
 };
 

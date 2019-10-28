@@ -496,6 +496,28 @@ std::string genCountBlockJson(const RequestId &requestId, size_t countBlocks, bo
     return jsonToString(doc, isFormat);
 }
 
+std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version) {
+    CHECK(bh.size() == blocks.size(), "Incorrect parameter blocks");
+    
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    rapidjson::Value vals(rapidjson::kArrayType);
+    for (size_t i = 0; i < bh.size(); i++) {
+        const BlockHeader &b  = bh[i];
+        
+        if (b.blockNumber == 0) {
+            return genErrorResponse(requestId, -32603, "Incorrect block number: 0. Genesis block begin with number 1");
+        }
+        vals.PushBack(blockHeaderToJson(b, {}, allocator, BlockTypeInfo::ForP2P, version), allocator);
+    }
+    doc.AddMember("result", vals, allocator);
+    const std::string blockHeaders = jsonToString(doc, false);
+    
+    const std::string blocksStr = genDumpBlocksBinary(blocks, isCompress);
+        
+    return serializeInt(blockHeaders.size()) + serializeInt(blocksStr.size()) + serializeInt(countBlocks) + blockHeaders + blocksStr;
+}
+
 std::string genBlockDumpJson(const RequestId &requestId, const std::string &blockDump, bool isFormat) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
@@ -742,66 +764,16 @@ std::string genDumpBlocksBinary(const std::vector<std::string> &blocks, bool isC
     }
 }
 
-std::string parseDumpBlockBinary(const std::string &response, bool isCompress) {
-    if (!isCompress) {
-        return response;
-    } else {
-        return decompress(response);
+std::string genRandomAddressesJson(const RequestId &requestId, const std::vector<torrent_node_lib::Address> &addresses, bool isFormat) {
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    addIdToResponse(requestId, doc, allocator);
+    rapidjson::Value nodesJson(rapidjson::kArrayType);
+    for (const Address &address: addresses) {
+        nodesJson.PushBack(strToJson(address.calcHexString(), allocator), allocator);
     }
-}
-
-std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool isCompress) {
-    std::vector<std::string> res;
-    const std::string r = isCompress ? decompress(response) : response;
-    size_t from = 0;
-    while (from < r.size()) {
-        res.emplace_back(deserializeStringBigEndian(r, from));
-    }
-    return res;
-}
-
-static MinimumBlockHeader parseBlockHeader(const rapidjson::Value &resultJson) {    
-    MinimumBlockHeader result;
-    CHECK(resultJson.HasMember("number") && resultJson["number"].IsInt64(), "number field not found");
-    result.number = resultJson["number"].GetInt64();
-    CHECK(resultJson.HasMember("hash") && resultJson["hash"].IsString(), "hash field not found");
-    result.hash = resultJson["hash"].GetString();
-    CHECK(resultJson.HasMember("prev_hash") && resultJson["prev_hash"].IsString(), "prev_hash field not found");
-    result.parentHash = resultJson["prev_hash"].GetString();
-    CHECK(resultJson.HasMember("size") && resultJson["size"].IsInt64(), "size field not found");
-    result.blockSize = resultJson["size"].GetInt64();
-    CHECK(resultJson.HasMember("fileName") && resultJson["fileName"].IsString(), "fileName field not found");
-    result.fileName = resultJson["fileName"].GetString();
-    
-    return result;
-}
-
-MinimumBlockHeader parseBlockHeader(const std::string &response) {
-    rapidjson::Document doc;
-    const rapidjson::ParseResult pr = doc.Parse(response.c_str());
-    CHECK(pr, "rapidjson parse error. Data: " + response);
-    
-    CHECK(!doc.HasMember("error") || doc["error"].IsNull(), jsonToString(doc["error"], false));
-    CHECK(doc.HasMember("result") && doc["result"].IsObject(), "result field not found");
-    const auto &resultJson = doc["result"];
-    
-    return parseBlockHeader(resultJson);
-}
-
-std::vector<MinimumBlockHeader> parseBlocksHeader(const std::string &response) {
-    rapidjson::Document doc;
-    const rapidjson::ParseResult pr = doc.Parse(response.c_str());
-    CHECK(pr, "rapidjson parse error. Data: " + response);
-    
-    CHECK(!doc.HasMember("error") || doc["error"].IsNull(), jsonToString(doc["error"], false));
-    CHECK(doc.HasMember("result") && doc["result"].IsArray(), "result field not found");
-    const auto &resultJson = doc["result"].GetArray();
-    
-    std::vector<MinimumBlockHeader> result;
-    for (const auto &rJson: resultJson) {
-        CHECK(rJson.IsObject(), "result field not found");
-        result.emplace_back(parseBlockHeader(rJson));
-    }
-    
-    return result;
+    rapidjson::Value resultJson(rapidjson::kObjectType);
+    resultJson.AddMember("addresses", nodesJson, allocator);
+    doc.AddMember("result", resultJson, allocator);
+    return jsonToString(doc, isFormat);
 }

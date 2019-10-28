@@ -16,6 +16,7 @@
 #include "utils/utils.h"
 #include "log.h"
 #include "utils/FileSystem.h"
+#include "curlWrapper.h"
 
 #include "duration.h"
 
@@ -113,10 +114,12 @@ static SettingsDb parseSettingsDb(const libconfig::Setting &allSettings, const s
 int main (int argc, char *const *argv) {
     //signal(SIGSEGV, crash_handler);
     //signal(SIGABRT, crash_handler);
-    
+  
     initializeStopProgram();
     tcmallocMaintenance();
-        
+    
+    Curl::initialize();
+    
     if (argc != 2) {
         std::cout << "path_to_config" << std::endl;
         return -1;
@@ -219,6 +222,11 @@ int main (int argc, char *const *argv) {
         if (allSettings.exists("technical_address")) {
             technicalAddress = static_cast<const char*>(allSettings["technical_address"]);
         }
+        
+        bool isPreLoad = false;
+        if (allSettings.exists("is_preload")) {
+            isPreLoad = allSettings["is_preload"];
+        }
                 
         std::set<std::string> modulesStr;
         for (const std::string &moduleStr: allSettings["modules"]) {
@@ -264,7 +272,7 @@ int main (int argc, char *const *argv) {
             technicalAddress,
             LevelDbOptions(settingsDb.writeBufSizeMb, settingsDb.isBloomFilter, settingsDb.isChecks, getFullPath("simple", pathToBd), settingsDb.lruCacheMb),
             CachesOptions(maxCountElementsBlockCache, maxCountElementsTxsCache, maxLocalCacheElements),
-            GetterBlockOptions(maxAdvancedLoadBlocks, countBlocksInBatch, p2p.get(), getBlocksFromFile, isValidate, isValidateSign, isCompress),
+            GetterBlockOptions(maxAdvancedLoadBlocks, countBlocksInBatch, p2p.get(), getBlocksFromFile, isValidate, isValidateSign, isCompress, isPreLoad),
             signKey,
             TestNodesOptions(otherPortTorrent, myIp, testNodesServer),
             isValidateState

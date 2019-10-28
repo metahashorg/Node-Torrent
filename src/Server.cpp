@@ -38,6 +38,7 @@ const static std::string GET_BLOCK_BY_NUMBER = "get-block-by-number";
 const static std::string GET_BLOCKS = "get-blocks";
 const static std::string GET_LAST_TXS = "get-last-txs";
 const static std::string GET_COUNT_BLOCKS = "get-count-blocks";
+const static std::string PRE_LOAD_BLOCKS = "pre-load";
 const static std::string GET_DUMP_BLOCK_BY_HASH = "get-dump-block-by-hash";
 const static std::string GET_DUMP_BLOCK_BY_NUMBER = "get-dump-block-by-number";
 const static std::string GET_DUMPS_BLOCKS_BY_HASH = "get-dumps-blocks-by-hash";
@@ -57,20 +58,20 @@ const static std::string GET_LAST_NODE_STAT_COUNT = "get-last-node-stat-count";
 const static std::string GET_LAST_NODES_STATS_RESULT = "get-last-nodes-stats-count";
 const static std::string GET_ALL_LAST_NODES_RESULT = "get-all-last-nodes-count";
 const static std::string GET_NODE_RAITING = "get-nodes-raiting";
+const static std::string GET_RANDOM_ADDRESSES = "get-random-addresses";
 
 const static int64_t MAX_BATCH_BLOCKS = 1000;
 const static size_t MAX_BATCH_TXS = 10000;
 const static size_t MAX_BATCH_BALANCES = 10000;
 const static size_t MAX_HISTORY_SIZE = 10000;
 const static size_t MAX_BATCH_DUMPS = 1000;
+const static size_t MAX_PRELOAD_BLOCKS = 10;
 
 const static int HTTP_STATUS_OK = 200;
 const static int HTTP_STATUS_METHOD_NOT_ALLOWED = 405;
 const static int HTTP_STATUS_BAD_REQUEST = 400;
 const static int HTTP_STATUS_NO_CONTENT = 204;
 const static int HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
-
-const static size_t MAX_COUNT_SIGN_TXS = 15;
 
 struct IncCountRunningThread {
   
@@ -166,7 +167,7 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
             const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
             std::vector<TransactionInfo> signs;
             if (nextBh.blockNumber.has_value()) {
-                const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, MAX_COUNT_SIGN_TXS);
+                const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
                 signs = nextBi.getBlockSignatures();
             }
             return blockHeaderToJson(requestId, bh, signs, isFormat, type, version);
@@ -177,7 +178,7 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
         const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
         std::vector<TransactionInfo> signs;
         if (nextBh.blockNumber.has_value()) {
-            const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, MAX_COUNT_SIGN_TXS);
+            const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
             signs = nextBi.getBlockSignatures();
         }
         const BlockInfo bi = sync.getFullBlock(bh, beginTx, countTxs);
@@ -217,7 +218,7 @@ static std::string getBlocks(const RequestId &requestId, const rapidjson::Docume
     const auto processBlock = [&bhs, &signs, &sync, type](int64_t i) {
         bhs.emplace_back(sync.getBlockchain().getBlock(i));
         if (type == BlockTypeInfo::Simple) {
-            const BlockInfo bi = sync.getFullBlock(bhs.back(), 0, MAX_COUNT_SIGN_TXS);
+            const BlockInfo bi = sync.getFullBlock(bhs.back(), 0, bhs.back().countSignTx);
             signs.emplace_back(bi.getBlockSignatures());
         } else {
             signs.push_back({});
@@ -502,6 +503,35 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const size_t countBlocks = sync.getBlockchain().countBlocks();
             
             response = genCountBlockJson(requestId, countBlocks, isFormatJson, jsonVersion);
+        } else if (func == PRE_LOAD_BLOCKS) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+            
+            const size_t currentBlock = get<int>(jsonParams, "currentBlock");
+            const bool isCompress = get<bool>(jsonParams, "compress");
+            const bool isSign = get<bool>(jsonParams, "isSign");
+            const size_t preLoadBlocks = get<int>(jsonParams, "preLoad");
+            const size_t maxBlockSize = get<int>(jsonParams, "maxBlockSize");
+            
+            CHECK(preLoadBlocks <= MAX_PRELOAD_BLOCKS, "Incorrect preload parameter");
+            
+            const size_t countBlocks = sync.getBlockchain().countBlocks();
+            
+            std::vector<torrent_node_lib::BlockHeader> bhs;
+            std::vector<std::string> blocks;
+            if (countBlocks <= currentBlock + preLoadBlocks + MAX_PRELOAD_BLOCKS / 2) {
+                for (size_t i = currentBlock + 1; i < std::min(currentBlock + 1 + preLoadBlocks, countBlocks + 1); i++) {
+                    const BlockHeader &bh = sync.getBlockchain().getBlock(i);
+                    CHECK(bh.blockNumber.has_value(), "block " + to_string(i) + " not found");
+                    if (bh.blockSize > maxBlockSize) {
+                        break;
+                    }
+                    
+                    bhs.emplace_back(bh);
+                    blocks.emplace_back(sync.getBlockDump(bh, 0, std::numeric_limits<size_t>::max(), false, isSign));
+                }
+            }
+            
+            response = preLoadBlocksJson(requestId, countBlocks, bhs, blocks, isCompress, jsonVersion);
         } else if (func == GET_ADDRESS_DELEGATIONS) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             
@@ -587,6 +617,14 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const auto result = sync.calcNodeRaiting(addressString, countTests);
             const size_t lastBlockDay = sync.getLastBlockDay();
             response = genNodesRaitingJson(requestId, addressString, result.first, result.second, lastBlockDay, isFormatJson, jsonVersion);
+        } else if (func == GET_RANDOM_ADDRESSES) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+            
+            const size_t countAddresses = get<size_t>(jsonParams, "count_addresses");
+            
+            const auto result = sync.getRandomAddresses(countAddresses);
+            
+            response = genRandomAddressesJson(requestId, result, isFormatJson);
         } else {
             throwUserErr("Incorrect func " + func);
         }

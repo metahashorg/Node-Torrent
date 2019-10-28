@@ -31,6 +31,7 @@ struct DelegateState;
 struct ForgingSums;
 struct TransactionStatus;
 struct Token;
+struct AddressInfo;
 
 class WorkerMain final: public Worker {  
 public:
@@ -77,6 +78,8 @@ public:
 
     Token getTokenInfo(const Address &address) const;
     
+    std::vector<Address> getRandomAddresses(size_t countAddresses) const;
+    
 private:
     
     void worker();
@@ -93,7 +96,7 @@ private:
     
     std::vector<TransactionInfo> getTxsForAddressWithoutStatuses(const Address& address, size_t &from, size_t count, size_t limitTxs, const TransactionsFilters &filters) const;
     
-    std::vector<TransactionInfo> readTxs(const std::vector<std::string> &foundResults) const;
+    std::vector<TransactionInfo> readTxs(const std::vector<AddressInfo> &foundResults) const;
     
     std::optional<TransactionInfo> findTransaction(const std::string &txHash) const;
     
@@ -101,13 +104,13 @@ private:
     
     BalanceInfo readBalance(const Address& address) const;
     
-    void saveTransactionStatus(const TransactionStatus &txStatus, std::vector<char> &buffer, Batch &txsBatch, const std::string &attributeTxStatusCache);
+    void saveTransactionStatus(const TransactionStatus &txStatus, Batch &txsBatch, const std::string &attributeTxStatusCache);
     
-    void saveTransaction(const TransactionInfo &tx, Batch &txsBatch, std::vector<char> &buffer);
+    void saveTransaction(const TransactionInfo &tx, Batch &txsBatch);
     
-    void saveAddressTransaction(const TransactionInfo &tx, const Address &address, std::vector<char> &buffer, Batch &batch);
+    void saveAddressTransaction(const TransactionInfo &tx, const Address &address, Batch &batch);
     
-    void saveAddressStatus(const TransactionStatus &status, const Address &address, std::vector<char> &buffer, Batch &batch);
+    void saveAddressStatus(const TransactionStatus &status, const Address &address, Batch &batch);
     
     void saveAddressBalance(const TransactionInfo &tx, const Address &address, std::unordered_map<std::string, BalanceInfo> &balances, bool isForging);
     
@@ -131,8 +134,6 @@ private:
     
     std::optional<TransactionStatus> calcTransactionStatusDelegate(const TransactionInfo &tx, size_t blockNumber, DelegateTransactionsCache &delegateCache, Batch &batch);
     
-    [[nodiscard]] bool checkAddressToSave(const TransactionInfo &tx, const Address &address) const;
-       
     void readTransactionInFile(TransactionInfo &filePos) const;
     
     void validateStateBlock(const BlockInfo &bi) const;

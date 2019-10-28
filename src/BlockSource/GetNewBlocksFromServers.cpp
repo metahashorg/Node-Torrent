@@ -3,15 +3,14 @@
 #include <functional>
 using namespace std::placeholders;
 
-#include "generate_json.h"
-
 #include <mutex>
 
 #include "BlockInfo.h"
 
 #include "check.h"
 #include "log.h"
-#include "jsonUtils.h"
+
+#include "get_new_blocks_messages.h"
 
 using namespace common;
 
@@ -34,15 +33,7 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
         }
         
         try {
-            rapidjson::Document doc;
-            const rapidjson::ParseResult pr = doc.Parse(result.c_str());
-            CHECK(pr, "rapidjson parse error. Data: " + result);
-            
-            CHECK(!doc.HasMember("error") || doc["error"].IsNull(), jsonToString(doc["error"], false));
-            CHECK(doc.HasMember("result") && doc["result"].IsObject(), "result field not found");
-            const auto &resultJson = doc["result"];
-            CHECK(resultJson.HasMember("count_blocks") && resultJson["count_blocks"].IsInt(), "count_blocks field not found");
-            const size_t countBlocks = resultJson["count_blocks"].GetInt();
+            const size_t countBlocks = parseCountBlocksMessage(result);
             
             std::lock_guard<std::mutex> lock(mut);
             if (!lastBlock.has_value()) {
@@ -61,7 +52,7 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
         }
     };
     
-    p2p.broadcast("get-count-blocks", "{\"id\": 1}", "", function);
+    p2p.broadcast("", makeGetCountBlocksMessage(), "", function);
     
     LastBlockResponse response;
     if (lastBlock.has_value()) {
@@ -73,12 +64,82 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
     return response;
 }
 
+GetNewBlocksFromServer::LastBlockPreLoadResponse GetNewBlocksFromServer::preLoadBlocks(size_t currentBlock, bool isSign) const {   
+    const size_t PRELOAD_BLOCKS = 5;
+    const size_t MAX_BLOCK_SIZE = 100000;
+    
+    std::string error;
+    std::mutex mut;
+    LastBlockPreLoadResponse answer;
+    const BroadcastResult function = [&error, &mut, &answer](const std::string &server, const std::string &result, const std::optional<CurlException> &curlException) {
+        if (curlException.has_value()) {
+            std::lock_guard<std::mutex> lock(mut);
+            error = curlException.value().message;
+            return;
+        }
+        
+        try {
+            const PreloadBlocksResponse response = parsePreloadBlocksMessage(result);
+            
+            if (response.error.has_value()) {
+                std::lock_guard<std::mutex> lock(mut);
+                error = response.error.value();
+                return;
+            }
+           
+            std::lock_guard<std::mutex> lock(mut);
+            if (!answer.lastBlock.has_value()) {
+                answer.lastBlock = 0;
+            }
+            if (answer.lastBlock < response.countBlocks) {
+                answer.lastBlock = response.countBlocks;
+                answer.servers.clear();
+                answer.servers.emplace_back(server);
+                
+                answer.blockHeaders = response.blockHeaders;
+                answer.blocksDumps = response.blockDumps;
+            } else if (answer.lastBlock == response.countBlocks) {
+                answer.servers.emplace_back(server);
+            }
+        } catch (const exception &e) {
+            std::lock_guard<std::mutex> lock(mut);
+            error = e;
+        }
+    };
+    
+    p2p.broadcast("", makePreloadBlocksMessage(currentBlock, isCompress, isSign, PRELOAD_BLOCKS, MAX_BLOCK_SIZE), "", function);
+    
+    if (!answer.lastBlock.has_value()) {
+        answer.error = error;
+    }
+    return answer;
+}
+
 void GetNewBlocksFromServer::clearAdvanced() {
     advancedLoadsBlocksHeaders.clear();
     advancedLoadsBlocksDumps.clear();
 }
 
-MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::string &server) const {
+void GetNewBlocksFromServer::addPreLoadBlocks(size_t fromBlock, const std::string &blockHeadersStr, const std::string &blockDumpsStr) {
+    try {
+        const std::vector<MinimumBlockHeader> blocksHeaders = parseBlocksHeader(blockHeadersStr);
+        const std::vector<std::string> blocksDumps = parseDumpBlocksBinary(blockDumpsStr, isCompress);
+        CHECK(blocksHeaders.size() == blocksDumps.size(), "Not equals count block headers and dumps");
+        
+        LOGINFO << "Ya tuta 0 " << blocksDumps.size();
+        
+        for (size_t j = 0; j < blocksHeaders.size(); j++) {
+            CHECK(blocksHeaders[j].number == fromBlock + j, "Incorrect block number in answer: " + std::to_string(blocksHeaders[j].number) + " " + std::to_string(fromBlock + j));
+            advancedLoadsBlocksHeaders.emplace_back(fromBlock + j, blocksHeaders[j]);
+            
+            advancedLoadsBlocksDumps[blocksHeaders[j].hash] = blocksDumps[j];
+        }
+    } catch (const exception &e) {
+        LOGWARN << "Dont added preload blocks " << e;
+    }
+}
+
+MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers) {
     const auto foundBlock = std::find_if(advancedLoadsBlocksHeaders.begin(), advancedLoadsBlocksHeaders.end(), [blockNum](const auto &pair) {
         return pair.first == blockNum;
     });
@@ -87,25 +148,39 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
     }
     
     advancedLoadsBlocksHeaders.clear();
-    
+        
     const size_t countBlocks = std::min(maxBlockNum - blockNum + 1, maxAdvancedLoadBlocks);
     const size_t countParts = (countBlocks + countBlocksInBatch - 1) / countBlocksInBatch;
     CHECK(countBlocks != 0 && countParts != 0, "Incorrect count blocks");
-    const auto makeQsAndPost = [blockNum, countBlocksInBatch=this->countBlocksInBatch, maxCountBlocks=countBlocks](size_t number) {
+    
+    const auto calcBlockIndexes = [blockNum, countBlocksInBatch=this->countBlocksInBatch, maxCountBlocks=countBlocks](size_t number) {
         const size_t beginBlock = blockNum + number * countBlocksInBatch;
         const size_t countBlocks = std::min(countBlocksInBatch, maxCountBlocks - number * countBlocksInBatch);
+        return std::make_pair(beginBlock, countBlocks);
+    };
+    
+    const auto makeQsAndPost = [calcBlockIndexes](size_t number) {
+        const auto [beginBlock, countBlocks] = calcBlockIndexes(number);
         if (countBlocks != 1) {
-            return std::make_pair("get-blocks", "{\"id\":1,\"params\":{\"beginBlock\": " + std::to_string(beginBlock) + ", \"countBlocks\": " + std::to_string(countBlocks) + ", \"type\": \"forP2P\", \"direction\": \"forward\"}}");
+            return std::make_pair("", makeGetBlocksMessage(beginBlock, countBlocks));
         } else {
-            return std::make_pair("get-block-by-number", "{\"id\":1,\"params\":{\"number\": " + std::to_string(blockNum + number) + ", \"type\": \"forP2P\"}}");
+            return std::make_pair("", makeGetBlockByNumberMessage(beginBlock));
         }
     };
     
-    const std::vector<std::string> answer = p2p.requests(countParts, makeQsAndPost, "", [](const std::string &result) {
+    const std::vector<std::string> answer = p2p.requests(countParts, makeQsAndPost, "", [calcBlockIndexes](const std::string &result, size_t fromIndex, size_t toIndex) {
         ResponseParse r;
-        r.response = result;
+        
+        const auto [beginBlock, countBlocks] = calcBlockIndexes(fromIndex);
+        
+        const auto checked = checkErrorGetBlockResponse(result, countBlocks);
+        if (checked.has_value()) {
+            r.error = checked.value();
+        } else {
+            r.response = result;
+        }
         return r;
-    }, {server});
+    }, servers);
     
     CHECK(answer.size() == countParts, "Incorrect answer");
     
@@ -120,7 +195,9 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
                 advancedLoadsBlocksHeaders.emplace_back(currBlockNum + j, blocks[j]);
             }
         } else {
-            advancedLoadsBlocksHeaders.emplace_back(currBlockNum, parseBlockHeader(answer[i]));
+            const MinimumBlockHeader header = parseBlockHeader(answer[i]);
+            CHECK(header.number == currBlockNum, "Incorrect block number in answer: " + std::to_string(header.number) + " " + std::to_string(currBlockNum));
+            advancedLoadsBlocksHeaders.emplace_back(currBlockNum, header);
         }
     }
     
@@ -128,44 +205,33 @@ MinimumBlockHeader GetNewBlocksFromServer::getBlockHeader(size_t blockNum, size_
 }
 
 MinimumBlockHeader GetNewBlocksFromServer::getBlockHeaderWithoutAdvanceLoad(size_t blockNum, const std::string &server) const {
-    const std::string response = p2p.runOneRequest(server, "get-block-by-number", "{\"id\":1,\"params\":{\"number\": " + std::to_string(blockNum) + ", \"type\": \"forP2P\"}}", "");
+    const std::string response = p2p.runOneRequest(server, "", makeGetBlockByNumberMessage(blockNum), "");
     
     return parseBlockHeader(response);
 }
 
 std::pair<std::string, std::string> GetNewBlocksFromServer::makeRequestForDumpBlock(const std::string &blockHash, size_t fromByte, size_t toByte) {
-    const static std::string QS = "get-dump-block-by-hash";
-    const std::string post = "{\"id\":1,\"params\":{\"hash\": \"" + blockHash + "\" , \"fromByte\": " + std::to_string(fromByte) + ", \"toByte\": " + std::to_string(toByte) + ", \"isHex\": false}}"; // TODO если isHex true, нужно менять код ниже
+    const static std::string QS = "";
+    const std::string post = makeGetDumpBlockMessage(blockHash, fromByte, toByte, false, false);
     return std::make_pair(QS, post);
 }
 
 std::pair<std::string, std::string> GetNewBlocksFromServer::makeRequestForDumpBlockSign(const std::string &blockHash, size_t fromByte, size_t toByte) {
-    const static std::string QS = "get-dump-block-by-hash";
-    const std::string post = "{\"id\":1,\"params\":{\"hash\": \"" + blockHash + "\" , \"fromByte\": " + std::to_string(fromByte) + ", \"toByte\": " + std::to_string(toByte) + "\", \"isHex\": false, \"isSign\": true, " + 
-    "\"compress\": " + "false" + 
-    "}}"; // TODO если isHex true, нужно менять код ниже
+    const static std::string QS = "";
+    const std::string post = makeGetDumpBlockMessage(blockHash, fromByte, toByte, true, false);
     return std::make_pair(QS, post);
 }
 
-ResponseParse GetNewBlocksFromServer::parseDumpBlockResponse(const std::string& result) {
+ResponseParse GetNewBlocksFromServer::parseDumpBlockResponse(bool manyBlocks, bool isSign, bool isCompress, const std::string& result, size_t fromByte, size_t toByte) {
     ResponseParse parsed;
     if (result.empty()) {
         return parsed;
     }
-    if (result.size() <= 512 && result[0] == '{' && result[result.size() - 1] == '}') { // скорее всего, это json. Проверка в предположении, что isHex false
-        try {
-            rapidjson::Document doc;
-            const rapidjson::ParseResult pr = doc.Parse(result.c_str());
-            CHECK(pr, "rapidjson parse error. Data: " + result);
-            
-            CHECK(!doc.HasMember("error") || doc["error"].IsNull(), jsonToString(doc["error"], false));
-            CHECK(doc.HasMember("result") && doc["result"].IsObject(), "result field not found");
-            const auto &resultJson = doc["result"];
-            CHECK(resultJson.HasMember("dump") && resultJson["dump"].IsString(), "dump field not found");
-            parsed.response = resultJson["dump"].GetString();
-        } catch (const exception &e) {
-            parsed.error = e;
-        }
+    
+    const auto checked = checkErrorGetBlockDumpResponse(result, manyBlocks, isSign, isCompress, toByte - fromByte);
+    
+    if (checked.has_value()) {
+        parsed.error = checked.value();
     } else {
         parsed.response = result;
     }
@@ -174,9 +240,9 @@ ResponseParse GetNewBlocksFromServer::parseDumpBlockResponse(const std::string& 
 
 std::string GetNewBlocksFromServer::getBlockDumpWithoutAdvancedLoad(const std::string &blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const {
     if (!isSign) {
-        return p2p.request(blockSize, true, std::bind(makeRequestForDumpBlock, std::ref(blockHash), _1, _2), "", parseDumpBlockResponse, hintsServers);
+        return p2p.request(blockSize, true, std::bind(makeRequestForDumpBlock, std::ref(blockHash), _1, _2), "", std::bind(parseDumpBlockResponse, false, isSign, false, _1, _2, _3), hintsServers);
     } else {
-        const std::string result = p2p.request(blockSize + ESTIMATE_SIZE_SIGNATURE, false, std::bind(makeRequestForDumpBlockSign, std::ref(blockHash), _1, _2), "", parseDumpBlockResponse, hintsServers);
+        const std::string result = p2p.request(blockSize + ESTIMATE_SIZE_SIGNATURE, false, std::bind(makeRequestForDumpBlockSign, std::ref(blockHash), _1, _2), "", std::bind(parseDumpBlockResponse, false, isSign, false, _1, _2, _3), hintsServers);
         return result;
     }
 }
@@ -209,42 +275,24 @@ std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, s
     const auto makeQsAndPost = [&blocksHashs, isSign, countBlocksInBatch=this->countBlocksInBatch, isCompress=this->isCompress](size_t number) {
         CHECK(blocksHashs.size() > number * countBlocksInBatch, "Incorrect number");
         const size_t beginBlock = number * countBlocksInBatch;
-        const size_t countBlocks = std::min(countBlocksInBatch, blocksHashs.size() - number * countBlocksInBatch);
+        const size_t countBlocks = std::min(countBlocksInBatch, blocksHashs.size() - beginBlock);
         if (countBlocks == 1) {
-            return std::make_pair("get-dump-block-by-hash", "{\"id\":1,\"params\":{\"hash\": \"" + blocksHashs[number] + "\" , \"isHex\": false, " + 
-                "\"isSign\": " + (isSign ? "true" : "false") + 
-                ", \"compress\": " + (isCompress ? "true" : "false") + 
-                "}}");
-        } else {            
-            std::string r;
-            r += "{\"id\":1,\"params\":{\"hashes\": [";
-            bool isFirst = true;
-            for (size_t i = beginBlock; i < beginBlock + countBlocks; i++) {
-                if (!isFirst) {
-                    r += ", ";
-                }
-                
-                r += "\"" + blocksHashs[i] + "\"";
-                
-                isFirst = false;
-            }
-            r += std::string("], \"isSign\": ") + (isSign ? "true" : "false") + 
-            ", \"compress\": " + (isCompress ? "true" : "false") + 
-            "}}";
-            
-            return std::make_pair("get-dumps-blocks-by-hash", r);
+            return std::make_pair("", makeGetDumpBlockMessage(blocksHashs[beginBlock], isSign, isCompress));
+        } else {           
+            return std::make_pair("", makeGetDumpsBlocksMessage(blocksHashs.begin() + beginBlock, blocksHashs.begin() + beginBlock + countBlocks, isSign, isCompress));
         }
     };
     
-    const std::vector<std::string> responses = p2p.requests(countParts, makeQsAndPost, "", parseDumpBlockResponse, hintsServers);
+    const std::vector<std::string> responses = p2p.requests(countParts, makeQsAndPost, "", std::bind(parseDumpBlockResponse, true, isSign, isCompress, _1, _2, _3), hintsServers);
     CHECK(responses.size() == countParts, "Incorrect responses");
     
     for (size_t i = 0; i < responses.size(); i++) {
         const size_t beginBlock = i * countBlocksInBatch;
-        const size_t blocksInPart = std::min(countBlocksInBatch, blocksHashs.size() - i * countBlocksInBatch);
+        const size_t blocksInPart = std::min(countBlocksInBatch, blocksHashs.size() - beginBlock);
         
         if (blocksInPart == 1) {
-            advancedLoadsBlocksDumps[blocksHashs[i]] = parseDumpBlockBinary(responses[i], isCompress);
+            CHECK(beginBlock < blocksHashs.size(), "Incorrect answer");
+            advancedLoadsBlocksDumps[blocksHashs[beginBlock]] = parseDumpBlockBinary(responses[i], isCompress);
         } else {
             const std::vector<std::string> blocks = parseDumpBlocksBinary(responses[i], isCompress);
             CHECK(blocks.size() == blocksInPart, "Incorrect answer");

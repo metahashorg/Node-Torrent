@@ -61,9 +61,7 @@ private:
 public:
     
     void synchronize(int countThreads);
-    
-    void addUsers(const std::set<Address> &addresses);
-    
+       
     std::vector<TransactionInfo> getTxsForAddress(const Address &address, size_t from, size_t count, size_t limitTxs) const;
     
     std::vector<TransactionInfo> getTxsForAddress(const Address &address, size_t &from, size_t count, size_t limitTxs, const TransactionsFilters &filters) const;
@@ -110,12 +108,12 @@ public:
     
     bool verifyTechnicalAddressSign(const std::string &binary, const std::vector<unsigned char> &signature, const std::vector<unsigned char> &pubkey) const;
     
+    std::vector<Address> getRandomAddresses(size_t countAddresses) const;
+    
 private:
    
     void saveTransactions(BlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
-    
-    void filterTransactionsToSave(BlockInfo &bi);
-    
+        
     void saveBlockToLeveldb(const BlockInfo &bi);
     
 private:

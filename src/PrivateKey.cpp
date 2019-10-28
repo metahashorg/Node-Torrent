@@ -32,6 +32,7 @@ PrivateKey::PrivateKey(const std::vector<unsigned char>& key, const std::string 
     , pubk(65)
     , address(address)
 {
+    CHECK(privateKey.size() >= 32, "Incorrect private key");
     try {
         secp256k1_pubkey pubkey;
         size_t size = pubk.size();

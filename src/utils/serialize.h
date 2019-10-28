@@ -13,6 +13,7 @@ namespace torrent_node_lib {
 // Процедуры сериализации сделаны таким образом, чтобы младшие разряды оказывались в конце
 template<typename T>
 [[nodiscard]] inline std::string toBinaryStringBigEndian(T val) {
+    static_assert(std::is_unsigned_v<T>, "Not unsigned integer");
     std::string result(sizeof(T), 0);
     int i = result.size() - 1;
     while (val != 0 && i >= 0) {
@@ -26,6 +27,7 @@ template<typename T>
 // Процедуры сериализации сделаны таким образом, чтобы младшие разряды оказывались в конце
 template<typename T>
 inline void toBinaryStringBigEndian(T val, std::vector<char> &buffer) {
+    static_assert(std::is_unsigned_v<T>, "Not unsigned integer");
     int i = sizeof(val) - 1;
     const size_t oldSize = buffer.size();
     buffer.resize(oldSize + sizeof(val), 0);
@@ -38,6 +40,7 @@ inline void toBinaryStringBigEndian(T val, std::vector<char> &buffer) {
 
 template<typename T>
 inline T fromBinaryStringBigEndian(const std::string &raw, size_t fromPos, size_t &endPos) {
+    static_assert(std::is_unsigned_v<T>, "Not unsigned integer");
     endPos = fromPos;
     constexpr size_t sizeField = sizeof(T);
     if (raw.size() < sizeField + fromPos) {

@@ -198,7 +198,6 @@ public:
     size_t blockNumber = 0;
     size_t blockIndex = 0;
     size_t sizeRawTx = 0;
-    bool isSaveToBd = true;
 
     bool isSignBlockTx = false;
 
@@ -380,7 +379,7 @@ public:
     
     int64_t calcBalance();
     
-    int64_t calcBalanceWithoutDelegate();
+    int64_t calcBalanceWithoutDelegate() const;
     
     void serialize(std::vector<char> &buffer) const;
     
@@ -412,6 +411,8 @@ struct BlockHeader {
     std::vector<unsigned char> signature;
        
     size_t countTxs = 0;
+    
+    size_t countSignTx = 0;
     
     FilePosition filePos;
         
@@ -455,17 +456,10 @@ struct BlockTimes {
     time_point timeEndSaveBlock;
 };
 
-struct TransactionStatistics {
-    size_t countTransferTxs = 0;
-    size_t countInitTxs = 0;
-};
-
 struct BlockInfo {
     BlockHeader header;
     
     BlockTimes times;
-    
-    TransactionStatistics txsStatistic;
     
     std::vector<TransactionInfo> txs;
     
@@ -545,21 +539,6 @@ struct DelegateState {
     void serialize(std::vector<char> &buffer) const;
     
     static DelegateState deserialize(const std::string &raw);
-};
-
-struct DelegateStateHelper {
-    size_t blockNumber = 0;
-    
-    DelegateStateHelper() = default;
-    
-    DelegateStateHelper(size_t blockNumber)
-        : blockNumber(blockNumber)
-    {}
-    
-    void serialize(std::vector<char> &buffer) const;
-    
-    static DelegateStateHelper deserialize(const std::string &raw);
-    
 };
 
 struct ForgingSums {

@@ -1,13 +1,15 @@
 #include "NetworkBlockSource.h"
 
 #include "utils/FileSystem.h"
-#include "GetNewBlocksFromServers.h"
 #include "log.h"
 #include "check.h"
-#include "PrivateKey.h"
-#include "BlockchainRead.h"
-#include "BlockInfo.h"
 #include "parallel_for.h"
+#include "convertStrings.h"
+
+#include "BlockInfo.h"
+#include "BlockchainRead.h"
+#include "GetNewBlocksFromServers.h"
+#include "PrivateKey.h"
 
 using namespace common;
 
@@ -15,12 +17,13 @@ namespace torrent_node_lib {
 
 const static size_t COUNT_ADVANCED_BLOCKS = 8;
     
-NetworkBlockSource::NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign) 
+NetworkBlockSource::NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad) 
     : getterBlocks(maxAdvancedLoadBlocks, countBlocksInBatch, p2p, isCompress)
     , folderPath(folderPath)
     , saveAllTx(saveAllTx)
     , isValidate(isValidate)
     , isVerifySign(isVerifySign)
+    , isPreLoad(isPreLoad)
 {}
 
 
@@ -30,13 +33,24 @@ void NetworkBlockSource::initialize() {
 
 std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
     nextBlockToRead = countBlocks + 1;
-    const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
-    CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
-    lastBlockInBlockchain = lastBlock.lastBlock;
-    servers = lastBlock.servers;
-
+    
     advancedBlocks.clear();
     getterBlocks.clearAdvanced();
+    
+    if (!isPreLoad) {
+        const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
+        CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
+        lastBlockInBlockchain = lastBlock.lastBlock;
+        servers = lastBlock.servers;
+    } else {
+        const GetNewBlocksFromServer::LastBlockPreLoadResponse lastBlock = getterBlocks.preLoadBlocks(countBlocks, isVerifySign);
+        CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
+        CHECK(lastBlock.lastBlock.has_value(), "Last block not setted");
+        lastBlockInBlockchain = lastBlock.lastBlock.value();
+        servers = lastBlock.servers;
+        
+        getterBlocks.addPreLoadBlocks(nextBlockToRead, lastBlock.blockHeaders, lastBlock.blocksDumps);
+    }
     
     return std::make_pair(lastBlockInBlockchain >= nextBlockToRead, lastBlockInBlockchain);
 }
@@ -76,7 +90,7 @@ bool NetworkBlockSource::process(BlockInfo &bi, std::string &binaryDump) {
         const size_t currBlock = nextBlockToRead + i;
         AdvancedBlock advanced;
         try {
-            advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers[0]);
+            advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers);
             advanced.dump = getterBlocks.getBlockDump(advanced.header.hash, advanced.header.blockSize, servers, isVerifySign);
         } catch (...) {
             advanced.exception = std::current_exception();
@@ -97,7 +111,9 @@ bool NetworkBlockSource::process(BlockInfo &bi, std::string &binaryDump) {
             }
             CHECK(pair.second.dump.size() == pair.second.header.blockSize, "binaryDump.size() == nextBlockHeader.blockSize");
             pair.second.bi.header.filePos.fileNameRelative = getBasename(pair.second.header.fileName);
+            const std::vector<unsigned char> hashBlockForRequest = fromHex(pair.second.header.hash);
             readNextBlockInfo(pair.second.dump.data(), pair.second.dump.data() + pair.second.dump.size(), 0, pair.second.bi, isValidate, saveAllTx, 0, 0);
+            CHECK(pair.second.bi.header.hash == hashBlockForRequest, "Incorrect block dump");
         } catch (...) {
             pair.second.exception = std::current_exception();
         }

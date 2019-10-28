@@ -11,7 +11,6 @@ class Address;
 struct TransactionInfo;
 struct BlockHeader;
 struct BlockInfo;
-struct MinimumBlockHeader;
 struct BalanceInfo;
 struct DelegateState;
 struct V8Details;
@@ -72,6 +71,8 @@ std::string blockInfoToJson(const RequestId &requestId, const torrent_node_lib::
 
 std::string genCountBlockJson(const RequestId &requestId, size_t countBlocks, bool isFormat, const JsonVersion &version);
 
+std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version);
+
 std::string genBlockDumpJson(const RequestId &requestId, const std::string &blockDump, bool isFormat);
 
 std::string delegateStatesToJson(const RequestId &requestId, const std::string &address, const std::vector<std::pair<torrent_node_lib::Address, torrent_node_lib::DelegateState>> &states, bool isFormat, const JsonVersion &version);
@@ -102,12 +103,6 @@ std::string genDumpBlockBinary(const std::string &block, bool isCompress);
 
 std::string genDumpBlocksBinary(const std::vector<std::string> &blocks, bool isCompress);
 
-std::string parseDumpBlockBinary(const std::string &response, bool isCompress);
-
-std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool isCompress);
-
-torrent_node_lib::MinimumBlockHeader parseBlockHeader(const std::string &response);
-
-std::vector<torrent_node_lib::MinimumBlockHeader> parseBlocksHeader(const std::string &response);
+std::string genRandomAddressesJson(const RequestId &requestId, const std::vector<torrent_node_lib::Address> &addresses, bool isFormat);
 
 #endif // GENERATE_JSON_H_

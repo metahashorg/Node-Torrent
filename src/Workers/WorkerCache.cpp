@@ -57,9 +57,7 @@ void WorkerCache::work() {
                         continue;
                     }
                     
-                    if (tx.isSaveToBd) {
-                        caches.txsCache.addValue(tx.hash, attribute, tx);
-                    }
+                    caches.txsCache.addValue(tx.hash, attribute, tx);
                 }
                 tt2.stop();
                 caches.txsCache.remove(std::to_string(bi.header.blockNumber.value() - caches.maxCountElementsTxsCache));

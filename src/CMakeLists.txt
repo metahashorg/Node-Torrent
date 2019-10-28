@@ -64,10 +64,14 @@ set(LIBRARY_SOURCES
     
     P2P/P2P.cpp
     P2P/P2P_Ips.cpp
+    P2P/QueueP2P.cpp
+    P2P/P2PThread.cpp
+    P2P/P2P_Impl.cpp
     
     BlockSource/GetNewBlocksFromServers.cpp
     BlockSource/FileBlockSource.cpp
     BlockSource/NetworkBlockSource.cpp
+    BlockSource/get_new_blocks_messages.cpp
 
     Address.cpp
     BlockInfo.cpp

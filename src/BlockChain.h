@@ -41,6 +41,8 @@ public:
     
     size_t countBlocks() const override;
     
+    BlockHeader getLastStateBlock() const;
+    
     void clear();
     
 private:
@@ -59,6 +61,8 @@ private:
     
     std::unordered_map<std::vector<unsigned char>, BlockHeader> blocks;
     std::vector<std::reference_wrapper<const BlockHeader>> hashes;
+    
+    size_t lastStateBlock = 0;
     
     mutable std::shared_mutex mut;
 };

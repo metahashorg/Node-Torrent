@@ -63,7 +63,12 @@ size_t BlockChain::calcBlockchain(const std::vector<unsigned char>& lastHash) {
         for (auto iter = processedBlocks.rbegin(); iter != processedBlocks.rend(); iter++) {
             BlockHeader &bh = *iter;
             bh.blockNumber = allNum - bh.blockNumber.value();
-            CHECK(bh.blockNumber.value() == hashes.size(), "Ups");
+            
+            if (bh.isStateBlock()) {
+                lastStateBlock = std::max(bh.blockNumber.value(), lastStateBlock);
+            }
+            
+            CHECK(bh.blockNumber.value() == hashes.size(), "Ups " + std::to_string(bh.blockNumber.value()) + " " + toHex(bh.hash));
             hashes.emplace_back(iter->get());
         }
         return allNum;
@@ -125,7 +130,16 @@ BlockHeader BlockChain::getLastBlock() const {
 }
 
 size_t BlockChain::countBlocks() const {
+    std::lock_guard<std::shared_mutex> lock(mut);
     return hashes.size() - 1;
+}
+
+BlockHeader BlockChain::getLastStateBlock() const {
+    std::lock_guard<std::shared_mutex> lock(mut);
+    
+    CHECK(lastStateBlock != 0, "Not found state block");
+    
+    return hashes[lastStateBlock];
 }
 
 void BlockChain::clear() {
