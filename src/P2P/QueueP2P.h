@@ -77,7 +77,7 @@ private:
     
     bool isError = false;
     
-    size_t taskId;
+    size_t taskId = 0;
 };
 
 class QueueP2PElement {
