@@ -104,6 +104,7 @@ BestNodeTest BestNodeTest::deserialize(const std::string &raw) {
     }
     result.day = deserializeInt<size_t>(raw, from);
     result.isMaxElement = deserializeInt<uint8_t>(raw, from) == 1;
+    result.deserialized = true;
     return result;
 }
 
