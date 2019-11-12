@@ -304,6 +304,9 @@ NodeTestResult readNodeTestTransaction(const BestNodeElement &nodeTestElement, s
 std::pair<size_t, NodeTestResult> WorkerNodeTest::getLastNodeTestResult(const std::string &address) const {
     const BestNodeTest lastNodeTests = leveldbNodeTest.findNodeStatLastResults(address);
     const size_t lastTimestamp = blockchain.getLastBlock().timestamp;
+    if (!lastNodeTests.deserialized) {
+        return std::make_pair(lastTimestamp, NodeTestResult());
+    }
 
     BestNodeElement nodeTestElement = lastNodeTests.getMax(getLastBlockDay());
     

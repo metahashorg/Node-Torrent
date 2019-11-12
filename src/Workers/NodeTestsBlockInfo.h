@@ -19,14 +19,16 @@ struct NodeTestResult {
     std::string result;
     std::string ip;
     std::string geo;
-    uint64_t rps;
-    bool success;
-    bool isForwardSort;
+    uint64_t rps = 0;
+    bool success = false;
+    bool isForwardSort = false;
     
     size_t day = 0;
     size_t timestamp = 0;
     
     uint64_t avgRps = 0;
+    
+    NodeTestResult() = default;
     
     NodeTestResult(const std::string &serverAddress, const Address &testerAddress, const std::string &typeNode, const std::vector<unsigned char> &result, const std::string &ip, const std::string &geo, uint64_t rps, bool success, bool isForwardSort)
         : serverAddress(serverAddress)
@@ -71,6 +73,8 @@ struct BestNodeTest {
     size_t day = 0;
     
     bool isMaxElement = true;
+    
+    bool deserialized = false;
     
     BestNodeTest(bool isMaxElement)
         : isMaxElement(isMaxElement)
