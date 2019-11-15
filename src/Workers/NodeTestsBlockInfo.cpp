@@ -27,6 +27,7 @@ BestNodeElement BestNodeElement::deserialize(const std::string &raw, size_t &fro
     result.geo = deserializeString(raw, from);
     result.rps = deserializeInt<size_t>(raw, from);
     result.txPos = FilePosition::deserialize(raw, from);
+    result.empty = false;
     return result;
 }
 

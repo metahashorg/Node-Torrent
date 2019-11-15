@@ -286,6 +286,9 @@ std::optional<size_t> WorkerNodeTest::getInitBlockNumber() const {
 }
 
 NodeTestResult readNodeTestTransaction(const BestNodeElement &nodeTestElement, size_t currDay, const std::string &folderBlocks) {
+    if (nodeTestElement.empty) {
+        return NodeTestResult();
+    }
     IfStream file;
     openFile(file, getFullPath(nodeTestElement.txPos.fileNameRelative, folderBlocks));
     TransactionInfo tx;
