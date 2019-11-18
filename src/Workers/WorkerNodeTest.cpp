@@ -76,7 +76,7 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
         
         //LOGINFO << "Node test found " << serverAddress;
         
-        return NodeTestResult(serverAddress, testerAddress, type, tx.data, ip, geo, rps, success, false);
+        return NodeTestResult(serverAddress, testerAddress, type, tx.data, ip, geo, rps, success, rpsStr.has_value());
     }
     return std::nullopt;
 }
