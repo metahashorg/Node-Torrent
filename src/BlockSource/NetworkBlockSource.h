@@ -28,7 +28,7 @@ public:
     
     size_t knownBlock() override;
     
-    bool process(BlockInfo &bi, std::string &binaryDump) override;
+    bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) override;
     
     void getExistingBlock(const BlockHeader &bh, BlockInfo &bi, std::string &blockDump) const override;
     

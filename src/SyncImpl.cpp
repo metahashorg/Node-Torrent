@@ -241,22 +241,23 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
             while (isContinue) {
                 Timer tt;
                 
-                std::shared_ptr<BlockInfo> nextBi = std::make_shared<BlockInfo>();
-                
-                nextBi->times.timeBegin = ::now();
-                nextBi->times.timeBeginGetBlock = ::now();
-                
+                std::shared_ptr<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>> nextBi = std::make_shared<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>>();
+                               
                 std::shared_ptr<std::string> nextBlockDump = std::make_shared<std::string>();
                 isContinue = getBlockAlgorithm->process(*nextBi, *nextBlockDump);
                 if (!isContinue) {
                     break;
                 }
                 
+                if (!std::holds_alternative<BlockInfo>(*nextBi)) {
+                    continue;
+                }
+                
                 Timer tt2;
                 
                 if (prevBi == nullptr) {
                     CHECK(prevDump == nullptr, "Ups");
-                    prevBi = nextBi;
+                    prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
                     prevDump = nextBlockDump;
                     
                     if (isValidate) {
@@ -264,15 +265,17 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     }
                 } else {
                     if (isValidate) {
+                        BlockInfo &nextB = std::get<BlockInfo>(*nextBi);
+                        
                         const auto &thisHashFromHex = prevBi->header.hash;
-                        for (size_t i = 0; i < nextBi->header.countSignTx; i++) {
-                            const TransactionInfo &tx = nextBi->txs[i];
+                        for (size_t i = 0; i < nextB.header.countSignTx; i++) {
+                            const TransactionInfo &tx = nextB.txs[i];
                             if (tx.isSignBlockTx) {
                                 CHECK(thisHashFromHex == tx.data, "Block signatures not confirmed");
                             }
                         }
                     } else {
-                        prevBi = nextBi;
+                        prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
                         prevDump = nextBlockDump;
                     }
                 }
@@ -301,7 +304,7 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                 saveBlockToLeveldb(*prevBi);
                 
                 if (isValidate) {
-                    prevBi = nextBi;
+                    prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
                     prevDump = nextBlockDump;
                 }
                 

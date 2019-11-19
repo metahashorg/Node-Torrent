@@ -456,6 +456,14 @@ struct BlockTimes {
     time_point timeEndSaveBlock;
 };
 
+struct SignBlockInfo {
+    
+};
+
+struct RejectedTxsBlockInfo {
+    
+};
+
 struct BlockInfo {
     BlockHeader header;
     
