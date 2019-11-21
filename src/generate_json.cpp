@@ -639,6 +639,7 @@ std::string genNodeStatResultJson(const RequestId &requestId, const std::string 
     resultJson.AddMember("address", strToJson(address, allocator), allocator);
     resultJson.AddMember("type", strToJson(result.typeNode, allocator), allocator);
     resultJson.AddMember("avgRps", strToJson(std::to_string(result.avgRps), allocator), allocator);
+    resultJson.AddMember("isLatency", !result.isForwardSort, allocator);
     resultJson.AddMember("ip", strToJson(result.ip, allocator), allocator);
     resultJson.AddMember("geo", strToJson(result.geo, allocator), allocator);
     resultJson.AddMember("state", strToJson(result.result, allocator), allocator);

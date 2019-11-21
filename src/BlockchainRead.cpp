@@ -27,6 +27,9 @@ using SizeTransactinType = uint64_t;
 
 const size_t BLOCK_HEADER_SIZE = 3*sizeof(uint64_t)+64;
 
+const static uint64_t SIGN_BLOCK_TYPE = 0x1100111167452301;
+const static uint64_t REJECTED_TXS_BLOCK_TYPE = 0x3300111167452301;
+
 void openFile(IfStream &file, const std::string &fileName) {
     CHECK(!fileName.empty(), "Empty file name");
     file.open(fileName);
@@ -111,24 +114,6 @@ static void readBlockHeader(const char *begin_pos, const char *end_pos, BlockHea
     cur_pos += sizeof(uint64_t);
     
     readBlockHeaderWithoutSize(cur_pos, end_pos, bi);
-}
-
-static bool readBlockHeader(IfStream &ifile, size_t currPos, size_t f_size, BlockHeader &bi) {   
-    if (f_size <= currPos) {
-        return false;
-    } else if ((f_size - currPos) >= BLOCK_HEADER_SIZE) {       
-        bi.filePos.pos = currPos;
-                
-        const size_t bh_size = BLOCK_HEADER_SIZE;
-        std::vector<char> fh_buff(bh_size, 0);
-        seekFile(ifile, currPos);
-        ifile.read(fh_buff.data(), bh_size);
-        
-        readBlockHeader(fh_buff.data(), fh_buff.data() + fh_buff.size(), bi);
-                
-        return true;
-    }
-    return false;
 }
 
 template<typename T>
@@ -452,26 +437,50 @@ static void readBlockTxs(const char *begin_pos, const char *end_pos, size_t posI
     }
 }
 
-size_t readNextBlockInfo(IfStream &ifile, size_t currPos, BlockInfo &bi, std::string &blockDump, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx) {
+size_t readNextBlockInfo(IfStream &ifile, size_t currPos, std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &blockDump, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx) {
     const size_t f_size = fileSize(ifile);
     
-    const bool res = readBlockHeader(ifile, currPos, f_size, bi.header);
-    if (!res) {
+    const size_t MINIMUM_BLOCK_SIZE = sizeof(uint64_t) * 2;
+    if (currPos + MINIMUM_BLOCK_SIZE > f_size) {
         return currPos;
     }
     
-    if (f_size - currPos < (bi.header.blockSize+sizeof(uint64_t))) {
+    std::vector<char> fh_buff(MINIMUM_BLOCK_SIZE, 0);
+    seekFile(ifile, currPos);
+    ifile.read(fh_buff.data(), fh_buff.size());
+    
+    const uint64_t block_size = *((const uint64_t *)fh_buff.data());
+    const uint64_t block_type = *((const uint64_t *)fh_buff.data() + 1);
+    if (block_type == SIGN_BLOCK_TYPE) {
+        bi = SignBlockInfo();
+        return currPos + sizeof(uint64_t) + block_size;
+    } else if (block_type == REJECTED_TXS_BLOCK_TYPE) {
+        bi = RejectedTxsBlockInfo();
+        return currPos + sizeof(uint64_t) + block_size;
+    }
+    
+    bi = BlockInfo();
+    BlockInfo &b = std::get<BlockInfo>(bi);
+    b.header.blockSize = block_size;
+
+    b.header.filePos.pos = currPos;
+    
+    const size_t offsetBeginBlock = sizeof(uint64_t);
+    
+    fh_buff.resize(block_size + offsetBeginBlock, 0);
+    seekFile(ifile, currPos);
+    ifile.read(fh_buff.data(), fh_buff.size());
+    
+    readBlockHeader(fh_buff.data(), fh_buff.data() + BLOCK_HEADER_SIZE, b.header);
+    
+    if (f_size - currPos < (b.header.blockSize+sizeof(uint64_t))) {
         return currPos;
     } else {
-        const size_t b_size = bi.header.blockSize;
-        blockDump = std::string(b_size, 0);
-        const size_t offsetBeginBlock = sizeof(uint64_t);
-        seekFile(ifile, currPos + offsetBeginBlock);
-        ifile.read(blockDump.data(), b_size);
+        blockDump = std::string(fh_buff.begin() + offsetBeginBlock, fh_buff.end());
 
-        readBlockTxs(blockDump.data(), blockDump.data() + blockDump.size(), currPos, bi, isSaveAllTx, beginTx, countTx, isValidate);
+        readBlockTxs(blockDump.data(), blockDump.data() + blockDump.size(), currPos, b, isSaveAllTx, beginTx, countTx, isValidate);
         
-        currPos += (bi.header.blockSize+sizeof(uint64_t));
+        currPos += (b.header.blockSize+sizeof(uint64_t));
     }
     
     return currPos;

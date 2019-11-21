@@ -48,8 +48,10 @@ struct BestNodeElement {
     size_t timestamp = 0;
     std::string geo;
     uint64_t rps = 0;
-    
+       
     FilePosition txPos;
+    
+    bool empty = true;
     
     BestNodeElement() = default;
     
@@ -58,6 +60,7 @@ struct BestNodeElement {
         , geo(geo)
         , rps(rps)
         , txPos(txPos)
+        , empty(false)
     {}
     
     bool operator<(const BestNodeElement &second) const;

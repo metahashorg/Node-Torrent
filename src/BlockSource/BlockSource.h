@@ -2,10 +2,13 @@
 #define BLOCK_SOURCE_H_
 
 #include <string>
+#include <variant>
 
 namespace torrent_node_lib {
 
 struct BlockInfo;
+struct SignBlockInfo;
+struct RejectedTxsBlockInfo;
 struct BlockHeader;
 
 class BlockSource {
@@ -17,7 +20,7 @@ public:
     
     virtual size_t knownBlock() = 0;
     
-    virtual bool process(BlockInfo &bi, std::string &binaryDump) = 0;
+    virtual bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) = 0;
     
     virtual void getExistingBlock(const BlockHeader &bh, BlockInfo &bi, std::string &blockDump) const = 0;
     

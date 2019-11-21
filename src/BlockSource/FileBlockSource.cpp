@@ -28,7 +28,7 @@ size_t FileBlockSource::knownBlock() {
     return 0;
 }
 
-bool FileBlockSource::process(BlockInfo &bi, std::string &binaryDump) {
+bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
     if (fileName.empty()) {
         const FileInfo fi = getNextFile(allFiles, folderPath);
         fileName = fi.filePos.fileNameRelative;
@@ -45,9 +45,12 @@ bool FileBlockSource::process(BlockInfo &bi, std::string &binaryDump) {
         fileName.clear();
         return false;
     } else {
-        bi.header.filePos.fileNameRelative = fileName;
-        for (auto &tx : bi.txs) {
-            tx.filePos.fileNameRelative = fileName;
+        if (std::holds_alternative<BlockInfo>(bi)) {
+            BlockInfo &b = std::get<BlockInfo>(bi);
+            b.header.filePos.fileNameRelative = fileName;
+            for (auto &tx : b.txs) {
+                tx.filePos.fileNameRelative = fileName;
+            }
         }
     }
 
@@ -62,7 +65,10 @@ void FileBlockSource::getExistingBlockS(const std::string &folder, const BlockHe
     CHECK(!bh.filePos.fileNameRelative.empty(), "Incorrect file name");
     IfStream file;
     openFile(file, getFullPath(bh.filePos.fileNameRelative, folder));
-    const size_t nextCurrPos = readNextBlockInfo(file, bh.filePos.pos, bi, blockDump, isValidate, false, 0, 0);
+    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
+    const size_t nextCurrPos = readNextBlockInfo(file, bh.filePos.pos, b, blockDump, isValidate, false, 0, 0);
+    CHECK(std::holds_alternative<BlockInfo>(b), "Incorrect blockinfo");
+    bi = std::get<BlockInfo>(b);
     CHECK(nextCurrPos != bh.filePos.pos, "File incorrect");
     bi.header.filePos.fileNameRelative = bh.filePos.fileNameRelative;
     for (auto &tx : bi.txs) {

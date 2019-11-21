@@ -799,7 +799,9 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
         IfStream file;
         openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
         std::string tmp;
-        const size_t nextPos = readNextBlockInfo(file, bh.filePos.pos, bi, tmp, false, false, beginTx, countTx);
+        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
+        const size_t nextPos = readNextBlockInfo(file, bh.filePos.pos, b, tmp, false, false, beginTx, countTx);
+        bi = std::get<BlockInfo>(b);
         CHECK(nextPos != bh.filePos.pos, "Ups");
     } else {
         std::shared_ptr<std::string> element = cache.value();

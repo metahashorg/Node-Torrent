@@ -76,7 +76,7 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
         
         //LOGINFO << "Node test found " << serverAddress;
         
-        return NodeTestResult(serverAddress, testerAddress, type, tx.data, ip, geo, rps, success, false);
+        return NodeTestResult(serverAddress, testerAddress, type, tx.data, ip, geo, rps, success, rpsStr.has_value());
     }
     return std::nullopt;
 }
@@ -163,6 +163,20 @@ static void processRegisterTransaction(const TransactionInfo &tx, AllNodes &allN
                                 }
                                 //LOGINFO << "Node register found " << host;
                                 allNodes.nodes[host] = AllNodesNode(name, type);
+                            }
+                        }
+                    } else if (method == "mhRegisterNode") {	
+                        if (doc.HasMember("params") && doc["params"].IsObject()) {	
+                            const auto &params = doc["params"];	
+                            if (params.HasMember("host") && params["host"].IsString() && params.HasMember("name") && params["name"].IsString()) {	
+                                const std::string host = params["host"].GetString();	
+                                const std::string name = params["name"].GetString();	
+                                std::string type;	
+                                if (params.HasMember("type") && params["type"].IsString()) {	
+                                    type = params["type"].GetString();	
+                                }	
+                                //LOGINFO << "Node register found " << host;	
+                                allNodes.nodes[host] = AllNodesNode(name, type);	
                             }
                         }
                     }
@@ -286,6 +300,9 @@ std::optional<size_t> WorkerNodeTest::getInitBlockNumber() const {
 }
 
 NodeTestResult readNodeTestTransaction(const BestNodeElement &nodeTestElement, size_t currDay, const std::string &folderBlocks) {
+    if (nodeTestElement.empty) {
+        return NodeTestResult();
+    }
     IfStream file;
     openFile(file, getFullPath(nodeTestElement.txPos.fileNameRelative, folderBlocks));
     TransactionInfo tx;

@@ -59,7 +59,7 @@ size_t NetworkBlockSource::knownBlock() {
     return lastBlockInBlockchain;
 }
 
-bool NetworkBlockSource::process(BlockInfo &bi, std::string &binaryDump) {
+bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
     const bool isContinue = lastBlockInBlockchain >= nextBlockToRead;
     if (!isContinue) {
         return false;
