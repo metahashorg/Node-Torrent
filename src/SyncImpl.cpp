@@ -233,8 +233,6 @@ std::vector<Worker*> SyncImpl::makeWorkers() {
 void SyncImpl::process(const std::vector<Worker*> &workers) {
     while (true) {
         const time_point beginWhileTime = ::now();
-        std::shared_ptr<BlockInfo> prevBi = nullptr;
-        std::shared_ptr<std::string> prevDump = nullptr;
         try {
             auto [isContinue, knownLstBlk] = getBlockAlgorithm->doProcess(blockchain.countBlocks());
             knownLastBlock = knownLstBlk;
@@ -253,60 +251,34 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     continue;
                 }
                 
+                BlockInfo &blockInfo = std::get<BlockInfo>(*nextBi);
+                
                 Timer tt2;
                 
-                if (prevBi == nullptr) {
-                    CHECK(prevDump == nullptr, "Ups");
-                    prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
-                    prevDump = nextBlockDump;
-                    
-                    if (isValidate) {
-                        continue;
-                    }
-                } else {
-                    if (isValidate) {
-                        BlockInfo &nextB = std::get<BlockInfo>(*nextBi);
-                        
-                        const auto &thisHashFromHex = prevBi->header.hash;
-                        for (size_t i = 0; i < nextB.header.countSignTx; i++) {
-                            const TransactionInfo &tx = nextB.txs[i];
-                            if (tx.isSignBlockTx) {
-                                CHECK(thisHashFromHex == tx.data, "Block signatures not confirmed");
-                            }
-                        }
-                    } else {
-                        prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
-                        prevDump = nextBlockDump;
-                    }
-                }
+                saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles);
                 
-                saveTransactions(*prevBi, *prevDump, isSaveBlockToFiles);
-                
-                const size_t currentBlockNum = blockchain.addBlock(prevBi->header);
+                const size_t currentBlockNum = blockchain.addBlock(blockInfo.header);
                 CHECK(currentBlockNum != 0, "Incorrect block number");
-                prevBi->header.blockNumber = currentBlockNum;
+                blockInfo.header.blockNumber = currentBlockNum;
                 
-                for (TransactionInfo &tx: prevBi->txs) {
-                    tx.blockNumber = prevBi->header.blockNumber.value();
+                for (TransactionInfo &tx: blockInfo.txs) {
+                    tx.blockNumber = blockInfo.header.blockNumber.value();
                 }
                 
                 tt.stop();
                 tt2.stop();
                 
-                prevBi->times.timeEndGetBlock = ::now();
+                blockInfo.times.timeEndGetBlock = ::now();
                 
-                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << prevBi->txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(prevBi->header.hash) << ". Parent hash " << toHex(prevBi->header.prevHash);
+                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(blockInfo.header.hash) << ". Parent hash " << toHex(blockInfo.header.prevHash);
+                
+                std::shared_ptr<BlockInfo> blockInfoPtr(nextBi, &blockInfo);
                 
                 for (Worker* worker: workers) {
-                    worker->process(prevBi, prevDump);
+                    worker->process(blockInfoPtr, nextBlockDump);
                 }
                 
-                saveBlockToLeveldb(*prevBi);
-                
-                if (isValidate) {
-                    prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
-                    prevDump = nextBlockDump;
-                }
+                saveBlockToLeveldb(blockInfo);
                 
                 checkStopSignal();
             }
