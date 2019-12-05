@@ -25,6 +25,10 @@ namespace torrent_node_lib {
 
 using SizeTransactinType = uint64_t;
 
+const static size_t BLOCK_SIZE_SIZE = sizeof(uint64_t);
+const static size_t BLOCK_TYPE_SIZE = sizeof(uint64_t);
+const static size_t MINIMUM_BLOCK_SIZE = BLOCK_SIZE_SIZE + BLOCK_TYPE_SIZE;
+
 const size_t BLOCK_HEADER_SIZE = 3*sizeof(uint64_t)+64;
 
 const static uint64_t SIGN_BLOCK_TYPE = 0x1100111167452301;
@@ -103,17 +107,6 @@ static void readBlockHeaderWithoutSize(const char *begin_pos, const char *end_po
     CHECK(cur_pos + 32 <= end_pos, "Out of the array");
     bi.txsHash.assign(cur_pos, cur_pos + 32);
     cur_pos += 32; //tx hash
-}
-
-static void readBlockHeader(const char *begin_pos, const char *end_pos, BlockHeader &bi) {
-    const char *cur_pos = begin_pos;
-    
-    CHECK(cur_pos + sizeof(uint64_t) <= end_pos, "Out of the array");
-    const uint64_t block_size = *((const uint64_t *)cur_pos);
-    bi.blockSize = block_size;
-    cur_pos += sizeof(uint64_t);
-    
-    readBlockHeaderWithoutSize(cur_pos, end_pos, bi);
 }
 
 template<typename T>
@@ -437,90 +430,67 @@ static void readBlockTxs(const char *begin_pos, const char *end_pos, size_t posI
     }
 }
 
-size_t readNextBlockInfo(IfStream &ifile, size_t currPos, std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &blockDump, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx) {
-    const size_t f_size = fileSize(ifile);
-    
-    const size_t MINIMUM_BLOCK_SIZE = sizeof(uint64_t) * 2;
-    if (currPos + MINIMUM_BLOCK_SIZE > f_size) {
+size_t readNextBlockDump(IfStream &ifile, size_t currPos, std::string &blockDump) {
+    auto pairRes = getBlockDump(ifile, currPos, 0, std::numeric_limits<size_t>::max());
+
+    if (pairRes.first == 0) {
         return currPos;
     }
     
-    std::vector<char> fh_buff(MINIMUM_BLOCK_SIZE, 0);
-    seekFile(ifile, currPos);
-    ifile.read(fh_buff.data(), fh_buff.size());
+    blockDump = std::move(pairRes.second);
     
-    const uint64_t block_size = *((const uint64_t *)fh_buff.data());
-    const uint64_t block_type = *((const uint64_t *)fh_buff.data() + 1);
+    return currPos + pairRes.first + BLOCK_SIZE_SIZE;
+}
+
+void parseNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx) {
+    const uint64_t block_type = *((const uint64_t *)begin_pos);
     if (block_type == SIGN_BLOCK_TYPE) {
         bi = SignBlockInfo();
-        return currPos + sizeof(uint64_t) + block_size;
+        return;
     } else if (block_type == REJECTED_TXS_BLOCK_TYPE) {
         bi = RejectedTxsBlockInfo();
-        return currPos + sizeof(uint64_t) + block_size;
+        return;
     }
     
     bi = BlockInfo();
     BlockInfo &b = std::get<BlockInfo>(bi);
-    b.header.blockSize = block_size;
-
-    b.header.filePos.pos = currPos;
     
-    const size_t offsetBeginBlock = sizeof(uint64_t);
-    
-    fh_buff.resize(block_size + offsetBeginBlock, 0);
-    seekFile(ifile, currPos);
-    ifile.read(fh_buff.data(), fh_buff.size());
-    
-    readBlockHeader(fh_buff.data(), fh_buff.data() + BLOCK_HEADER_SIZE, b.header);
-    
-    if (f_size - currPos < (b.header.blockSize+sizeof(uint64_t))) {
-        return currPos;
-    } else {
-        blockDump = std::string(fh_buff.begin() + offsetBeginBlock, fh_buff.end());
-
-        readBlockTxs(blockDump.data(), blockDump.data() + blockDump.size(), currPos, b, isSaveAllTx, beginTx, countTx, isValidate);
-        
-        currPos += (b.header.blockSize+sizeof(uint64_t));
-    }
-    
-    return currPos;
-}
-
-void readNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, BlockInfo &bi, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx) {
-    readBlockHeaderWithoutSize(begin_pos, end_pos, bi.header);
-    readBlockTxs(begin_pos, end_pos, posInFile, bi, isSaveAllTx, beginTx, countTx, isValidate);
-    bi.header.blockSize = std::distance(begin_pos, end_pos);
-    bi.header.filePos.pos = posInFile;
+    readBlockHeaderWithoutSize(begin_pos, end_pos, b.header);
+    readBlockTxs(begin_pos, end_pos, posInFile, b, isSaveAllTx, beginTx, countTx, isValidate);
+    b.header.blockSize = std::distance(begin_pos, end_pos);
+    b.header.filePos.pos = posInFile;
 }
 
 std::pair<size_t, std::string> getBlockDump(IfStream &ifile, size_t currPos, size_t fromByte, size_t toByte) {
     const size_t f_size = fileSize(ifile);
-    if (f_size <= currPos) {
-        return std::make_pair(0, "");
-    } else if ((f_size - currPos) >= BLOCK_HEADER_SIZE) {       
-        const size_t bh_size = BLOCK_HEADER_SIZE;
-        std::vector<char> fh_buff(bh_size, 0);
-        seekFile(ifile, currPos);
-        ifile.read(fh_buff.data(), bh_size);
-        
-        const char *cur_pos = fh_buff.data();
-        
-        const uint64_t block_size = *((const uint64_t *)cur_pos);
-        
-        if (fromByte >= block_size) {
-            return {};
-        }
-        if (toByte > block_size) {
-            toByte = block_size;
-        }
-        
-        std::string result(toByte - fromByte, 0);
-        const size_t offsetBeginBlock = sizeof(uint64_t);
-        seekFile(ifile, currPos + offsetBeginBlock + fromByte);
-        ifile.read((char*)result.data(), result.size());
-        return std::make_pair(block_size, result);
+    
+    if (currPos + BLOCK_SIZE_SIZE > f_size) {
+        return {};
     }
-    return std::make_pair(0, "");;
+    
+    std::vector<char> fh_buff(BLOCK_SIZE_SIZE, 0);
+    seekFile(ifile, currPos);
+    ifile.read(fh_buff.data(), BLOCK_SIZE_SIZE);
+    
+    const char *cur_pos = fh_buff.data();
+    
+    const uint64_t block_size = *((const uint64_t *)cur_pos);
+    
+    if (f_size < block_size + BLOCK_SIZE_SIZE + currPos) {
+        return std::make_pair(0, "");
+    }
+        
+    if (fromByte >= block_size) {
+        return std::make_pair(0, "");
+    }
+    if (toByte > block_size) {
+        toByte = block_size;
+    }
+    
+    std::string result(toByte - fromByte, 0);
+    seekFile(ifile, currPos + BLOCK_SIZE_SIZE + fromByte);
+    ifile.read((char*)result.data(), result.size());
+    return std::make_pair(block_size, result);
 }
 
 }

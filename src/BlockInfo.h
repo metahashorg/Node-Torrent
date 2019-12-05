@@ -468,10 +468,21 @@ struct BlockInfo {
     BlockHeader header;
     
     BlockTimes times;
-    
+       
     std::vector<TransactionInfo> txs;
     
     std::vector<TransactionInfo> getBlockSignatures() const;
+    
+    void saveSenderInfo(const std::vector<unsigned char> &senderSign, const std::vector<unsigned char> &senderPubkey, const std::vector<unsigned char> &senderAddress) {
+        header.senderSign = senderSign;
+        header.senderPubkey = senderPubkey;
+        header.senderAddress = senderAddress;
+    }
+    
+    void saveFilePath(const std::string &path) {
+        header.filePos.fileNameRelative = path;
+    }
+    
 };
 
 struct BlocksMetadata {

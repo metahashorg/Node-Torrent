@@ -38,7 +38,7 @@ private:
     
     struct AdvancedBlock {
         MinimumBlockHeader header;
-        BlockInfo bi;
+        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> bi;
         std::string dump;
         std::exception_ptr exception;
     };
