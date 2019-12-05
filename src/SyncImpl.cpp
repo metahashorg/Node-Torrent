@@ -268,8 +268,6 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                 tt.stop();
                 tt2.stop();
                 
-                blockInfo.times.timeEndGetBlock = ::now();
-                
                 LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(blockInfo.header.hash) << ". Parent hash " << toHex(blockInfo.header.prevHash);
                 
                 std::shared_ptr<BlockInfo> blockInfoPtr(nextBi, &blockInfo);

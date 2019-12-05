@@ -372,8 +372,6 @@ void WorkerMain::worker() {
             
             CHECK(prevHash.empty() || prevHash == bi.header.prevHash, "Incorrect prev hash. Expected " + toHex(prevHash) + ", received " + toHex(bi.header.prevHash));
             
-            bi.times.timeBeginSaveBlock = ::now();
-            
             CommonBalance commonBalance = leveldb.findCommonBalance();
             const bool updateCommonBalance = commonBalance.blockNumber < bi.header.blockNumber.value();
             
@@ -511,9 +509,6 @@ void WorkerMain::worker() {
             addBatch(batch, leveldb);
             
             tt.stop();
-            
-            bi.times.timeEndSaveBlock = ::now();
-            bi.times.timeEnd = ::now();
             
             LOGINFO << "Block " << bi.header.blockNumber.value() << " saved. Count txs " << bi.txs.size() << ". Time ms " << tt.countMs();
             

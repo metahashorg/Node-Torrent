@@ -445,17 +445,6 @@ struct MinimumBlockHeader {
     std::string fileName;
 };
 
-struct BlockTimes {
-    time_point timeBegin;
-    time_point timeEnd;
-    
-    time_point timeBeginGetBlock;
-    time_point timeEndGetBlock;
-    
-    time_point timeBeginSaveBlock;
-    time_point timeEndSaveBlock;
-};
-
 struct SignBlockInfo {
     
 };
@@ -467,8 +456,6 @@ struct RejectedTxsBlockInfo {
 struct BlockInfo {
     BlockHeader header;
     
-    BlockTimes times;
-       
     std::vector<TransactionInfo> txs;
     
     std::vector<TransactionInfo> getBlockSignatures() const;
