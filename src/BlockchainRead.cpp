@@ -39,22 +39,12 @@ void openFile(IfStream &file, const std::string &fileName) {
     file.open(fileName);
 }
 
-void openFile(std::ofstream& file, const std::string& fileName) {
-    CHECK(!fileName.empty(), "Empty file name");
-    file.open(fileName.c_str(), std::ios::app|std::ios::binary);
-    CHECK(file.is_open(), "File " + fileName + " not opened");
-}
-
 void flushFile(IfStream& file, const std::string& fileName) {
     CHECK(!fileName.empty(), "Empty file name");
     file.reopen(fileName);
 }
 
 void closeFile(IfStream& file) {
-    file.close();
-}
-
-void closeFile(std::ofstream& file) {
     file.close();
 }
 
@@ -78,12 +68,6 @@ size_t saveBlockToFileBinary(const std::string& fileName, const std::string& dat
     const uint64_t blockSize = data.size();
     const std::string blockSizeStr(reinterpret_cast<const char*>(&blockSize), sizeof(blockSize));
     file << blockSizeStr;
-    file << data;
-    return oldSize;
-}
-
-size_t saveTransactionToFile(std::ofstream& file, const std::string& data) {
-    const size_t oldSize = fileSize(file);
     file << data;
     return oldSize;
 }

@@ -14,24 +14,17 @@ struct TransactionInfo;
 struct BlockInfo;
 struct SignBlockInfo;
 struct RejectedTxsBlockInfo;
-class PrivateKey;
 
 /**
  *c Возвращает размер файла до записи в него
  */
 size_t saveBlockToFileBinary(const std::string &fileName, const std::string &data);
 
-size_t saveTransactionToFile(std::ofstream &file, const std::string &data);
-
 void openFile(IfStream &file, const std::string &fileName);
-
-void openFile(std::ofstream &file, const std::string &fileName);
 
 void flushFile(IfStream &file, const std::string &fileName);
 
 void closeFile(IfStream &file);
-
-void closeFile(std::ofstream &file);
 
 bool readOneTransactionInfo(IfStream &ifile, size_t currPos, TransactionInfo &txInfo, bool isSaveAllTx);
 
