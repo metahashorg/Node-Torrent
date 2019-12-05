@@ -26,7 +26,7 @@ void flushFile(IfStream &file, const std::string &fileName);
 
 void closeFile(IfStream &file);
 
-bool readOneTransactionInfo(IfStream &ifile, size_t currPos, TransactionInfo &txInfo, bool isSaveAllTx);
+bool readOneSimpleTransactionInfo(IfStream &ifile, size_t currPos, TransactionInfo &txInfo, bool isSaveAllTx);
 
 void parseNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx);
 

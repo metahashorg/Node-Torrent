@@ -558,7 +558,7 @@ std::vector<TransactionInfo> WorkerMain::readTxs(const std::vector<AddressInfo> 
             currFileName = addressInfo.filePos.fileNameRelative;
         }
         TransactionInfo tx;
-        const bool res = readOneTransactionInfo(file, addressInfo.filePos.pos, tx, false);
+        const bool res = readOneSimpleTransactionInfo(file, addressInfo.filePos.pos, tx, false);
         CHECK(res, "Incorrect read transaction info");
         tx.blockNumber = addressInfo.blockNumber;
         tx.blockIndex = addressInfo.blockIndex;
@@ -708,7 +708,7 @@ void WorkerMain::readTransactionInFile(TransactionInfo& tx) const {
     IfStream file;
     const std::string hash = tx.hash;
     openFile(file, getFullPath(tx.filePos.fileNameRelative, folderBlocks));
-    const bool res = readOneTransactionInfo(file, tx.filePos.pos, tx, false);
+    const bool res = readOneSimpleTransactionInfo(file, tx.filePos.pos, tx, false);
     CHECK(res, "Incorrect read transaction info");
     CHECK(hash == tx.hash, "Incorrect transaction");
 }
