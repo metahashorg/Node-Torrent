@@ -261,6 +261,12 @@ static rapidjson::Value transactionInfoToJson(const TransactionInfo &info, const
     }
 }
 
+static rapidjson::Value signTransactionInfoToJson(const SignTransactionInfo &info, rapidjson::Document::AllocatorType &allocator, const JsonVersion &version) {
+    rapidjson::Value infoJson(rapidjson::kObjectType);
+    infoJson.AddMember("data", strToJson(toHex(info.data.begin(), info.data.end()), allocator), allocator);
+    return infoJson;
+}
+
 std::string transactionToJson(const RequestId &requestId, const TransactionInfo &info, const BlockChainReadInterface &blockchain, size_t countBlocks, size_t knwonBlock, bool isFormat, const JsonVersion &version) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
@@ -401,7 +407,7 @@ std::string balancesInfoToJson(const RequestId &requestId, const std::vector<std
     return jsonToString(doc, isFormat);
 }
 
-static rapidjson::Value blockHeaderToJson(const BlockHeader &bh, const std::vector<TransactionInfo> &signatures, rapidjson::Document::AllocatorType &allocator, BlockTypeInfo type, const JsonVersion &version) {
+static rapidjson::Value blockHeaderToJson(const BlockHeader &bh, const std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> &signatures, rapidjson::Document::AllocatorType &allocator, BlockTypeInfo type, const JsonVersion &version) {
     const bool isStringValue = version == JsonVersion::V2;
     
     CHECK(bh.blockNumber.has_value(), "Block header not set");
@@ -427,15 +433,21 @@ static rapidjson::Value blockHeaderToJson(const BlockHeader &bh, const std::vect
     
     if (type == BlockTypeInfo::Simple) {
         rapidjson::Value signaturesValue(rapidjson::kArrayType);
-        for (const TransactionInfo &tx: signatures) {
-            signaturesValue.PushBack(transactionInfoToJson(tx, bh, 0, allocator, BlockTypeInfo::Full, version), allocator);
+        if (std::holds_alternative<std::vector<TransactionInfo>>(signatures)) {
+            for (const TransactionInfo &tx: std::get<std::vector<TransactionInfo>>(signatures)) {
+                signaturesValue.PushBack(transactionInfoToJson(tx, bh, 0, allocator, BlockTypeInfo::Full, version), allocator);
+            }
+        } else {
+            for (const SignTransactionInfo &tx: std::get<std::vector<SignTransactionInfo>>(signatures)) {
+                signaturesValue.PushBack(signTransactionInfoToJson(tx, allocator, version), allocator);
+            }
         }
         resultValue.AddMember("signatures", signaturesValue, allocator);
     }
     return resultValue;
 }
 
-std::string blockHeaderToJson(const RequestId &requestId, const BlockHeader &bh, const std::vector<TransactionInfo> &signatures, bool isFormat, BlockTypeInfo type, const JsonVersion &version) {
+std::string blockHeaderToJson(const RequestId &requestId, const BlockHeader &bh, const std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> &signatures, bool isFormat, BlockTypeInfo type, const JsonVersion &version) {
     if (bh.blockNumber == 0) {
         return genErrorResponse(requestId, -32603, "Incorrect block number: 0. Genesis block begin with number 1");
     }
@@ -446,7 +458,7 @@ std::string blockHeaderToJson(const RequestId &requestId, const BlockHeader &bh,
     return jsonToString(doc, isFormat);
 }
 
-std::string blockHeadersToJson(const RequestId &requestId, const std::vector<BlockHeader> &bh, const std::vector<std::vector<TransactionInfo>> &signatures, BlockTypeInfo type, bool isFormat, const JsonVersion &version) {
+std::string blockHeadersToJson(const RequestId &requestId, const std::vector<BlockHeader> &bh, const std::vector<std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>>> &signatures, BlockTypeInfo type, bool isFormat, const JsonVersion &version) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
     addIdToResponse(requestId, doc, allocator);
@@ -454,7 +466,7 @@ std::string blockHeadersToJson(const RequestId &requestId, const std::vector<Blo
     CHECK(bh.size() + 1 == signatures.size(), "Incorrect signatures vect");
     for (size_t i = 0; i < bh.size(); i++) {
         const BlockHeader &b  = bh[i];
-        const std::vector<TransactionInfo> signature = signatures[i + 1];
+        const std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> signature = signatures[i + 1];
         
         if (b.blockNumber == 0) {
             return genErrorResponse(requestId, -32603, "Incorrect block number: 0. Genesis block begin with number 1");
@@ -465,7 +477,7 @@ std::string blockHeadersToJson(const RequestId &requestId, const std::vector<Blo
     return jsonToString(doc, isFormat);
 }
 
-std::string blockInfoToJson(const RequestId &requestId, const BlockInfo &bi, const std::vector<TransactionInfo> &signatures, BlockTypeInfo type, bool isFormat, const JsonVersion &version) {
+std::string blockInfoToJson(const RequestId &requestId, const BlockInfo &bi, const std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> &signatures, BlockTypeInfo type, bool isFormat, const JsonVersion &version) {
     const BlockHeader &bh = bi.header;
     
     if (bh.blockNumber == 0) {

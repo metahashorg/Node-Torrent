@@ -443,7 +443,7 @@ std::string SyncImpl::getBlockDump(const BlockHeader &bh, size_t fromByte, size_
     }
 }
 
-SignBlockInfo SyncImpl::readSignBlockInfo(const MinimumSignBlockHeader &bh) {
+SignBlockInfo SyncImpl::readSignBlockInfo(const MinimumSignBlockHeader &bh) const {
     CHECK(!bh.filePos.fileNameRelative.empty(), "Empty file name in block header");
     IfStream file;
     openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
@@ -462,6 +462,16 @@ bool SyncImpl::verifyTechnicalAddressSign(const std::string &binary, const std::
         return false;
     }
     return technicalAddress == getAddress(pubkey);
+}
+
+std::vector<SignTransactionInfo> SyncImpl::findSignBlock(const BlockHeader &bh) const {
+    const std::optional<MinimumSignBlockHeader> signBlockHeader = timeline.findSignForBlock(bh.hash);
+    if (!signBlockHeader.has_value()) {
+        return {};
+    }
+    
+    const SignBlockInfo signBlockInfo = readSignBlockInfo(signBlockHeader.value());
+    return signBlockInfo.txs;
 }
 
 BlockInfo SyncImpl::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const {

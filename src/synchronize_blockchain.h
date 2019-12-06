@@ -29,6 +29,9 @@ struct NodeTestTrust;
 struct NodeTestCount;
 struct NodeTestExtendedStat;
 struct Token;
+struct SignBlockInfo;
+struct SignTransactionInfo;
+struct MinimumSignBlockHeader;
 
 struct TransactionsFilters;
 
@@ -106,6 +109,8 @@ public:
     bool verifyTechnicalAddressSign(const std::string &binary, const std::vector<unsigned char> &signature, const std::vector<unsigned char> &pubkey) const;
     
     std::vector<Address> getRandomAddresses(size_t countAddresses) const;
+    
+    std::vector<SignTransactionInfo> findSignBlock(const BlockHeader &bh) const;
     
 private:
     

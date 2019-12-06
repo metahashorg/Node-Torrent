@@ -144,6 +144,10 @@ std::vector<Address> Sync::getRandomAddresses(size_t countAddresses) const {
     return impl->getRandomAddresses(countAddresses);
 }
 
+std::vector<SignTransactionInfo> Sync::findSignBlock(const BlockHeader &bh) const {
+    return impl->findSignBlock(bh);
+}
+
 Sync::~Sync() = default;
 
 }

@@ -111,6 +111,8 @@ public:
     
     std::vector<Address> getRandomAddresses(size_t countAddresses) const;
     
+    std::vector<SignTransactionInfo> findSignBlock(const BlockHeader &bh) const;
+    
 private:
    
     void saveTransactions(BlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
@@ -121,7 +123,7 @@ private:
     
     void saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement);
     
-    SignBlockInfo readSignBlockInfo(const MinimumSignBlockHeader &header);
+    SignBlockInfo readSignBlockInfo(const MinimumSignBlockHeader &header) const;
     
 private:
     

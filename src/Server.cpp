@@ -165,10 +165,12 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
     if (type == BlockTypeInfo::Simple || type == BlockTypeInfo::ForP2P || type == BlockTypeInfo::Small) {
         if (type == BlockTypeInfo::Simple) {
             const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
-            std::vector<TransactionInfo> signs;
-            if (nextBh.blockNumber.has_value()) {
+            std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> signs;
+            if (nextBh.blockNumber.has_value() && nextBh.countSignTx) {
                 const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
                 signs = nextBi.getBlockSignatures();
+            } else {
+                signs = sync.findSignBlock(bh);
             }
             return blockHeaderToJson(requestId, bh, signs, isFormat, type, version);
         } else {
@@ -176,10 +178,12 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
         }
     } else {
         const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
-        std::vector<TransactionInfo> signs;
-        if (nextBh.blockNumber.has_value()) {
+        std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> signs;
+        if (nextBh.blockNumber.has_value() && nextBh.countSignTx) {
             const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
             signs = nextBi.getBlockSignatures();
+        } else {
+            signs = sync.findSignBlock(bh);
         }
         const BlockInfo bi = sync.getFullBlock(bh, beginTx, countTxs);
         return blockInfoToJson(requestId, bi, signs, type, isFormat, version);
@@ -211,15 +215,19 @@ static std::string getBlocks(const RequestId &requestId, const rapidjson::Docume
     const bool isForward = getOpt<std::string>(jsonParams, "direction", "backgward") == std::string("forward");
     
     std::vector<BlockHeader> bhs;
-    std::vector<std::vector<TransactionInfo>> signs;
+    std::vector<std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>>> signs;
     bhs.reserve(countBlocks);
     signs.reserve(countBlocks);
     
     const auto processBlock = [&bhs, &signs, &sync, type](int64_t i) {
         bhs.emplace_back(sync.getBlockchain().getBlock(i));
         if (type == BlockTypeInfo::Simple) {
-            const BlockInfo bi = sync.getFullBlock(bhs.back(), 0, bhs.back().countSignTx);
-            signs.emplace_back(bi.getBlockSignatures());
+            if (bhs.back().countSignTx != 0) {
+                const BlockInfo bi = sync.getFullBlock(bhs.back(), 0, bhs.back().countSignTx);
+                signs.emplace_back(bi.getBlockSignatures());
+            } else {
+                signs.emplace_back(sync.findSignBlock(bhs.back()));
+            }
         } else {
             signs.push_back({});
         }
