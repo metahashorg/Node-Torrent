@@ -105,6 +105,18 @@ void SyncImpl::saveTransactions(BlockInfo& bi, const std::string &binaryDump, bo
     }
 }
 
+void SyncImpl::saveTransactionsSignBlock(SignBlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile) {
+    if (!saveBlockToFile) {
+        return;
+    }
+    
+    const std::string &fileName = bi.header.filePos.fileNameRelative;
+    CHECK(!fileName.empty(), "File name not set");
+    
+    const size_t currPos = saveBlockToFileBinary(getFullPath(fileName, folderBlocks), binaryDump);
+    bi.header.filePos.pos = currPos;
+}
+
 void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     Batch batch;
     if (modules[MODULE_BLOCK]) {
@@ -125,6 +137,20 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     }
     batch.addBlockMetadata(newMetadata);
     
+    FileInfo fi;
+    fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
+    fi.filePos.pos = bi.header.endBlockPos();
+    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
+    
+    addBatch(batch, leveldb);
+}
+
+void SyncImpl::saveSignBlockToLeveldb(const SignBlockInfo &bi) {
+    Batch batch;
+    if (modules[MODULE_BLOCK]) {
+        batch.addSignBlockHeader(bi.header.hash, bi.header);
+    }
+        
     FileInfo fi;
     fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
     fi.filePos.pos = bi.header.endBlockPos();
@@ -247,36 +273,47 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     break;
                 }
                 
-                if (!std::holds_alternative<BlockInfo>(*nextBi)) {
-                    continue;
+                if (std::holds_alternative<BlockInfo>(*nextBi)) {
+                    BlockInfo &blockInfo = std::get<BlockInfo>(*nextBi);
+                    
+                    Timer tt2;
+                    
+                    saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles);
+                    
+                    const size_t currentBlockNum = blockchain.addBlock(blockInfo.header);
+                    CHECK(currentBlockNum != 0, "Incorrect block number");
+                    blockInfo.header.blockNumber = currentBlockNum;
+                    
+                    for (TransactionInfo &tx: blockInfo.txs) {
+                        tx.blockNumber = blockInfo.header.blockNumber.value();
+                    }
+                    
+                    tt.stop();
+                    tt2.stop();
+                    
+                    LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(blockInfo.header.hash) << ". Parent hash " << toHex(blockInfo.header.prevHash);
+                    
+                    std::shared_ptr<BlockInfo> blockInfoPtr(nextBi, &blockInfo);
+                    
+                    for (Worker* worker: workers) {
+                        worker->process(blockInfoPtr, nextBlockDump);
+                    }
+                    
+                    saveBlockToLeveldb(blockInfo);
+                } else if (std::holds_alternative<SignBlockInfo>(*nextBi)) {
+                    SignBlockInfo &blockInfo = std::get<SignBlockInfo>(*nextBi);
+                    Timer tt2;
+                    
+                    saveTransactionsSignBlock(blockInfo, *nextBlockDump, isSaveBlockToFiles);
+                    
+                    tt.stop();
+                    tt2.stop();
+                
+                    LOGINFO << "Sign block " << toHex(blockInfo.header.hash) << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << ". Parent hash " << toHex(blockInfo.header.prevHash);
+                    
+                    saveSignBlockToLeveldb(blockInfo);
                 }
                 
-                BlockInfo &blockInfo = std::get<BlockInfo>(*nextBi);
-                
-                Timer tt2;
-                
-                saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles);
-                
-                const size_t currentBlockNum = blockchain.addBlock(blockInfo.header);
-                CHECK(currentBlockNum != 0, "Incorrect block number");
-                blockInfo.header.blockNumber = currentBlockNum;
-                
-                for (TransactionInfo &tx: blockInfo.txs) {
-                    tx.blockNumber = blockInfo.header.blockNumber.value();
-                }
-                
-                tt.stop();
-                tt2.stop();
-                
-                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(blockInfo.header.hash) << ". Parent hash " << toHex(blockInfo.header.prevHash);
-                
-                std::shared_ptr<BlockInfo> blockInfoPtr(nextBi, &blockInfo);
-                
-                for (Worker* worker: workers) {
-                    worker->process(blockInfoPtr, nextBlockDump);
-                }
-                
-                saveBlockToLeveldb(blockInfo);
                 
                 checkStopSignal();
             }

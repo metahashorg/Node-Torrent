@@ -445,7 +445,44 @@ struct MinimumBlockHeader {
     std::string fileName;
 };
 
+struct SignBlockHeader {
+    size_t timestamp;
+    uint64_t blockSize = 0;
+    
+    std::vector<unsigned char> hash;
+    std::vector<unsigned char> prevHash;
+    
+    FilePosition filePos;
+    
+    std::vector<unsigned char> senderSign;
+    std::vector<unsigned char> senderPubkey;
+    std::vector<unsigned char> senderAddress;
+    
+    std::string serialize() const;
+    
+    static SignBlockHeader deserialize(const std::string &raw);
+    
+    size_t endBlockPos() const;
+};
+
+struct SignTransactionInfo {
+    std::vector<unsigned char> data;
+};
+
 struct SignBlockInfo {
+    SignBlockHeader header;
+    
+    std::vector<SignTransactionInfo> txs;
+    
+    void saveSenderInfo(const std::vector<unsigned char> &senderSign, const std::vector<unsigned char> &senderPubkey, const std::vector<unsigned char> &senderAddress) {
+        header.senderSign = senderSign;
+        header.senderPubkey = senderPubkey;
+        header.senderAddress = senderAddress;
+    }
+    
+    void saveFilePath(const std::string &path) {
+        header.filePos.fileNameRelative = path;
+    }
     
 };
 

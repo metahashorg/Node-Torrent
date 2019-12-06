@@ -30,6 +30,7 @@ const static size_t BLOCK_TYPE_SIZE = sizeof(uint64_t);
 const static size_t MINIMUM_BLOCK_SIZE = BLOCK_SIZE_SIZE + BLOCK_TYPE_SIZE;
 
 const static size_t SIMPLE_BLOCK_HEADER_SIZE = 3*sizeof(uint64_t)+64;
+const static size_t SIGN_BLOCK_HEADER_SIZE = 3*sizeof(uint64_t)+32;
 
 const static uint64_t SIGN_BLOCK_TYPE = 0x1100111167452301;
 const static uint64_t REJECTED_TXS_BLOCK_TYPE = 0x3300111167452301;
@@ -112,6 +113,19 @@ static void readSimpleBlockHeaderWithoutSize(const char *begin_pos, const char *
     cur_pos += 32; //tx hash
 }
 
+static void readSignBlockHeaderWithoutSize(const char *begin_pos, const char *end_pos, SignBlockHeader &bh) {
+    const char *cur_pos = begin_pos;
+    
+    const uint64_t blockType = readInt<uint64_t>(cur_pos, end_pos);
+    CHECK(blockType == SIGN_BLOCK_TYPE, "Incorrect block type");
+    
+    bh.timestamp = readInt<uint64_t>(cur_pos, end_pos);
+    
+    CHECK(cur_pos + 32 <= end_pos, "Out of the array");
+    bh.prevHash.assign(cur_pos, cur_pos + 32);
+    cur_pos += 32; //prev block
+}
+
 struct PrevTransactionSignHelper {
     bool isFirst = false;
     bool isPrevSign = false;
@@ -123,6 +137,21 @@ static bool isSignBlockTx(const TransactionInfo &txInfo, const PrevTransactionSi
         return false;
     }
     return txInfo.fromAddress == txInfo.toAddress && txInfo.value == 0 && (helper.isFirst || (txInfo.data == helper.prevTxData && !txInfo.data.empty()));
+}
+
+static std::tuple<bool, SizeTransactinType, const char*> readSignTransactionInfo(const char *cur_pos, const char *end_pos, SignTransactionInfo &txInfo) {
+    const SizeTransactinType tx_size = readVarInt(cur_pos, end_pos);
+    
+    if (tx_size == 0) {
+        return std::make_tuple(false, 0, cur_pos);
+    }
+    CHECK(cur_pos + tx_size <= end_pos, "Out of the array");
+    end_pos = cur_pos + tx_size;
+    
+    txInfo.data = std::vector<unsigned char>(cur_pos, cur_pos + tx_size);
+    cur_pos += tx_size;
+    
+    return std::make_tuple(true, tx_size, end_pos);
 }
 
 static std::tuple<bool, SizeTransactinType, const char*> readSimpleTransactionInfo(const char *cur_pos, const char *end_pos, TransactionInfo &txInfo, bool isParseTx, bool isSaveAllTx, const PrevTransactionSignHelper &helper, bool isValidate) {    
@@ -406,6 +435,27 @@ static void readSimpleBlockTxs(const char *begin_pos, const char *end_pos, size_
     }
 }
 
+static void readSignBlockTxs(const char *begin_pos, const char *end_pos, size_t posInFile, SignBlockInfo &bi) {
+    const char *cur_pos = begin_pos;
+    cur_pos += SIGN_BLOCK_HEADER_SIZE - BLOCK_SIZE_SIZE;
+    
+    std::array<unsigned char, 32> block_hash = get_double_sha256((unsigned char *)begin_pos, std::distance(begin_pos, end_pos));
+    bi.header.hash.assign(block_hash.cbegin(), block_hash.cend());
+    
+    SizeTransactinType tx_size = 0;
+    do {
+        SignTransactionInfo txInfo;
+        
+        const auto &[isInitialized, newSize, newPos] = readSignTransactionInfo(cur_pos, end_pos, txInfo);
+        
+        tx_size = newSize;
+        cur_pos = newPos;
+        if (isInitialized) {
+            bi.txs.push_back(txInfo);
+        }
+    } while (tx_size > 0);
+}
+
 size_t readNextBlockDump(IfStream &ifile, size_t currPos, std::string &blockDump) {
     auto pairRes = getBlockDump(ifile, currPos, 0, std::numeric_limits<size_t>::max());
 
@@ -422,6 +472,12 @@ void parseNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posIn
     const uint64_t block_type = *((const uint64_t *)begin_pos);
     if (block_type == SIGN_BLOCK_TYPE) {
         bi = SignBlockInfo();
+        SignBlockInfo &b = std::get<SignBlockInfo>(bi);
+        
+        readSignBlockHeaderWithoutSize(begin_pos, end_pos, b.header);
+        readSignBlockTxs(begin_pos, end_pos, posInFile, b);
+        b.header.blockSize = std::distance(begin_pos, end_pos);
+        b.header.filePos.pos = posInFile;
     } else if (block_type == REJECTED_TXS_BLOCK_TYPE) {
         bi = RejectedTxsBlockInfo();
     } else {

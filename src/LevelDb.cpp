@@ -83,6 +83,8 @@ const static std::string NODES_STATS_ALL = "nsaa2_";
 const static std::string NODE_STAT_RPS_PREFIX = "nrps_";
 const static std::string FORGING_SUMS_ALL = "fsa_";
 
+const static std::string SIGNS_BLOCK_NUMBER_PREFIX = "signs_";
+
 thread_local std::vector<char> Batch::bufferKey;
 
 thread_local std::vector<char> Batch::bufferValue;
@@ -302,6 +304,11 @@ void addBatch(Batch& batch, LevelDb& leveldb) {
 
 void Batch::addBlockHeader(const std::vector<unsigned char>& blockHash, const BlockHeader& value) {
     makeKey(bufferKey, BLOCK_PREFIX, blockHash);
+    addKey(bufferKey, value);
+}
+
+void Batch::addSignBlockHeader(const std::vector<unsigned char> &blockHash, const SignBlockHeader &value) {
+    makeKey(bufferKey, SIGNS_BLOCK_NUMBER_PREFIX, blockHash);
     addKey(bufferKey, value);
 }
 

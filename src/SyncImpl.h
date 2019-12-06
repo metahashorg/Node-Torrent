@@ -113,8 +113,12 @@ public:
 private:
    
     void saveTransactions(BlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
+    
+    void saveTransactionsSignBlock(SignBlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
         
     void saveBlockToLeveldb(const BlockInfo &bi);
+    
+    void saveSignBlockToLeveldb(const SignBlockInfo &bi);
     
 private:
     

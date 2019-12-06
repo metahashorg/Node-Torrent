@@ -90,6 +90,8 @@ public:
     
     void addBlockHeader(const std::vector<unsigned char> &blockHash, const BlockHeader &value);
     
+    void addSignBlockHeader(const std::vector<unsigned char> &blockHash, const SignBlockHeader &value);
+    
     void addBlockMetadata(const BlocksMetadata &value);
     
     void addFileMetadata(const CroppedFileName &fileName, const FileInfo &value);
