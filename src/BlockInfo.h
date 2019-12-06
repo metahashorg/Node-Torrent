@@ -113,11 +113,6 @@ private:
     
     TransactionStatus() = default;
     
-    template <std::size_t ... I>
-    void parseVarint(const std::string &raw, size_t &fromPos, size_t number, std::index_sequence<I ... >);
-    
-    template<size_t I>
-    void tryParse(const std::string &raw, size_t &fromPos, size_t number);
 };
 
 struct Token {
@@ -443,6 +438,17 @@ struct MinimumBlockHeader {
     std::string hash;
     std::string parentHash;
     std::string fileName;
+};
+
+struct MinimumSignBlockHeader {
+    std::vector<unsigned char> hash;
+    FilePosition filePos;
+    std::vector<unsigned char> prevHash;
+    
+    void serialize(std::vector<char> &buffer) const;
+    
+    static MinimumSignBlockHeader deserialize(const std::string &raw, size_t &fromPos);
+    
 };
 
 struct SignBlockHeader {

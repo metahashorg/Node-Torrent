@@ -7,6 +7,7 @@
 #include "Cache/Cache.h"
 #include "LevelDb.h"
 #include "BlockChain.h"
+#include "BlocksTimeline.h"
 
 #include "ConfigOptions.h"
 
@@ -116,9 +117,11 @@ private:
     
     void saveTransactionsSignBlock(SignBlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
         
-    void saveBlockToLeveldb(const BlockInfo &bi);
+    void saveBlockToLeveldb(const BlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement);
     
-    void saveSignBlockToLeveldb(const SignBlockInfo &bi);
+    void saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement);
+    
+    SignBlockInfo readSignBlockInfo(const MinimumSignBlockHeader &header);
     
 private:
     
@@ -136,6 +139,8 @@ private:
     
     BlockChain blockchain;
         
+    BlocksTimeline timeline;
+    
     int countThreads;
         
     std::unique_ptr<BlockSource> getBlockAlgorithm;

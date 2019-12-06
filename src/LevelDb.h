@@ -106,6 +106,8 @@ public:
     
     void addAllNodes(const AllNodes &value);
     
+    void saveBlockTimeline(size_t key, const std::vector<char> &data);
+        
 private:
     
     template<class Key, class Value>
@@ -148,6 +150,8 @@ public:
     void saveTransactionStatus(const std::string &txHash, const TransactionStatus &value);
     
     void saveVersionDb(const std::string &value);
+       
+    std::vector<std::pair<size_t, std::string>> findAllBlocksTimeline();
     
     BlocksMetadata findBlockMetadata() const;
     

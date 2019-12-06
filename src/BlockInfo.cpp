@@ -160,32 +160,12 @@ TransactionStatus::V8Status TransactionStatus::V8Status::deserialize(const std::
     return result;
 }
 
-template<size_t I>
-void TransactionStatus::tryParse(const std::string &raw, size_t &fromPos, size_t number) {
-    if (I == number) {
-        using TypeElement = std::decay_t<decltype(std::get<I>(status))>;
-        if constexpr (!std::is_same_v<TypeElement, std::monostate>) {
-            status = TypeElement::deserialize(raw, fromPos);
-        }
-    }
-}
-
-template <std::size_t ... I>
-void TransactionStatus::parseVarint(const std::string &raw, size_t &fromPos, size_t number, std::index_sequence<I ... >) {    
-    (tryParse<I>(raw, fromPos, number), ...);
-}
-
 void TransactionStatus::serialize(std::vector<char>& buffer) const {
     serializeInt<uint8_t>(isSuccess, buffer);
     serializeInt<size_t>(blockNumber, buffer);
     serializeString(transaction, buffer);
     CHECK(status.index() != 0, "Status not set");
-    serializeInt<uint64_t>(status.index(), buffer);
-    std::visit([&buffer](auto &&arg){
-        if constexpr (!std::is_same_v<std::decay_t<decltype(arg)>, std::monostate>) {
-            arg.serialize(buffer);
-        }
-    }, status);
+    serializeVariant(status, buffer);
 }
 
 TransactionStatus TransactionStatus::deserialize(const std::string& raw) {
@@ -195,10 +175,8 @@ TransactionStatus TransactionStatus::deserialize(const std::string& raw) {
     result.isSuccess = deserializeInt<uint8_t>(raw, from);
     result.blockNumber = deserializeInt<size_t>(raw, from);
     result.transaction = deserializeString(raw, from);
-    constexpr size_t varintSize = std::variant_size_v<std::decay_t<decltype(result.status)>>;
-    const size_t number = deserializeInt<size_t>(raw, from);
-    CHECK(number != 0 && number < varintSize, "Incorrect type in transaction status");
-    result.parseVarint(raw, from, number, std::make_index_sequence<varintSize>{});
+    deserializeVarint(raw, from, result.status);
+    CHECK(result.status.index() != 0, "Incorrect deserialize");
     
     return result;
 }
@@ -692,6 +670,25 @@ SignBlockHeader SignBlockHeader::deserialize(const std::string &raw) {
     result.senderSign = deserializeVector(raw, from);
     result.senderPubkey = deserializeVector(raw, from);
     result.senderAddress = deserializeVector(raw, from);
+    
+    return result;
+}
+
+void MinimumSignBlockHeader::serialize(std::vector<char> &buffer) const {
+    CHECK(!hash.empty(), "empty hash");
+    CHECK(!filePos.fileNameRelative.empty(), "MinimumSignBlockHeader not setted fileName");
+    
+    filePos.serialize(buffer);
+    serializeVector(hash, buffer);
+    serializeVector(prevHash, buffer);
+}
+
+MinimumSignBlockHeader MinimumSignBlockHeader::deserialize(const std::string &raw, size_t &fromPos) {
+    MinimumSignBlockHeader result;
+    
+    result.filePos = FilePosition::deserialize(raw, fromPos);
+    result.hash = deserializeVector(raw, fromPos);
+    result.prevHash = deserializeVector(raw, fromPos);
     
     return result;
 }

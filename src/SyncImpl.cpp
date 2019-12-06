@@ -117,7 +117,7 @@ void SyncImpl::saveTransactionsSignBlock(SignBlockInfo &bi, const std::string &b
     bi.header.filePos.pos = currPos;
 }
 
-void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
+void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement) {
     Batch batch;
     if (modules[MODULE_BLOCK]) {
         batch.addBlockHeader(bi.header.hash, bi.header);
@@ -142,10 +142,12 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     fi.filePos.pos = bi.header.endBlockPos();
     batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
     
+    batch.saveBlockTimeline(timeLineKey, timelineElement);
+    
     addBatch(batch, leveldb);
 }
 
-void SyncImpl::saveSignBlockToLeveldb(const SignBlockInfo &bi) {
+void SyncImpl::saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement) {
     Batch batch;
     if (modules[MODULE_BLOCK]) {
         batch.addSignBlockHeader(bi.header.hash, bi.header);
@@ -155,6 +157,8 @@ void SyncImpl::saveSignBlockToLeveldb(const SignBlockInfo &bi) {
     fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
     fi.filePos.pos = bi.header.endBlockPos();
     batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
+    
+    batch.saveBlockTimeline(timeLineKey, timelineElement);
     
     addBatch(batch, leveldb);
 }
@@ -191,6 +195,10 @@ void SyncImpl::initialize() {
         const size_t countBlocks = blockchain.calcBlockchain(metadata.blockHash);
         LOGINFO << "Last block " << countBlocks << " " << toHex(metadata.blockHash);
     }
+    
+    const std::vector<std::pair<size_t, std::string>> timeLinesSerialized = leveldb.findAllBlocksTimeline();
+    timeline.deserialize(timeLinesSerialized);
+    LOGINFO << "Timeline size " << timeline.size();
 }
 
 std::vector<Worker*> SyncImpl::makeWorkers() {
@@ -288,6 +296,8 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                         tx.blockNumber = blockInfo.header.blockNumber.value();
                     }
                     
+                    auto [timelineKey, timelineElement] = timeline.addSimpleBlock(blockInfo.header);
+                    
                     tt.stop();
                     tt2.stop();
                     
@@ -299,19 +309,21 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                         worker->process(blockInfoPtr, nextBlockDump);
                     }
                     
-                    saveBlockToLeveldb(blockInfo);
+                    saveBlockToLeveldb(blockInfo, timelineKey, timelineElement);
                 } else if (std::holds_alternative<SignBlockInfo>(*nextBi)) {
                     SignBlockInfo &blockInfo = std::get<SignBlockInfo>(*nextBi);
                     Timer tt2;
                     
                     saveTransactionsSignBlock(blockInfo, *nextBlockDump, isSaveBlockToFiles);
                     
+                    auto [timelineKey, timelineElement] = timeline.addSignBlock(blockInfo.header);
+                    
                     tt.stop();
                     tt2.stop();
                 
                     LOGINFO << "Sign block " << toHex(blockInfo.header.hash) << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << ". Parent hash " << toHex(blockInfo.header.prevHash);
                     
-                    saveSignBlockToLeveldb(blockInfo);
+                    saveSignBlockToLeveldb(blockInfo, timelineKey, timelineElement);
                 }
                 
                 
@@ -429,6 +441,19 @@ std::string SyncImpl::getBlockDump(const BlockHeader &bh, size_t fromByte, size_
     } else {
         return res;
     }
+}
+
+SignBlockInfo SyncImpl::readSignBlockInfo(const MinimumSignBlockHeader &bh) {
+    CHECK(!bh.filePos.fileNameRelative.empty(), "Empty file name in block header");
+    IfStream file;
+    openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
+    std::string tmp;
+    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
+    const size_t nextPos = readNextBlockDump(file, bh.filePos.pos, tmp);
+    parseNextBlockInfo(tmp.data(), tmp.data() + tmp.size(), bh.filePos.pos, b, false, false, 0, std::numeric_limits<size_t>::max());
+    CHECK(nextPos != bh.filePos.pos, "Ups");
+    CHECK(std::holds_alternative<SignBlockInfo>(b), "Incorrect block type");
+    return std::get<SignBlockInfo>(b);
 }
 
 bool SyncImpl::verifyTechnicalAddressSign(const std::string &binary, const std::vector<unsigned char> &signature, const std::vector<unsigned char> &pubkey) const {

@@ -102,6 +102,8 @@ set(LIBRARY_SOURCES
     utils/SystemInfo.cpp
     utils/IfStream.cpp
     utils/crypto.cpp
+    
+    BlocksTimeline.cpp
 )
 
 set(PROJECT_MAIN
