@@ -24,10 +24,6 @@ std::pair<bool, size_t> FileBlockSource::doProcess(size_t countBlocks) {
     return std::make_pair(true, 0);
 }
 
-size_t FileBlockSource::knownBlock() {
-    return 0;
-}
-
 bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
     if (fileName.empty()) {
         const FileInfo fi = getNextFile(allFiles, folderPath);

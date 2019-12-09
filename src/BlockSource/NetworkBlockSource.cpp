@@ -55,10 +55,6 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
     return std::make_pair(lastBlockInBlockchain >= nextBlockToRead, lastBlockInBlockchain);
 }
 
-size_t NetworkBlockSource::knownBlock() {
-    return lastBlockInBlockchain;
-}
-
 bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
     const bool isContinue = lastBlockInBlockchain >= nextBlockToRead;
     if (!isContinue) {
