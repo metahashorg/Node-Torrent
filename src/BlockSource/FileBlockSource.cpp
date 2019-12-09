@@ -55,6 +55,9 @@ bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockI
         } else if (std::holds_alternative<SignBlockInfo>(bi)) {
             SignBlockInfo &b = std::get<SignBlockInfo>(bi);
             b.header.filePos.fileNameRelative = fileName;
+        } else if (std::holds_alternative<RejectedTxsBlockInfo>(bi)) {
+            RejectedTxsBlockInfo &b = std::get<RejectedTxsBlockInfo>(bi);
+            b.header.filePos.fileNameRelative = fileName;
         }
     }
 

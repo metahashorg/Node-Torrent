@@ -125,6 +125,8 @@ private:
     
     void saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement);
     
+    void saveRejectedTxsBlockToLeveldb(const RejectedTxsBlockInfo &bi);
+    
     SignBlockInfo readSignBlockInfo(const MinimumSignBlockHeader &header) const;
     
 private:

@@ -163,6 +163,16 @@ void SyncImpl::saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKe
     addBatch(batch, leveldb);
 }
 
+void SyncImpl::saveRejectedTxsBlockToLeveldb(const RejectedTxsBlockInfo &bi) {
+    Batch batch;
+    FileInfo fi;
+    fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
+    fi.filePos.pos = bi.header.endBlockPos();
+    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
+    
+    addBatch(batch, leveldb);
+}
+
 void SyncImpl::initialize() {
     const std::string modulesStr = leveldb.findModules();
     if (!modulesStr.empty()) {
@@ -324,6 +334,12 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     LOGINFO << "Sign block " << toHex(blockInfo.header.hash) << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << ". Parent hash " << toHex(blockInfo.header.prevHash);
                     
                     saveSignBlockToLeveldb(blockInfo, timelineKey, timelineElement);
+                } else if (std::holds_alternative<RejectedTxsBlockInfo>(*nextBi)) {
+                    RejectedTxsBlockInfo &blockInfo = std::get<RejectedTxsBlockInfo>(*nextBi);
+                    
+                    saveRejectedTxsBlockToLeveldb(blockInfo);
+                } else {
+                    throwErr("Unknown block type");
                 }
                 
                 

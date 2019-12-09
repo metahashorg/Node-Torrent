@@ -495,8 +495,16 @@ struct SignBlockInfo {
     
 };
 
-struct RejectedTxsBlockInfo {
+struct RejectedTxsBlockHeader {
+    uint64_t blockSize = 0;
     
+    FilePosition filePos;
+       
+    size_t endBlockPos() const;
+};
+
+struct RejectedTxsBlockInfo {
+    RejectedTxsBlockHeader header;
 };
 
 struct BlockInfo {

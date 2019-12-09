@@ -498,6 +498,10 @@ void parseNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posIn
         b.header.filePos.pos = posInFile;
     } else if (block_type == REJECTED_TXS_BLOCK_TYPE) {
         bi = RejectedTxsBlockInfo();
+        RejectedTxsBlockInfo &b = std::get<RejectedTxsBlockInfo>(bi);
+        
+        b.header.blockSize = std::distance(begin_pos, end_pos);
+        b.header.filePos.pos = posInFile;
     } else {
         bi = BlockInfo();
         BlockInfo &b = std::get<BlockInfo>(bi);

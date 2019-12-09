@@ -583,6 +583,10 @@ size_t SignBlockHeader::endBlockPos() const {
     return filePos.pos + blockSize + sizeof(uint64_t);
 }
 
+size_t RejectedTxsBlockHeader::endBlockPos() const {
+    return filePos.pos + blockSize + sizeof(uint64_t);
+}
+
 std::string BlockHeader::serialize() const {
     CHECK(!hash.empty(), "empty hash");
     CHECK(!prevHash.empty(), "empty prevHash");
