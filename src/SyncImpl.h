@@ -113,6 +113,8 @@ public:
     
     std::vector<SignTransactionInfo> findSignBlock(const BlockHeader &bh) const;
     
+    std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const;
+    
 private:
    
     void saveTransactions(BlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);

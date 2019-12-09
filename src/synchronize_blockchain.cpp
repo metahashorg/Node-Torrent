@@ -148,6 +148,10 @@ std::vector<SignTransactionInfo> Sync::findSignBlock(const BlockHeader &bh) cons
     return impl->findSignBlock(bh);
 }
 
+std::vector<MinimumSignBlockHeader> Sync::getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const {
+    return impl->getSignaturesBetween(firstBlock, secondBlock);
+}
+
 Sync::~Sync() = default;
 
 }

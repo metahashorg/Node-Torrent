@@ -508,9 +508,26 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             }
             response = transactionsToJson(requestId, txsResult, sync.getBlockchain(), isFormatJson, jsonVersion);
         } else if (func == GET_COUNT_BLOCKS) {
+            bool forP2P = false;
+            if (doc.HasMember("params") && doc["params"].IsObject()) {
+                const auto &jsonParams = get<JsonObject>(doc, "params");
+                forP2P = getOpt<bool>(jsonParams, "forP2P", false);
+            }
+            
             const size_t countBlocks = sync.getBlockchain().countBlocks();
             
-            response = genCountBlockJson(requestId, countBlocks, isFormatJson, jsonVersion);
+            if (!forP2P) {
+                response = genCountBlockJson(requestId, countBlocks, isFormatJson, jsonVersion);
+            } else {
+                const BlockHeader header = sync.getBlockchain().getBlock(countBlocks);
+                const std::vector<MinimumSignBlockHeader> signatures = sync.getSignaturesBetween(header.hash, std::nullopt);
+                CHECK(signatures.size() <= 10, "Too many signatures");
+                std::vector<std::vector<unsigned char>> signHashes;
+                signHashes.reserve(signatures.size());
+                std::transform(signatures.begin(), signatures.end(), std::back_inserter(signHashes), std::mem_fn(&MinimumSignBlockHeader::hash));
+                
+                response = genCountBlockForP2PJson(requestId, countBlocks, signHashes, isFormatJson, jsonVersion);
+            }
         } else if (func == PRE_LOAD_BLOCKS) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             

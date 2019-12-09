@@ -572,4 +572,8 @@ std::vector<Address> SyncImpl::getRandomAddresses(size_t countAddresses) const {
     return mainWorker->getRandomAddresses(countAddresses);
 }
 
+std::vector<MinimumSignBlockHeader> SyncImpl::getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const {
+    return timeline.getSignaturesBetween(firstBlock, secondBlock);
+}
+
 }

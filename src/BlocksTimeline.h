@@ -30,6 +30,10 @@ public:
     
     using List = std::list<Element>;
     
+    using Iterator = List::const_iterator;
+    
+    using Hash = std::vector<unsigned char>;
+    
 public:
     
     void deserialize(const std::vector<std::pair<size_t, std::string>> &elements);
@@ -42,7 +46,9 @@ public:
     
     std::pair<size_t, std::vector<char>> addSignBlock(const SignBlockHeader &bh);
     
-    std::optional<MinimumSignBlockHeader> findSignForBlock(const std::vector<unsigned char> &hash) const;
+    std::optional<MinimumSignBlockHeader> findSignForBlock(const Hash &hash) const;
+    
+    std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<Hash> &firstBlock, const std::optional<Hash> &secondBlock) const;
     
 private:
     
@@ -50,9 +56,9 @@ private:
     
     List timeline;
     
-    std::map<std::vector<unsigned char>, List::iterator> hashes; // TODO переписать на unordered_map
+    std::map<Hash, Iterator> hashes; // TODO переписать на unordered_map
     
-    std::map<std::vector<unsigned char>, List::iterator> signsParent;
+    std::map<Hash, Iterator> signsParent;
 };
     
 } // namespace torrent_node_lib {

@@ -511,6 +511,24 @@ std::string genCountBlockJson(const RequestId &requestId, size_t countBlocks, bo
     return jsonToString(doc, isFormat);
 }
 
+std::string genCountBlockForP2PJson(const RequestId &requestId, size_t countBlocks, const std::vector<std::vector<unsigned char>> &signaturesBlocks, bool isFormat, const JsonVersion &version) {
+    const bool isStringValue = version == JsonVersion::V2;
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    addIdToResponse(requestId, doc, allocator);
+    rapidjson::Value resultValue(rapidjson::kObjectType);
+    resultValue.AddMember("count_blocks", intOrString(countBlocks, isStringValue, allocator), allocator);
+    
+    rapidjson::Value signatures(rapidjson::kArrayType);
+    for (const std::vector<unsigned char> &signBlock: signaturesBlocks) {
+        signatures.PushBack(strToJson(toHex(signBlock.begin(), signBlock.end()), allocator), allocator);
+    }
+    resultValue.AddMember("next_signatures", signatures, allocator);
+    
+    doc.AddMember("result", resultValue, allocator);
+    return jsonToString(doc, isFormat);
+}
+
 std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version) {
     CHECK(bh.size() == blocks.size(), "Incorrect parameter blocks");
     

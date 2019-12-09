@@ -112,6 +112,8 @@ public:
     
     std::vector<SignTransactionInfo> findSignBlock(const BlockHeader &bh) const;
     
+    std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const;
+    
 private:
     
     std::unique_ptr<SyncImpl> impl;
