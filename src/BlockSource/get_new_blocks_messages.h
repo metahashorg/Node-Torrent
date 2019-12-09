@@ -4,6 +4,7 @@
 #include <string>
 #include <optional>
 #include <vector>
+#include <set>
 
 namespace torrent_node_lib {
 
@@ -31,7 +32,7 @@ std::string makeGetDumpBlockMessage(const std::string &blockHash, bool isSign, b
 
 std::string makeGetDumpsBlocksMessage(std::vector<std::string>::const_iterator begin, std::vector<std::string>::const_iterator end, bool isSign, bool isCompress);
 
-size_t parseCountBlocksMessage(const std::string &response);
+std::pair<size_t, std::set<std::vector<unsigned char>>> parseCountBlocksMessage(const std::string &response);
 
 PreloadBlocksResponse parsePreloadBlocksMessage(const std::string &response);
 

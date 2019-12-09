@@ -24,8 +24,9 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
     std::optional<size_t> lastBlock;
     std::string error;
     std::vector<std::string> serversSave;
+    std::set<std::vector<unsigned char>> extraBlocksSave;
     std::mutex mut;
-    const BroadcastResult function = [&lastBlock, &error, &mut, &serversSave](const std::string &server, const std::string &result, const std::optional<CurlException> &curlException) {
+    const BroadcastResult function = [&lastBlock, &error, &mut, &serversSave, &extraBlocksSave](const std::string &server, const std::string &result, const std::optional<CurlException> &curlException) {
         if (curlException.has_value()) {
             std::lock_guard<std::mutex> lock(mut);
             error = curlException.value().message;
@@ -33,7 +34,7 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
         }
         
         try {
-            const size_t countBlocks = parseCountBlocksMessage(result);
+            const auto [countBlocks, extraBlocks] = parseCountBlocksMessage(result);
             
             std::lock_guard<std::mutex> lock(mut);
             if (!lastBlock.has_value()) {
@@ -42,9 +43,11 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
             if (lastBlock < countBlocks) {
                 lastBlock = countBlocks;
                 serversSave.clear();
+                extraBlocksSave = extraBlocks;
                 serversSave.emplace_back(server);
             } else if (lastBlock == countBlocks) {
                 serversSave.emplace_back(server);
+                extraBlocksSave.insert(extraBlocks.begin(), extraBlocks.end());
             }
         } catch (const exception &e) {
             std::lock_guard<std::mutex> lock(mut);
@@ -58,6 +61,7 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
     if (lastBlock.has_value()) {
         response.lastBlock = lastBlock.value();
         response.servers = serversSave;
+        response.extraBlocks = extraBlocksSave;
     } else {
         response.error = error;
     }

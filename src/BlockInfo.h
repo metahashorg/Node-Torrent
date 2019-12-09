@@ -448,6 +448,9 @@ struct MinimumBlockHeader {
     std::string hash;
     std::string parentHash;
     std::string fileName;
+    
+    std::set<std::vector<unsigned char>> prevExtraBlocks;
+    std::set<std::vector<unsigned char>> nextExtraBlocks;
 };
 
 struct MinimumSignBlockHeader {

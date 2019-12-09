@@ -13,6 +13,7 @@ public:
     struct LastBlockResponse {
         std::vector<std::string> servers;
         size_t lastBlock;
+        std::set<std::vector<unsigned char>> extraBlocks;
         std::optional<std::string> error;
     };
     
