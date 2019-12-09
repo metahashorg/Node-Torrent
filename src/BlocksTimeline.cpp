@@ -126,4 +126,20 @@ std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const s
     return result;
 }
 
+std::optional<MinimumSignBlockHeader> BlocksTimeline::findSignature(const Hash &hash) const {
+    std::lock_guard<std::mutex> lock(mut);
+    
+    const auto found = hashes.find(hash);
+    if (found == hashes.end()) {
+        return std::nullopt;
+    }
+    
+    const auto &variant = *found->second;
+    if (!std::holds_alternative<MinimumSignBlockHeader>(variant)) {
+        return std::nullopt;
+    }
+    
+    return std::get<MinimumSignBlockHeader>(variant);
+}
+
 } // namespace torrent_node_lib {

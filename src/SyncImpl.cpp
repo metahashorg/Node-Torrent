@@ -404,7 +404,7 @@ BalanceInfo SyncImpl::getBalance(const Address &address) const {
     return mainWorker->getBalance(address);
 }
 
-std::string SyncImpl::getBlockDump(const BlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
+std::string SyncImpl::getBlockDump(const CommonMimimumBlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
     CHECK(modules[MODULE_BLOCK] && modules[MODULE_BLOCK_RAW], "modules " + MODULE_BLOCK_STR + " " + MODULE_BLOCK_RAW_STR + " not set");
        
     const std::optional<std::shared_ptr<std::string>> cache = caches.blockDumpCache.getValue(common::HashedString(bh.hash.data(), bh.hash.size()));
@@ -590,6 +590,10 @@ std::vector<Address> SyncImpl::getRandomAddresses(size_t countAddresses) const {
 
 std::vector<MinimumSignBlockHeader> SyncImpl::getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const {
     return timeline.getSignaturesBetween(firstBlock, secondBlock);
+}
+
+std::optional<MinimumSignBlockHeader> SyncImpl::findSignature(const std::vector<unsigned char> &hash) const {
+    return timeline.findSignature(hash);
 }
 
 }

@@ -461,6 +461,30 @@ std::string blockHeaderToJson(const RequestId &requestId, const BlockHeader &bh,
     return jsonToString(doc, isFormat);
 }
 
+std::string blockHeaderToP2PJson(const RequestId &requestId, const torrent_node_lib::BlockHeader &bh, const std::vector<std::vector<unsigned char>> &prevSignaturesBlocks, const std::vector<std::vector<unsigned char>> &nextSignaturesBlocks, bool isFormat, BlockTypeInfo type, const JsonVersion &version) {
+    if (bh.blockNumber == 0) {
+        return genErrorResponse(requestId, -32603, "Incorrect block number: 0. Genesis block begin with number 1");
+    }
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    addIdToResponse(requestId, doc, allocator);
+    rapidjson::Value resultVal = blockHeaderToJson(bh, {}, allocator, type, version);
+    
+    const auto makeSignatures = [&allocator](rapidjson::Value &resultVal, const std::string &name, const std::vector<std::vector<unsigned char>> &signaturesBlocks) {
+        rapidjson::Value signatures(rapidjson::kArrayType);
+        for (const std::vector<unsigned char> &signBlock: signaturesBlocks) {
+            signatures.PushBack(strToJson(toHex(signBlock.begin(), signBlock.end()), allocator), allocator);
+        }
+        resultVal.AddMember(strToJson(name, allocator), signatures, allocator);
+    };
+    
+    makeSignatures(resultVal, "next_extra_blocks", nextSignaturesBlocks);
+    makeSignatures(resultVal, "prev_extra_blocks", prevSignaturesBlocks);
+    
+    doc.AddMember("result", resultVal, allocator);
+    return jsonToString(doc, isFormat);
+}
+
 std::string blockHeadersToJson(const RequestId &requestId, const std::vector<BlockHeader> &bh, const std::vector<std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>>> &signatures, BlockTypeInfo type, bool isFormat, const JsonVersion &version) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
@@ -475,6 +499,42 @@ std::string blockHeadersToJson(const RequestId &requestId, const std::vector<Blo
             return genErrorResponse(requestId, -32603, "Incorrect block number: 0. Genesis block begin with number 1");
         }
         vals.PushBack(blockHeaderToJson(b, signature, allocator, type, version), allocator);
+    }
+    doc.AddMember("result", vals, allocator);
+    return jsonToString(doc, isFormat);
+}
+
+std::string blockHeadersToP2PJson(const RequestId &requestId, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::vector<std::vector<unsigned char>>> &blockSignatures, bool isFormat, const JsonVersion &version) {
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    addIdToResponse(requestId, doc, allocator);
+    rapidjson::Value vals(rapidjson::kArrayType);
+    CHECK(bh.empty() || bh.size() + 1 == blockSignatures.size(), "Incorrect signatures vect");
+    for (size_t i = 0; i < bh.size(); i++) {
+        const BlockHeader &b  = bh[i];
+        const std::vector<std::vector<unsigned char>> &prevSignature = blockSignatures[i];
+        const std::vector<std::vector<unsigned char>> &nextSignature = blockSignatures[i + 1];
+        
+        if (b.blockNumber == 0) {
+            return genErrorResponse(requestId, -32603, "Incorrect block number: 0. Genesis block begin with number 1");
+        }
+        
+        rapidjson::Value res = blockHeaderToJson(b, {}, allocator, BlockTypeInfo::ForP2P, version);
+        
+        const auto makeSignatures = [&allocator](rapidjson::Value &resultVal, const std::string &name, const std::vector<std::vector<unsigned char>> &signaturesBlocks) {
+            rapidjson::Value signatures(rapidjson::kArrayType);
+            for (const std::vector<unsigned char> &signBlock: signaturesBlocks) {
+                signatures.PushBack(strToJson(toHex(signBlock.begin(), signBlock.end()), allocator), allocator);
+            }
+            resultVal.AddMember(strToJson(name, allocator), signatures, allocator);
+        };
+        
+        if (i == bh.size() - 1) {
+            makeSignatures(res, "next_extra_blocks", nextSignature);
+        }
+        makeSignatures(res, "prev_extra_blocks", prevSignature);
+        
+        vals.PushBack(res, allocator);
     }
     doc.AddMember("result", vals, allocator);
     return jsonToString(doc, isFormat);
@@ -523,7 +583,7 @@ std::string genCountBlockForP2PJson(const RequestId &requestId, size_t countBloc
     for (const std::vector<unsigned char> &signBlock: signaturesBlocks) {
         signatures.PushBack(strToJson(toHex(signBlock.begin(), signBlock.end()), allocator), allocator);
     }
-    resultValue.AddMember("next_signatures", signatures, allocator);
+    resultValue.AddMember("next_extra_blocks", signatures, allocator);
     
     doc.AddMember("result", resultValue, allocator);
     return jsonToString(doc, isFormat);

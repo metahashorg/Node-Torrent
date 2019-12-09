@@ -50,6 +50,8 @@ public:
     
     std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<Hash> &firstBlock, const std::optional<Hash> &secondBlock) const;
     
+    std::optional<MinimumSignBlockHeader> findSignature(const Hash &hash) const;
+    
 private:
     
     mutable std::mutex mut;

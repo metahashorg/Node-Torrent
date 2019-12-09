@@ -395,6 +395,16 @@ struct CommonBalance {
     static CommonBalance deserialize(const std::string &raw);
 };
 
+struct CommonMimimumBlockHeader {
+    std::vector<unsigned char> hash;
+    FilePosition filePos;
+    
+    CommonMimimumBlockHeader(const std::vector<unsigned char> &hash, const FilePosition &filePos)
+        : hash(hash)
+        , filePos(filePos)
+    {}
+};
+
 struct BlockHeader {
     size_t timestamp;
     uint64_t blockSize = 0;

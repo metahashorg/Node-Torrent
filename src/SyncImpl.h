@@ -71,7 +71,7 @@ public:
     
     BalanceInfo getBalance(const Address &address) const;
     
-    std::string getBlockDump(const BlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
+    std::string getBlockDump(const CommonMimimumBlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
     
     BlockInfo getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const;
     
@@ -114,6 +114,8 @@ public:
     std::vector<SignTransactionInfo> findSignBlock(const BlockHeader &bh) const;
     
     std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const;
+    
+    std::optional<MinimumSignBlockHeader> findSignature(const std::vector<unsigned char> &hash) const;
     
 private:
    

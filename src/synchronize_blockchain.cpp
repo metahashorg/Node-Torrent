@@ -36,7 +36,7 @@ BalanceInfo Sync::getBalance(const Address& address) const {
     return impl->getBalance(address);
 }
 
-std::string Sync::getBlockDump(const BlockHeader& bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
+std::string Sync::getBlockDump(const CommonMimimumBlockHeader& bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
     return impl->getBlockDump(bh, fromByte, toByte, isHex, isSign);
 }
 
@@ -150,6 +150,10 @@ std::vector<SignTransactionInfo> Sync::findSignBlock(const BlockHeader &bh) cons
 
 std::vector<MinimumSignBlockHeader> Sync::getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const {
     return impl->getSignaturesBetween(firstBlock, secondBlock);
+}
+
+std::optional<MinimumSignBlockHeader> Sync::findSignature(const std::vector<unsigned char> &hash) const {
+    return impl->findSignature(hash);
 }
 
 Sync::~Sync() = default;

@@ -102,26 +102,25 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
             return;
         }
         try {
+            BlockSignatureCheckResult signBlock;
             if (isVerifySign) {
-                const BlockSignatureCheckResult signBlock = checkSignatureBlock(pair.second.dump);
+                signBlock = checkSignatureBlock(pair.second.dump);
                 pair.second.dump = signBlock.block;
-                std::visit([&signBlock](auto &element) {
-                    if constexpr (std::is_same_v<std::decay_t<decltype(element)>, BlockInfo>) {
-                        element.saveSenderInfo(std::vector<unsigned char>(signBlock.sign.begin(), signBlock.sign.end()), std::vector<unsigned char>(signBlock.pubkey.begin(), signBlock.pubkey.end()), std::vector<unsigned char>(signBlock.address.begin(), signBlock.address.end()));
-                    }
-                }, pair.second.bi);
             }
             CHECK(pair.second.dump.size() == pair.second.header.blockSize, "binaryDump.size() == nextBlockHeader.blockSize");
-            std::visit([&pair](auto &element) {
-                if constexpr (std::is_same_v<std::decay_t<decltype(element)>, BlockInfo>) {
-                    element.saveFilePath(getBasename(pair.second.header.fileName));
-                }
-            }, pair.second.bi);
             const std::vector<unsigned char> hashBlockForRequest = fromHex(pair.second.header.hash);
             parseNextBlockInfo(pair.second.dump.data(), pair.second.dump.data() + pair.second.dump.size(), 0, pair.second.bi, isValidate, saveAllTx, 0, 0);
-            std::visit([&hashBlockForRequest](auto &element) {
+            std::visit([&hashBlockForRequest, &signBlock, &pair, this](auto &element) {
                 if constexpr (std::is_same_v<std::decay_t<decltype(element)>, BlockInfo>) {
                     CHECK(element.header.hash == hashBlockForRequest, "Incorrect block dump");
+                    element.saveFilePath(getBasename(pair.second.header.fileName));
+                    
+                    if (isVerifySign) {
+                        element.saveSenderInfo(std::vector<unsigned char>(signBlock.sign.begin(), signBlock.sign.end()), std::vector<unsigned char>(signBlock.pubkey.begin(), signBlock.pubkey.end()), std::vector<unsigned char>(signBlock.address.begin(), signBlock.address.end()));
+                    }
+                } else if constexpr (std::is_same_v<std::decay_t<decltype(element)>, SignBlockInfo>) {
+                    CHECK(element.header.hash == hashBlockForRequest, "Incorrect block dump");
+                    element.saveFilePath(getBasename(pair.second.header.fileName));
                 }
             }, pair.second.bi);
         } catch (...) {

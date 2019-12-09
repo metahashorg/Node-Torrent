@@ -14,7 +14,7 @@ using namespace common;
 namespace torrent_node_lib {
 
 std::string makeGetCountBlocksMessage() {
-    return "{\"method\": \"get-count-blocks\"}";
+    return "{\"method\": \"get-count-blocks\", \"params\": {\"type\": \"forP2P\"}}";
 }
 
 std::string makePreloadBlocksMessage(size_t currentBlock, bool isCompress, bool isSign, size_t preloadBlocks, size_t maxBlockSize) {
