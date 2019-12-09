@@ -148,8 +148,26 @@ static std::tuple<bool, SizeTransactinType, const char*> readSignTransactionInfo
     CHECK(cur_pos + tx_size <= end_pos, "Out of the array");
     end_pos = cur_pos + tx_size;
     
-    txInfo.data = std::vector<unsigned char>(cur_pos, cur_pos + tx_size);
-    cur_pos += tx_size;
+    const size_t hash_size = 32;
+    CHECK(cur_pos + hash_size <= end_pos, "Out of the array");
+    txInfo.blockHash = std::vector<unsigned char>(cur_pos, cur_pos + hash_size);
+    cur_pos += hash_size;
+    
+    const size_t signSize = readVarInt(cur_pos, end_pos);
+    CHECK(cur_pos + signSize <= end_pos, "Out of the array");
+    txInfo.sign = std::vector<char>(cur_pos, cur_pos + signSize);
+    cur_pos += signSize;
+        
+    const size_t pubkSize = readVarInt(cur_pos, end_pos);
+    CHECK(cur_pos + pubkSize <= end_pos, "Out of the array");
+    txInfo.pubkey = std::vector<unsigned char>(cur_pos, cur_pos + pubkSize);
+    cur_pos += pubkSize;
+    
+    const std::vector<unsigned char> binAddress = get_address_bin(txInfo.pubkey);
+    CHECK(!binAddress.empty(), "incorrect pubkey script");
+    txInfo.address = Address(binAddress, false);
+    
+    CHECK(crypto_check_sign_data(txInfo.sign, txInfo.pubkey, (const unsigned char*)txInfo.blockHash.data(), txInfo.blockHash.size()), "Not validate");
     
     return std::make_tuple(true, tx_size, end_pos);
 }

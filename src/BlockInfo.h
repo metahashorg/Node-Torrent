@@ -472,7 +472,10 @@ struct SignBlockHeader {
 };
 
 struct SignTransactionInfo {
-    std::vector<unsigned char> data;
+    std::vector<unsigned char> blockHash;
+    std::vector<char> sign;
+    std::vector<unsigned char> pubkey;
+    Address address;
 };
 
 struct SignBlockInfo {

@@ -263,7 +263,10 @@ static rapidjson::Value transactionInfoToJson(const TransactionInfo &info, const
 
 static rapidjson::Value signTransactionInfoToJson(const SignTransactionInfo &info, rapidjson::Document::AllocatorType &allocator, const JsonVersion &version) {
     rapidjson::Value infoJson(rapidjson::kObjectType);
-    infoJson.AddMember("data", strToJson(toHex(info.data.begin(), info.data.end()), allocator), allocator);
+    infoJson.AddMember("blockHash", strToJson(toHex(info.blockHash.begin(), info.blockHash.end()), allocator), allocator);
+    infoJson.AddMember("signature", strToJson(toHex(info.sign.begin(), info.sign.end()), allocator), allocator);
+    infoJson.AddMember("publickey", strToJson(toHex(info.pubkey.begin(), info.pubkey.end()), allocator), allocator);
+    infoJson.AddMember("address", strToJson(info.address.calcHexString(), allocator), allocator);
     return infoJson;
 }
 
