@@ -8,6 +8,7 @@
 #include <memory>
 #include <set>
 #include <unordered_map>
+#include <variant>
 
 #include "ConfigOptions.h"
 
@@ -33,6 +34,7 @@ struct SignBlockInfo;
 struct SignTransactionInfo;
 struct MinimumSignBlockHeader;
 struct CommonMimimumBlockHeader;
+struct RejectedTxsBlockInfo;
 
 struct TransactionsFilters;
 
@@ -55,7 +57,7 @@ public:
     
 public:
     
-    static BlockInfo parseBlockDump(const std::string &binaryDump, bool isValidate);
+    static std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> parseBlockDump(const std::string &binaryDump, bool isValidate);
     
 public:
     

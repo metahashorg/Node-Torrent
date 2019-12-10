@@ -132,12 +132,10 @@ bool Sync::verifyTechnicalAddressSign(const std::string &binary, const std::vect
     return impl->verifyTechnicalAddressSign(binary, signature, pubkey);
 }
 
-BlockInfo Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
+std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
     std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
     parseNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), 0, b, isValidate, true, 0, 0);
-    CHECK(std::holds_alternative<BlockInfo>(b), "Incorrect blockinfo");
-    const BlockInfo& bi = std::get<BlockInfo>(b);
-    return bi;
+    return b;
 }
 
 std::vector<Address> Sync::getRandomAddresses(size_t countAddresses) const {
