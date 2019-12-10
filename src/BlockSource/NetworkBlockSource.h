@@ -58,7 +58,7 @@ private:
             bool operator<(const Key &second) const;
         };
         
-        BlockPos pos;
+        BlockPos pos = BlockPos::Block;
         MinimumBlockHeader header;
         std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> bi;
         std::string dump;

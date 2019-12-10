@@ -2,6 +2,7 @@
 
 #include "check.h"
 #include "utils/serialize.h"
+#include "convertStrings.h"
 
 #include <algorithm>
 
@@ -59,6 +60,8 @@ std::pair<size_t, std::vector<char>> BlocksTimeline::addSimpleBlock(const BlockH
     
     std::lock_guard<std::mutex> lock(mut);
     
+    CHECK(hashes.find(bh.hash) == hashes.end(), "Element " + toHex(bh.hash) + " already exist");
+    
     auto iter = timeline.insert(timeline.end(), element);
     hashes.emplace(element.hash, iter);
     
@@ -75,8 +78,11 @@ std::pair<size_t, std::vector<char>> BlocksTimeline::addSignBlock(const SignBloc
     
     std::lock_guard<std::mutex> lock(mut);
     
+    CHECK(hashes.find(bh.hash) == hashes.end(), "Element " + toHex(bh.hash) + " already exist");
+    
     auto iter = timeline.insert(timeline.end(), element);
     hashes.emplace(element.hash, iter);
+    
     signsParent.emplace(element.prevHash, iter);
     
     std::vector<char> serializedData = serializeElement(*iter);

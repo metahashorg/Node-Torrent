@@ -24,7 +24,7 @@ NetworkBlockSource::AdvancedBlock::Key NetworkBlockSource::AdvancedBlock::key() 
 }
 
 bool NetworkBlockSource::AdvancedBlock::Key::operator<(const Key &second) const {
-    return std::make_tuple(this->number, this->pos, this->hash) < std::make_tuple(second.number, pos, second.hash);
+    return std::make_tuple(this->number, this->pos, this->hash) < std::make_tuple(second.number, second.pos, second.hash);
 }
 
 NetworkBlockSource::NetworkBlockSource(const BlocksTimeline &timeline, const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad) 
@@ -79,10 +79,22 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
 }
 
 void NetworkBlockSource::processAdditingBlocks(std::vector<GetNewBlocksFromServer::AdditingBlock> &additingBlocks) {
+    std::set<std::string> existingHashs;
+    additingBlocks.erase(std::remove_if(additingBlocks.begin(), additingBlocks.end(), [&existingHashs](const GetNewBlocksFromServer::AdditingBlock &block) {
+        if (existingHashs.find(block.hash) != existingHashs.end()) {
+            return true;
+        } else {
+            existingHashs.insert(block.hash);
+            return false;
+        }
+    }), additingBlocks.end());
+    
     timeline.filter<GetNewBlocksFromServer::AdditingBlock>(additingBlocks, [](const GetNewBlocksFromServer::AdditingBlock &block) {
         return fromHex(block.hash);
     });
+    
     getterBlocks.loadAdditingBlocks(additingBlocks, servers, isVerifySign);
+    
     for (const GetNewBlocksFromServer::AdditingBlock &additingBlock: additingBlocks) {
         AdvancedBlock advanced;
         advanced.header.blockSize = additingBlock.dump.size();

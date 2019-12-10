@@ -57,13 +57,9 @@ public:
     void filter(std::vector<T> &elements, const std::function<Hash(const T &t)> &getter) const {
         std::lock_guard<std::mutex> lock(mut);
         
-        for (auto iter = elements.begin(); iter != elements.end();) {
-            if (hashes.find(getter(*iter)) != hashes.end()) {
-                iter = elements.erase(iter);
-            } else {
-                iter++;
-            }
-        }
+        elements.erase(std::remove_if(elements.begin(), elements.end(), [this, &getter](const T &element) {
+            return hashes.find(getter(element)) != hashes.end();
+        }), elements.end());
     }
     
 private:

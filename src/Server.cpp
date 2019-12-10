@@ -603,7 +603,7 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             bool forP2P = false;
             if (doc.HasMember("params") && doc["params"].IsObject()) {
                 const auto &jsonParams = get<JsonObject>(doc, "params");
-                forP2P = getOpt<bool>(jsonParams, "forP2P", false);
+                forP2P = getOpt<std::string>(jsonParams, "type", "") == "forP2P";
             }
             
             const size_t countBlocks = sync.getBlockchain().countBlocks();
