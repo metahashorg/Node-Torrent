@@ -45,6 +45,13 @@ set(LIBRARY_HEADERS
     BlockChainReadInterface.h
     P2P/P2P.h
     P2P/P2P_Ips.h
+    P2P/P2PStructs.h
+    P2P/ReferenceWrapper.h
+    P2P/safe_ptr.h
+    P2P/P2P_Impl.h
+    P2P/P2PThread.h
+    P2P/QueueP2P.h
+    P2P/LimitArray.h
     Modules.h
     ConfigOptions.h
     synchronize_blockchain.h
