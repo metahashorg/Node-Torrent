@@ -17,6 +17,14 @@ namespace torrent_node_lib {
 
 const static size_t COUNT_ADVANCED_BLOCKS = 8;
     
+NetworkBlockSource::AdvancedBlock::Key NetworkBlockSource::AdvancedBlock::key() const {
+    return Key(header.hash, header.number);
+}
+
+bool NetworkBlockSource::AdvancedBlock::Key::operator<(const Key &second) const {
+    return std::make_tuple(this->number, this->hash) < std::make_tuple(second.number, second.hash);
+}
+
 NetworkBlockSource::NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad) 
     : getterBlocks(maxAdvancedLoadBlocks, countBlocksInBatch, p2p, isCompress)
     , folderPath(folderPath)
@@ -25,7 +33,6 @@ NetworkBlockSource::NetworkBlockSource(const std::string &folderPath, size_t max
     , isVerifySign(isVerifySign)
     , isPreLoad(isPreLoad)
 {}
-
 
 void NetworkBlockSource::initialize() {
     createDirectories(folderPath);
@@ -36,6 +43,7 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
     
     advancedBlocks.clear();
     getterBlocks.clearAdvanced();
+    currentProcessedBlock = advancedBlocks.end();
     
     if (!isPreLoad) {
         const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
@@ -56,24 +64,25 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
 }
 
 bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
-    const bool isContinue = lastBlockInBlockchain >= nextBlockToRead;
+    const bool isContinue = currentProcessedBlock != advancedBlocks.end() || lastBlockInBlockchain >= nextBlockToRead;
     if (!isContinue) {
         return false;
     }
     
-    const auto processAdvanced = [&bi, &binaryDump, this](const AdvancedBlock &advanced) {
+    const auto processAdvanced = [&bi, &binaryDump, this](std::map<AdvancedBlock::Key, AdvancedBlock>::iterator &iter) {
+        const AdvancedBlock &advanced = iter->second;
         if (advanced.exception) {
             std::rethrow_exception(advanced.exception);
         }
         bi = advanced.bi;
         binaryDump = advanced.dump;
         
+        iter++;
         nextBlockToRead++;
     };
     
-    const auto foundBlock = advancedBlocks.find(nextBlockToRead);
-    if (foundBlock != advancedBlocks.end()) {
-        processAdvanced(foundBlock->second);
+    if (currentProcessedBlock != advancedBlocks.end()) {
+        processAdvanced(currentProcessedBlock);
         return true;
     }
     
@@ -91,41 +100,44 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
         } catch (...) {
             advanced.exception = std::current_exception();
         }
-        advancedBlocks[currBlock] = advanced;
+        CHECK(currBlock == advanced.header.number, "Incorrect data");
+        advancedBlocks.emplace(advanced.key(), advanced);
     }
     parallelFor(countAdvanced, advancedBlocks.begin(), advancedBlocks.end(), [this](auto &pair) {
-        if (pair.second.exception) {
+        AdvancedBlock &advanced = pair.second;
+        if (advanced.exception) {
             return;
         }
         try {
             BlockSignatureCheckResult signBlock;
             if (isVerifySign) {
-                signBlock = checkSignatureBlock(pair.second.dump);
-                pair.second.dump = signBlock.block;
+                signBlock = checkSignatureBlock(advanced.dump);
+                advanced.dump = signBlock.block;
             }
-            CHECK(pair.second.dump.size() == pair.second.header.blockSize, "binaryDump.size() == nextBlockHeader.blockSize");
-            const std::vector<unsigned char> hashBlockForRequest = fromHex(pair.second.header.hash);
-            parseNextBlockInfo(pair.second.dump.data(), pair.second.dump.data() + pair.second.dump.size(), 0, pair.second.bi, isValidate, saveAllTx, 0, 0);
-            std::visit([&hashBlockForRequest, &signBlock, &pair, this](auto &element) {
+            CHECK(advanced.dump.size() == advanced.header.blockSize, "binaryDump.size() == nextBlockHeader.blockSize");
+            const std::vector<unsigned char> hashBlockForRequest = fromHex(advanced.header.hash);
+            parseNextBlockInfo(advanced.dump.data(), advanced.dump.data() + advanced.dump.size(), 0, advanced.bi, isValidate, saveAllTx, 0, 0);
+            std::visit([&hashBlockForRequest, &signBlock, &advanced, this](auto &element) {
                 if constexpr (std::is_same_v<std::decay_t<decltype(element)>, BlockInfo>) {
                     CHECK(element.header.hash == hashBlockForRequest, "Incorrect block dump");
-                    element.saveFilePath(getBasename(pair.second.header.fileName));
+                    element.saveFilePath(getBasename(advanced.header.fileName));
                     
                     if (isVerifySign) {
                         element.saveSenderInfo(std::vector<unsigned char>(signBlock.sign.begin(), signBlock.sign.end()), std::vector<unsigned char>(signBlock.pubkey.begin(), signBlock.pubkey.end()), std::vector<unsigned char>(signBlock.address.begin(), signBlock.address.end()));
                     }
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(element)>, SignBlockInfo>) {
                     CHECK(element.header.hash == hashBlockForRequest, "Incorrect block dump");
-                    element.saveFilePath(getBasename(pair.second.header.fileName));
+                    element.saveFilePath(getBasename(advanced.header.fileName));
                 }
-            }, pair.second.bi);
+            }, advanced.bi);
         } catch (...) {
-            pair.second.exception = std::current_exception();
+            advanced.exception = std::current_exception();
         }
     });
     
-    CHECK(advancedBlocks.find(nextBlockToRead) != advancedBlocks.end(), "Incorrect results");
-    processAdvanced(advancedBlocks[nextBlockToRead]);
+    currentProcessedBlock = advancedBlocks.begin();
+    
+    processAdvanced(currentProcessedBlock);
     return true;
 }
 

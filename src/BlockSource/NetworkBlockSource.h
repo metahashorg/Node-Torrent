@@ -12,6 +12,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <set>
 
 namespace torrent_node_lib {
     
@@ -35,10 +36,24 @@ public:
 private:
     
     struct AdvancedBlock {
+        struct Key {
+            std::string hash;
+            size_t number;
+            
+            Key(const std::string &hash, size_t number)
+                : hash(hash)
+                , number(number)
+            {}
+            
+            bool operator<(const Key &second) const;
+        };
+        
         MinimumBlockHeader header;
         std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> bi;
         std::string dump;
         std::exception_ptr exception;
+        
+        Key key() const;
     };
     
 private:
@@ -61,7 +76,9 @@ private:
   
     const bool isPreLoad;
     
-    std::map<size_t, AdvancedBlock> advancedBlocks;
+    std::map<AdvancedBlock::Key, AdvancedBlock> advancedBlocks;
+    
+    std::map<AdvancedBlock::Key, AdvancedBlock>::iterator currentProcessedBlock;
     
 };
 
