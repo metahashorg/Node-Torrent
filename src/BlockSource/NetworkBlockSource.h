@@ -36,18 +36,27 @@ public:
 private:
     
     struct AdvancedBlock {
+        enum BlockPos {
+            BeforeBlock = 0,
+            Block = 1,
+            AfterBlock = 2
+        };
+        
         struct Key {
             std::string hash;
             size_t number;
+            BlockPos pos;
             
-            Key(const std::string &hash, size_t number)
+            Key(const std::string &hash, size_t number, BlockPos pos)
                 : hash(hash)
                 , number(number)
+                , pos(pos)
             {}
             
             bool operator<(const Key &second) const;
         };
         
+        BlockPos pos;
         MinimumBlockHeader header;
         std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> bi;
         std::string dump;

@@ -18,11 +18,11 @@ namespace torrent_node_lib {
 const static size_t COUNT_ADVANCED_BLOCKS = 8;
     
 NetworkBlockSource::AdvancedBlock::Key NetworkBlockSource::AdvancedBlock::key() const {
-    return Key(header.hash, header.number);
+    return Key(header.hash, header.number, pos);
 }
 
 bool NetworkBlockSource::AdvancedBlock::Key::operator<(const Key &second) const {
-    return std::make_tuple(this->number, this->hash) < std::make_tuple(second.number, second.hash);
+    return std::make_tuple(this->number, this->pos, this->hash) < std::make_tuple(second.number, pos, second.hash);
 }
 
 NetworkBlockSource::NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad) 
@@ -94,6 +94,7 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
     for (size_t i = 0; i < countAdvanced; i++) {
         const size_t currBlock = nextBlockToRead + i;
         AdvancedBlock advanced;
+        advanced.pos = AdvancedBlock::BlockPos::Block;
         try {
             advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers);
             advanced.dump = getterBlocks.getBlockDump(advanced.header.hash, advanced.header.blockSize, servers, isVerifySign);

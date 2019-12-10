@@ -310,4 +310,42 @@ std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, s
     return advancedLoadsBlocksDumps[blockHash];
 }
 
+void GetNewBlocksFromServer::loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign) {
+    const size_t countParts = (blocks.size() + countBlocksInBatch - 1) / countBlocksInBatch;
+    
+    const auto makeQsAndPost = [&blocks, isSign, countBlocksInBatch=this->countBlocksInBatch, isCompress=this->isCompress](size_t number) {
+        CHECK(blocks.size() > number * countBlocksInBatch, "Incorrect number");
+        const size_t beginBlock = number * countBlocksInBatch;
+        const size_t countBlocks = std::min(countBlocksInBatch, blocks.size() - beginBlock);
+        if (countBlocks == 1) {
+            return std::make_pair("", makeGetDumpBlockMessage(blocks[beginBlock].hash, isSign, isCompress));
+        } else {
+            std::vector<std::string> hashes;
+            hashes.reserve(countBlocks);
+            std::transform(blocks.begin() + beginBlock, blocks.begin() + beginBlock + countBlocks, std::back_inserter(hashes), std::mem_fn(&AdditingBlock::hash));
+            return std::make_pair("", makeGetDumpsBlocksMessage(hashes.begin(), hashes.end(), isSign, isCompress));
+        }
+    };
+    
+    const std::vector<std::string> responses = p2p.requests(countParts, makeQsAndPost, "", std::bind(parseDumpBlockResponse, true, isSign, isCompress, _1, _2, _3), hintsServers);
+    CHECK(responses.size() == countParts, "Incorrect responses");
+    
+    for (size_t i = 0; i < responses.size(); i++) {
+        const size_t beginBlock = i * countBlocksInBatch;
+        const size_t blocksInPart = std::min(countBlocksInBatch, blocks.size() - beginBlock);
+        
+        if (blocksInPart == 1) {
+            CHECK(beginBlock < blocks.size(), "Incorrect answer");
+            blocks[beginBlock].dump = parseDumpBlockBinary(responses[i], isCompress);
+        } else {
+            const std::vector<std::string> bs = parseDumpBlocksBinary(responses[i], isCompress);
+            CHECK(bs.size() == blocksInPart, "Incorrect answer");
+            CHECK(beginBlock + bs.size() <= blocks.size(), "Incorrect answer");
+            for (size_t j = 0; j < bs.size(); j++) {
+                blocks[beginBlock + j].dump = bs[j];
+            }
+        }
+    }
+}
+
 }

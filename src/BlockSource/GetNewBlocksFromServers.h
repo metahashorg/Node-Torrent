@@ -26,6 +26,19 @@ public:
         std::string blocksDumps;
     };
     
+    struct AdditingBlock {
+        enum Type {
+            BeforeBlock = 0,
+            AfterBlock = 1
+        };
+        
+        Type type;
+        size_t number = 0;
+        std::string hash;
+        
+        std::string dump;
+    };
+    
 public:
     
     static std::pair<std::string, std::string> makeRequestForDumpBlock(const std::string &blockHash, size_t fromByte, size_t toByte);
@@ -56,6 +69,8 @@ public:
     std::string getBlockDump(const std::string &blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const;
     
     std::string getBlockDumpWithoutAdvancedLoad(const std::string &blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const;
+    
+    void loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign);
     
     void clearAdvanced();
     
