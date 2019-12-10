@@ -13,7 +13,7 @@ public:
     struct LastBlockResponse {
         std::vector<std::string> servers;
         size_t lastBlock;
-        std::set<std::vector<unsigned char>> extraBlocks;
+        std::set<std::string> extraBlocks;
         std::optional<std::string> error;
     };
     
@@ -35,6 +35,14 @@ public:
         Type type;
         size_t number = 0;
         std::string hash;
+        std::string fileName;
+        
+        AdditingBlock(Type type, size_t number, const std::string &hash, const std::string &fileName)
+            : type(type)
+            , number(number)
+            , hash(hash)
+            , fileName(fileName)
+        {}
         
         std::string dump;
     };

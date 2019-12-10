@@ -24,7 +24,7 @@ GetNewBlocksFromServer::LastBlockResponse GetNewBlocksFromServer::getLastBlock()
     std::optional<size_t> lastBlock;
     std::string error;
     std::vector<std::string> serversSave;
-    std::set<std::vector<unsigned char>> extraBlocksSave;
+    std::set<std::string> extraBlocksSave;
     std::mutex mut;
     const BroadcastResult function = [&lastBlock, &error, &mut, &serversSave, &extraBlocksSave](const std::string &server, const std::string &result, const std::optional<CurlException> &curlException) {
         if (curlException.has_value()) {
@@ -129,9 +129,7 @@ void GetNewBlocksFromServer::addPreLoadBlocks(size_t fromBlock, const std::strin
         const std::vector<MinimumBlockHeader> blocksHeaders = parseBlocksHeader(blockHeadersStr);
         const std::vector<std::string> blocksDumps = parseDumpBlocksBinary(blockDumpsStr, isCompress);
         CHECK(blocksHeaders.size() == blocksDumps.size(), "Not equals count block headers and dumps");
-        
-        LOGINFO << "Ya tuta 0 " << blocksDumps.size();
-        
+               
         for (size_t j = 0; j < blocksHeaders.size(); j++) {
             CHECK(blocksHeaders[j].number == fromBlock + j, "Incorrect block number in answer: " + std::to_string(blocksHeaders[j].number) + " " + std::to_string(fromBlock + j));
             advancedLoadsBlocksHeaders.emplace_back(fromBlock + j, blocksHeaders[j]);
@@ -311,6 +309,10 @@ std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, s
 }
 
 void GetNewBlocksFromServer::loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign) {
+    if (blocks.empty()) {
+        return;
+    }
+    
     const size_t countParts = (blocks.size() + countBlocksInBatch - 1) / countBlocksInBatch;
     
     const auto makeQsAndPost = [&blocks, isSign, countBlocksInBatch=this->countBlocksInBatch, isCompress=this->isCompress](size_t number) {

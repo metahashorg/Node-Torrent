@@ -58,7 +58,7 @@ std::string makeGetDumpsBlocksMessage(std::vector<std::string>::const_iterator b
     return r;
 }
 
-std::pair<size_t, std::set<std::vector<unsigned char>>> parseCountBlocksMessage(const std::string &response) {
+std::pair<size_t, std::set<std::string>> parseCountBlocksMessage(const std::string &response) {
     rapidjson::Document doc;
     const rapidjson::ParseResult pr = doc.Parse(response.c_str());
     CHECK(pr, "rapidjson parse error. Data: " + response);
@@ -69,11 +69,11 @@ std::pair<size_t, std::set<std::vector<unsigned char>>> parseCountBlocksMessage(
     CHECK(resultJson.HasMember("count_blocks") && resultJson["count_blocks"].IsInt(), "count_blocks field not found");
     const size_t countBlocks = resultJson["count_blocks"].GetInt();
     
-    std::set<std::vector<unsigned char>> nextExtraBlocks;
+    std::set<std::string> nextExtraBlocks;
     if (resultJson.HasMember("next_extra_blocks") && resultJson["next_extra_blocks"].IsArray()) {
         for (const auto &extraBlockJson: resultJson["next_extra_blocks"].GetArray()) {
             const std::string extraBlock = get<std::string>(extraBlockJson);
-            nextExtraBlocks.emplace(fromHex(extraBlock));
+            nextExtraBlocks.emplace(extraBlock);
         }
     }
     
@@ -144,14 +144,14 @@ static MinimumBlockHeader parseBlockHeader(const rapidjson::Value &resultJson) {
     if (resultJson.HasMember("prev_extra_blocks") && resultJson["prev_extra_blocks"].IsArray()) {
         for (const auto &prevExtraBlockJson: resultJson["prev_extra_blocks"].GetArray()) {
             const std::string prevExtraBlock = get<std::string>(prevExtraBlockJson);
-            result.prevExtraBlocks.emplace(fromHex(prevExtraBlock));
+            result.prevExtraBlocks.emplace(prevExtraBlock);
         }
     }
     
     if (resultJson.HasMember("next_extra_blocks") && resultJson["next_extra_blocks"].IsArray()) {
-        for (const auto &prevExtraBlockJson: resultJson["next_extra_blocks"].GetArray()) {
-            const std::string prevExtraBlock = get<std::string>(prevExtraBlockJson);
-            result.prevExtraBlocks.emplace(fromHex(prevExtraBlock));
+        for (const auto &nextExtraBlockJson: resultJson["next_extra_blocks"].GetArray()) {
+            const std::string nextExtraBlock = get<std::string>(nextExtraBlockJson);
+            result.nextExtraBlocks.emplace(nextExtraBlock);
         }
     }
     

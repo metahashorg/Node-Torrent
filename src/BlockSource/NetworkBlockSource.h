@@ -17,11 +17,13 @@
 namespace torrent_node_lib {
     
 class P2P;
-   
+
+class BlocksTimeline;
+
 class NetworkBlockSource final: public BlockSource, common::no_copyable, common::no_moveable {
 public:
     
-    NetworkBlockSource(const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad);
+    NetworkBlockSource(const BlocksTimeline &timeline, const std::string &folderPath, size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, bool isCompress, P2P &p2p, bool saveAllTx, bool isValidate, bool isVerifySign, bool isPreLoad);
     
     void initialize() override;
     
@@ -67,6 +69,13 @@ private:
     
 private:
     
+    void processAdditingBlocks(std::vector<GetNewBlocksFromServer::AdditingBlock> &additingBlocks);
+    
+    void parseBlockInfo();
+    
+private:
+    const BlocksTimeline &timeline;
+    
     GetNewBlocksFromServer getterBlocks;
     
     const std::string folderPath;
@@ -88,6 +97,8 @@ private:
     std::map<AdvancedBlock::Key, AdvancedBlock> advancedBlocks;
     
     std::map<AdvancedBlock::Key, AdvancedBlock>::iterator currentProcessedBlock;
+    
+    std::string lastFileName;
     
 };
 
