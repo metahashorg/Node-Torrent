@@ -47,6 +47,9 @@ void BlocksTimeline::deserialize(const std::vector<std::pair<size_t, std::string
             signsParent.emplace(block.prevHash, iter);
         }
     }
+    
+    std::lock_guard<std::mutex> lock(mut);
+    initialized = true;
 }
 
 size_t BlocksTimeline::size() const {
@@ -93,6 +96,8 @@ std::pair<size_t, std::vector<char>> BlocksTimeline::addSignBlock(const SignBloc
 std::optional<MinimumSignBlockHeader> BlocksTimeline::findSignForBlock(const Hash &hash) const {
     std::lock_guard<std::mutex> lock(mut);
     
+    CHECK(initialized, "Not initialized");
+    
     const auto found = signsParent.find(hash);
     if (found == signsParent.end()) {
         return std::nullopt;
@@ -105,6 +110,8 @@ std::optional<MinimumSignBlockHeader> BlocksTimeline::findSignForBlock(const Has
 
 std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const std::optional<Hash> &firstBlock, const std::optional<Hash> &secondBlock) const {
     std::lock_guard<std::mutex> lock(mut);
+    
+    CHECK(initialized, "Not initialized");
     
     Iterator iterFirst = timeline.cbegin();
     if (firstBlock.has_value()) {
@@ -132,8 +139,10 @@ std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const s
     return result;
 }
 
-std::optional<MinimumSignBlockHeader> BlocksTimeline::findSignature(const Hash &hash) const {
+std::optional<MinimumSignBlockHeader> BlocksTimeline::findSignature(const Hash &hash) const {   
     std::lock_guard<std::mutex> lock(mut);
+    
+    CHECK(initialized, "Not initialized");
     
     const auto found = hashes.find(hash);
     if (found == hashes.end()) {

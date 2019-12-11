@@ -66,6 +66,8 @@ private:
     
     mutable std::mutex mut;
     
+    bool initialized = false;
+    
     List timeline;
     
     std::map<Hash, Iterator> hashes; // TODO переписать на unordered_map
