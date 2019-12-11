@@ -130,7 +130,6 @@ std::vector<std::string> GetNewBlocksFromServer::addPreLoadBlocks(size_t fromBlo
         const std::vector<MinimumBlockHeader> blocksHeaders = parseBlocksHeader(blockHeadersStr);
         const std::vector<std::string> additingBlocksHashes = parseAdditionalBlockHashes(additionalBlockHashsesStr);
         const std::vector<std::string> blocksDumps = parseDumpBlocksBinary(blockDumpsStr, isCompress);
-        CHECK(blocksHeaders.size() == blocksDumps.size(), "Not equals count block headers and dumps");
                
         for (size_t j = 0; j < blocksHeaders.size(); j++) {
             CHECK(blocksHeaders[j].number == fromBlock + j, "Incorrect block number in answer: " + std::to_string(blocksHeaders[j].number) + " " + std::to_string(fromBlock + j));
@@ -346,7 +345,9 @@ void GetNewBlocksFromServer::loadAdditingBlocks(std::vector<AdditingBlock> &bloc
         }
     }
     
-    loadBlockDumpsToCache(absentHashes, hintsServers, isSign);
+    if (!absentHashes.empty()) {
+        loadBlockDumpsToCache(absentHashes, hintsServers, isSign);
+    }
     
     for (AdditingBlock &block: blocks) {
         const std::string &hash = block.hash;

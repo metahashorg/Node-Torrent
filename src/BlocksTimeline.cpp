@@ -119,18 +119,22 @@ std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const s
     if (firstBlock.has_value()) {
         const auto found = hashes.find(firstBlock.value());
         CHECK(found != hashes.end(), "Block not found in timeline");
-        iterFirst = found->second;
+        iterFirst = std::next(found->second);
     } else {
         const auto found = hashes.find(secondBlock.value());
         CHECK(found != hashes.end(), "Block not found in timeline");
         Iterator iter = found->second;
-        while (iter != timeline.begin()) {
-            iter--;
-            if (std::holds_alternative<SimpleBlockElement>(*iter)) {
-                break;
+        if (iter == timeline.cbegin()) {
+            iterFirst = iter;
+        } else {
+            while (iter != timeline.cbegin()) {
+                iter--;
+                if (std::holds_alternative<SimpleBlockElement>(*iter)) {
+                    break;
+                }
             }
+            iterFirst = std::next(iter);
         }
-        iterFirst = std::next(iter);
     }
     
     Iterator iterSecond = timeline.cend();
@@ -142,18 +146,18 @@ std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const s
         const auto found = hashes.find(firstBlock.value());
         CHECK(found != hashes.end(), "Block not found in timeline");
         Iterator iter = found->second;
-        while (iter != timeline.end()) {
+        while (iter != timeline.cend()) {
             iter++;
             if (std::holds_alternative<SimpleBlockElement>(*iter)) {
                 break;
             }
         }
-        iterFirst = iter; // dont prev;
+        iterSecond = iter; // dont prev;
     }
     
     std::vector<MinimumSignBlockHeader> result;
     std::for_each(iterFirst, iterSecond, [&result](const Element &element) {
-        CHECK(std::holds_alternative<SignBlockElement>(element), "Incorrect block type");
+        CHECK(std::holds_alternative<SignBlockElement>(element), "Incorrect block type ") ;
         result.emplace_back(std::get<SignBlockElement>(element));
     });
     

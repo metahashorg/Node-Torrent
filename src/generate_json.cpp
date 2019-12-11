@@ -607,8 +607,6 @@ static std::string blockHashesToJson(const std::vector<std::vector<unsigned char
 }
 
 std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::vector<std::vector<unsigned char>>> &blockSignatures, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version) {
-    CHECK(bh.size() == blocks.size(), "Incorrect parameter blocks");
-    
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
     

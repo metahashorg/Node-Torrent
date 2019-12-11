@@ -133,6 +133,10 @@ std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool
 }
 
 std::vector<std::string> parseAdditionalBlockHashes(const std::string &response) {
+    if (response.empty()) {
+        return {};
+    }
+    
     rapidjson::Document doc;
     const rapidjson::ParseResult pr = doc.Parse(response.c_str());
     CHECK(pr, "rapidjson parse error. Data: " + response);

@@ -175,28 +175,14 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
     } else if (type == BlockTypeInfo::ForP2P) {
         std::vector<std::vector<unsigned char>> prevSignatures;
         if (bh.blockNumber.has_value()) {
-            std::vector<MinimumSignBlockHeader> blockSignatures;
-            if (bh.blockNumber.value() == 1) {
-                // empty
-            } else if (bh.blockNumber.value() > 1) {
-                const auto prevBhHash = sync.getBlockchain().getBlock(bh.blockNumber.value() - 1).hash;
-                blockSignatures = sync.getSignaturesBetween(prevBhHash, bh.hash);
-            } else {
-                blockSignatures = sync.getSignaturesBetween(std::nullopt, bh.hash);
-            }
+            const std::vector<MinimumSignBlockHeader> blockSignatures = sync.getSignaturesBetween(std::nullopt, bh.hash);
             CHECK(blockSignatures.size() <= 10, "Too many block signatures");
             std::transform(blockSignatures.begin(), blockSignatures.end(), std::back_inserter(prevSignatures), std::mem_fn(&MinimumSignBlockHeader::hash));
         }
         
         std::vector<std::vector<unsigned char>> nextSignatures;
         if (bh.blockNumber.has_value()) {
-            std::vector<MinimumSignBlockHeader> blockSignatures;
-            if (bh.blockNumber.value() < sync.getBlockchain().countBlocks()) {
-                const auto nextBhHash = sync.getBlockchain().getBlock(bh.blockNumber.value() + 1).hash;
-                blockSignatures = sync.getSignaturesBetween(bh.hash, nextBhHash);
-            } else {
-                blockSignatures = sync.getSignaturesBetween(bh.hash, std::nullopt);
-            }
+            const std::vector<MinimumSignBlockHeader> blockSignatures = sync.getSignaturesBetween(bh.hash, std::nullopt);
             CHECK(blockSignatures.size() <= 10, "Too many block signatures");
             std::transform(blockSignatures.begin(), blockSignatures.end(), std::back_inserter(nextSignatures), std::mem_fn(&MinimumSignBlockHeader::hash));
         }
@@ -221,30 +207,19 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
 static std::vector<std::vector<MinimumSignBlockHeader>> getBlocksSignaturesFull(const Sync &sync, const std::vector<BlockHeader> &bhs) {
     std::vector<std::vector<MinimumSignBlockHeader>> blockSignatures;
     
-    if (!bhs.empty()) {
-        std::optional<std::vector<unsigned char>> prevHash;
-        
+    if (!bhs.empty()) {       
         const BlockHeader &fst = bhs.front();
         CHECK(fst.blockNumber.value() != 0, "Incorrect block number");
-        if (fst.blockNumber.value() > 1) {
-            prevHash = sync.getBlockchain().getBlock(fst.blockNumber.value() - 1).hash;
-        }
         
         for (const BlockHeader &bh: bhs) {
-            const auto blockSigns = sync.getSignaturesBetween(prevHash, bh.hash);
+            const auto blockSigns = sync.getSignaturesBetween(std::nullopt, bh.hash);
             CHECK(blockSigns.size() <= 10, "Too many block signatures");
             blockSignatures.emplace_back(blockSigns);
-            
-            prevHash = bh.hash;
         }
         
         const BlockHeader bck = bhs.back();
-        std::optional<std::vector<unsigned char>> nextHash;
-        if (bck.blockNumber.value() < sync.getBlockchain().countBlocks()) {
-            nextHash = sync.getBlockchain().getBlock(bck.blockNumber.value() + 1).hash;
-        }
         
-        const auto blockSigns = sync.getSignaturesBetween(bck.hash, nextHash);
+        const auto blockSigns = sync.getSignaturesBetween(bck.hash, std::nullopt);
         CHECK(blockSigns.size() <= 10, "Too many block signatures");
         blockSignatures.emplace_back(blockSigns);
     }
@@ -649,8 +624,6 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const bool isSign = get<bool>(jsonParams, "isSign");
             const size_t preLoadBlocks = get<int>(jsonParams, "preLoad");
             const size_t maxBlockSize = get<int>(jsonParams, "maxBlockSize");
-            
-            CHECK(currentBlock != 0, "Incorrect current block");
             
             CHECK(preLoadBlocks <= MAX_PRELOAD_BLOCKS, "Incorrect preload parameter");
             
