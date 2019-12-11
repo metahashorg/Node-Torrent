@@ -55,7 +55,7 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
         lastBlockInBlockchain = lastBlock.lastBlock;
         servers = lastBlock.servers;
         
-        if (lastBlockInBlockchain < nextBlockToRead) {
+        if (lastBlockInBlockchain == nextBlockToRead - 1) {
             afterBlocksAdditings.cleared = false;
             afterBlocksAdditings.file = lastFileName;
             afterBlocksAdditings.blockNumber = lastBlockInBlockchain;
@@ -217,8 +217,12 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
     
     parseBlockInfo();
     
-    processAdvanced(bi, binaryDump, currentProcessedBlock);
-    return true;
+    if (currentProcessedBlock != advancedBlocks.end()) {
+        processAdvanced(bi, binaryDump, currentProcessedBlock);
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void NetworkBlockSource::getExistingBlock(const BlockHeader& bh, BlockInfo& bi, std::string &blockDump) const {
