@@ -78,9 +78,13 @@ public:
     
     std::string getBlockDumpWithoutAdvancedLoad(const std::string &blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const;
     
-    void loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign);
+    void loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign) const;
     
     void clearAdvanced();
+    
+private:
+    
+    void loadBlockDumpsToCache(const std::vector<std::string> &blocksHashs, const std::vector<std::string> &hintsServers, bool isSign) const;
     
 private:
     

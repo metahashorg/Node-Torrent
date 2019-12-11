@@ -249,27 +249,7 @@ std::string GetNewBlocksFromServer::getBlockDumpWithoutAdvancedLoad(const std::s
     }
 }
 
-std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const {
-    const auto foundDump = advancedLoadsBlocksDumps.find(blockHash);
-    if (foundDump != advancedLoadsBlocksDumps.end()) {
-        return foundDump->second;
-    }
-       
-    if (blockSize > MAX_BLOCK_SIZE_WITHOUT_ADVANCE) {
-        return getBlockDumpWithoutAdvancedLoad(blockHash, blockSize, hintsServers, isSign);
-    }
-    
-    advancedLoadsBlocksDumps.clear();
-    
-    const auto foundHeader = std::find_if(advancedLoadsBlocksHeaders.begin(), advancedLoadsBlocksHeaders.end(), [&blockHash](const auto &pair) {
-        return pair.second.hash == blockHash;
-    });
-   
-    std::vector<std::string> blocksHashs;
-    for (auto iterHeader = foundHeader ; iterHeader != advancedLoadsBlocksHeaders.end() && iterHeader->second.blockSize <= MAX_BLOCK_SIZE_WITHOUT_ADVANCE; iterHeader++) {
-        blocksHashs.emplace_back(iterHeader->second.hash);
-    }
-    
+void GetNewBlocksFromServer::loadBlockDumpsToCache(const std::vector<std::string> &blocksHashs, const std::vector<std::string> &hintsServers, bool isSign) const {
     CHECK(!blocksHashs.empty(), "advanced blocks not loaded");
     
     const size_t countParts = (blocksHashs.size() + countBlocksInBatch - 1) / countBlocksInBatch;
@@ -304,49 +284,53 @@ std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, s
             }
         }
     }
+}
+
+std::string GetNewBlocksFromServer::getBlockDump(const std::string& blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const {
+    const auto foundDump = advancedLoadsBlocksDumps.find(blockHash);
+    if (foundDump != advancedLoadsBlocksDumps.end()) {
+        return foundDump->second;
+    }
+       
+    if (blockSize > MAX_BLOCK_SIZE_WITHOUT_ADVANCE) {
+        return getBlockDumpWithoutAdvancedLoad(blockHash, blockSize, hintsServers, isSign);
+    }
+    
+    const auto foundHeader = std::find_if(advancedLoadsBlocksHeaders.begin(), advancedLoadsBlocksHeaders.end(), [&blockHash](const auto &pair) {
+        return pair.second.hash == blockHash;
+    });
+   
+    std::vector<std::string> blocksHashs;
+    for (auto iterHeader = foundHeader ; iterHeader != advancedLoadsBlocksHeaders.end() && iterHeader->second.blockSize <= MAX_BLOCK_SIZE_WITHOUT_ADVANCE; iterHeader++) {
+        blocksHashs.emplace_back(iterHeader->second.hash);
+    }
+    
+    loadBlockDumpsToCache(blocksHashs, hintsServers, isSign);
     
     return advancedLoadsBlocksDumps[blockHash];
 }
 
-void GetNewBlocksFromServer::loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign) {
+void GetNewBlocksFromServer::loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign) const {
     if (blocks.empty()) {
         return;
     }
     
-    const size_t countParts = (blocks.size() + countBlocksInBatch - 1) / countBlocksInBatch;
-    
-    const auto makeQsAndPost = [&blocks, isSign, countBlocksInBatch=this->countBlocksInBatch, isCompress=this->isCompress](size_t number) {
-        CHECK(blocks.size() > number * countBlocksInBatch, "Incorrect number");
-        const size_t beginBlock = number * countBlocksInBatch;
-        const size_t countBlocks = std::min(countBlocksInBatch, blocks.size() - beginBlock);
-        if (countBlocks == 1) {
-            return std::make_pair("", makeGetDumpBlockMessage(blocks[beginBlock].hash, isSign, isCompress));
-        } else {
-            std::vector<std::string> hashes;
-            hashes.reserve(countBlocks);
-            std::transform(blocks.begin() + beginBlock, blocks.begin() + beginBlock + countBlocks, std::back_inserter(hashes), std::mem_fn(&AdditingBlock::hash));
-            return std::make_pair("", makeGetDumpsBlocksMessage(hashes.begin(), hashes.end(), isSign, isCompress));
+    std::vector<std::string> absentHashes;
+    for (const AdditingBlock &block: blocks) {
+        const std::string &hash = block.hash;
+        const auto found = advancedLoadsBlocksDumps.find(hash);
+        if (found == advancedLoadsBlocksDumps.end()) {
+            absentHashes.emplace_back(hash);
         }
-    };
+    }
     
-    const std::vector<std::string> responses = p2p.requests(countParts, makeQsAndPost, "", std::bind(parseDumpBlockResponse, true, isSign, isCompress, _1, _2, _3), hintsServers);
-    CHECK(responses.size() == countParts, "Incorrect responses");
+    loadBlockDumpsToCache(absentHashes, hintsServers, isSign);
     
-    for (size_t i = 0; i < responses.size(); i++) {
-        const size_t beginBlock = i * countBlocksInBatch;
-        const size_t blocksInPart = std::min(countBlocksInBatch, blocks.size() - beginBlock);
-        
-        if (blocksInPart == 1) {
-            CHECK(beginBlock < blocks.size(), "Incorrect answer");
-            blocks[beginBlock].dump = parseDumpBlockBinary(responses[i], isCompress);
-        } else {
-            const std::vector<std::string> bs = parseDumpBlocksBinary(responses[i], isCompress);
-            CHECK(bs.size() == blocksInPart, "Incorrect answer");
-            CHECK(beginBlock + bs.size() <= blocks.size(), "Incorrect answer");
-            for (size_t j = 0; j < bs.size(); j++) {
-                blocks[beginBlock + j].dump = bs[j];
-            }
-        }
+    for (AdditingBlock &block: blocks) {
+        const std::string &hash = block.hash;
+        const auto found = advancedLoadsBlocksDumps.find(hash);
+        CHECK(found != advancedLoadsBlocksDumps.end(), "Not found block " + block.hash);
+        block.dump = found->second;
     }
 }
 
