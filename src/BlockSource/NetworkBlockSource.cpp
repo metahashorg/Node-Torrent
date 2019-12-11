@@ -47,6 +47,7 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
     advancedBlocks.clear();
     getterBlocks.clearAdvanced();
     currentProcessedBlock = advancedBlocks.end();
+    afterBlocksAdditings.clear();
     
     if (!isPreLoad) {
         const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
@@ -55,15 +56,10 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
         servers = lastBlock.servers;
         
         if (lastBlockInBlockchain < nextBlockToRead) {
-            std::vector<GetNewBlocksFromServer::AdditingBlock> additingBlocks;
-            for (const std::string &extraBlockHash: lastBlock.extraBlocks) {
-                additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::AfterBlock, lastBlockInBlockchain, extraBlockHash, lastFileName);
-            }
-            processAdditingBlocks(additingBlocks);
-            
-            parseBlockInfo();
-            
-            return std::make_pair(!advancedBlocks.empty(), lastBlockInBlockchain);
+            afterBlocksAdditings.cleared = false;
+            afterBlocksAdditings.file = lastFileName;
+            afterBlocksAdditings.blockNumber = lastBlockInBlockchain;
+            afterBlocksAdditings.hashes.assign(lastBlock.extraBlocks.begin(), lastBlock.extraBlocks.end());
         }
     } else {
         const GetNewBlocksFromServer::LastBlockPreLoadResponse lastBlock = getterBlocks.preLoadBlocks(countBlocks, isVerifySign);
@@ -75,7 +71,7 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
         getterBlocks.addPreLoadBlocks(nextBlockToRead, lastBlock.blockHeaders, lastBlock.blocksDumps);
     }
     
-    return std::make_pair(lastBlockInBlockchain >= nextBlockToRead, lastBlockInBlockchain);
+    return std::make_pair(!afterBlocksAdditings.isClear() || lastBlockInBlockchain >= nextBlockToRead, lastBlockInBlockchain);
 }
 
 void NetworkBlockSource::processAdditingBlocks(std::vector<GetNewBlocksFromServer::AdditingBlock> &additingBlocks) {
@@ -148,11 +144,11 @@ void NetworkBlockSource::parseBlockInfo() {
 }
 
 bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
-    const bool isContinue = currentProcessedBlock != advancedBlocks.end() || lastBlockInBlockchain >= nextBlockToRead;
+    const bool isContinue = currentProcessedBlock != advancedBlocks.end() || !afterBlocksAdditings.isClear() || lastBlockInBlockchain >= nextBlockToRead;
     if (!isContinue) {
         return false;
     }
-    
+        
     const auto processAdvanced = [this](std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump, std::map<AdvancedBlock::Key, AdvancedBlock>::iterator &iter) {
         const AdvancedBlock &advanced = iter->second;
         if (advanced.exception) {
@@ -176,34 +172,47 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
         return true;
     }
     
-    advancedBlocks.clear();
-    
-    const size_t countAdvanced = std::min(COUNT_ADVANCED_BLOCKS, lastBlockInBlockchain - nextBlockToRead + 1);
-    
-    CHECK(!servers.empty(), "Servers empty");
-    for (size_t i = 0; i < countAdvanced; i++) {
-        const size_t currBlock = nextBlockToRead + i;
-        AdvancedBlock advanced;
-        advanced.pos = AdvancedBlock::BlockPos::Block;
-        try {
-            advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers);
-            advanced.dump = getterBlocks.getBlockDump(advanced.header.hash, advanced.header.blockSize, servers, isVerifySign);
-        } catch (...) {
-            advanced.exception = std::current_exception();
-        }
-        CHECK(currBlock == advanced.header.number, "Incorrect data");
-        advancedBlocks.emplace(advanced.key(), advanced);
-    }
-    
     std::vector<GetNewBlocksFromServer::AdditingBlock> additingBlocks;
-    for (const auto &[key, advanced]: advancedBlocks) {
-        for (const std::string &blockHash: advanced.header.prevExtraBlocks) {
-            additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::BeforeBlock, advanced.header.number, blockHash, advanced.header.fileName);
+    if (afterBlocksAdditings.isClear()) {
+        CHECK(lastBlockInBlockchain >= nextBlockToRead, "New blocks absent");
+        
+        advancedBlocks.clear();
+        
+        const size_t countAdvanced = std::min(COUNT_ADVANCED_BLOCKS, lastBlockInBlockchain - nextBlockToRead + 1);
+        
+        CHECK(!servers.empty(), "Servers empty");
+        for (size_t i = 0; i < countAdvanced; i++) {
+            const size_t currBlock = nextBlockToRead + i;
+            AdvancedBlock advanced;
+            advanced.pos = AdvancedBlock::BlockPos::Block;
+            try {
+                advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers);
+                advanced.dump = getterBlocks.getBlockDump(advanced.header.hash, advanced.header.blockSize, servers, isVerifySign);
+            } catch (...) {
+                advanced.exception = std::current_exception();
+            }
+            CHECK(currBlock == advanced.header.number, "Incorrect data");
+            advancedBlocks.emplace(advanced.key(), advanced);
         }
-        for (const std::string &blockHash: advanced.header.nextExtraBlocks) {
-            additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::AfterBlock, advanced.header.number, blockHash, advanced.header.fileName);
+        
+        for (const auto &[key, advanced]: advancedBlocks) {
+            for (const std::string &blockHash: advanced.header.prevExtraBlocks) {
+                additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::BeforeBlock, advanced.header.number, blockHash, advanced.header.fileName);
+            }
+            for (const std::string &blockHash: advanced.header.nextExtraBlocks) {
+                additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::AfterBlock, advanced.header.number, blockHash, advanced.header.fileName);
+            }
         }
+    } else {
+        CHECK(advancedBlocks.empty(), "Incorrect advanced blocks");
+        
+        for (const std::string &hash: afterBlocksAdditings.hashes) {
+            additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::AfterBlock, afterBlocksAdditings.blockNumber, hash, afterBlocksAdditings.file);
+        }
+            
+        afterBlocksAdditings.clear();
     }
+    
     processAdditingBlocks(additingBlocks);
     
     parseBlockInfo();

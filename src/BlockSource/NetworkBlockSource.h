@@ -67,6 +67,22 @@ private:
         Key key() const;
     };
     
+    struct AfterBlocksAdditings {
+        bool cleared = true;
+        
+        size_t blockNumber;
+        std::string file; 
+        std::vector<std::string> hashes;
+        
+        bool isClear() const {
+            return cleared;
+        }
+        
+        void clear() {
+            cleared = true;
+        }
+    };
+    
 private:
     
     void processAdditingBlocks(std::vector<GetNewBlocksFromServer::AdditingBlock> &additingBlocks);
@@ -97,6 +113,8 @@ private:
     std::map<AdvancedBlock::Key, AdvancedBlock> advancedBlocks;
     
     std::map<AdvancedBlock::Key, AdvancedBlock>::iterator currentProcessedBlock;
+    
+    AfterBlocksAdditings afterBlocksAdditings;
     
     std::string lastFileName;
     
