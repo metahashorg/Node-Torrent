@@ -41,7 +41,7 @@ void NetworkBlockSource::initialize() {
     createDirectories(folderPath);
 }
 
-std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
+size_t NetworkBlockSource::doProcess(size_t countBlocks) {
     nextBlockToRead = countBlocks + 1;
     
     advancedBlocks.clear();
@@ -71,7 +71,7 @@ std::pair<bool, size_t> NetworkBlockSource::doProcess(size_t countBlocks) {
         getterBlocks.addPreLoadBlocks(nextBlockToRead, lastBlock.blockHeaders, lastBlock.blocksDumps);
     }
     
-    return std::make_pair(!afterBlocksAdditings.isClear() || lastBlockInBlockchain >= nextBlockToRead, lastBlockInBlockchain);
+    return lastBlockInBlockchain;
 }
 
 void NetworkBlockSource::processAdditingBlocks(std::vector<GetNewBlocksFromServer::AdditingBlock> &additingBlocks) {

@@ -27,7 +27,7 @@ public:
     
     void initialize() override;
     
-    std::pair<bool, size_t> doProcess(size_t countBlocks) override;
+    size_t doProcess(size_t countBlocks) override;
     
     bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) override;
     

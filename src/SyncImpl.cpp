@@ -278,15 +278,14 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
     while (true) {
         const time_point beginWhileTime = ::now();
         try {
-            auto [isContinue, knownLstBlk] = getBlockAlgorithm->doProcess(blockchain.countBlocks());
-            knownLastBlock = knownLstBlk;
-            while (isContinue) {
+            knownLastBlock = getBlockAlgorithm->doProcess(blockchain.countBlocks());
+            while (true) {
                 Timer tt;
                 
                 std::shared_ptr<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>> nextBi = std::make_shared<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>>();
                                
                 std::shared_ptr<std::string> nextBlockDump = std::make_shared<std::string>();
-                isContinue = getBlockAlgorithm->process(*nextBi, *nextBlockDump);
+                const bool isContinue = getBlockAlgorithm->process(*nextBi, *nextBlockDump);
                 if (!isContinue) {
                     break;
                 }
