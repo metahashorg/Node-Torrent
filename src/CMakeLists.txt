@@ -34,6 +34,7 @@ set(COMMON_LIBRARY_HEADERS
     Thread.h
     logger/easylogging++.h
     logger/inc.h
+    curlWrapper.h
 )
 
 set(COMMON_LIBRARY_DIR
