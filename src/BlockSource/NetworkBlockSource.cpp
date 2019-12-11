@@ -68,7 +68,13 @@ size_t NetworkBlockSource::doProcess(size_t countBlocks) {
         lastBlockInBlockchain = lastBlock.lastBlock.value();
         servers = lastBlock.servers;
         
-        getterBlocks.addPreLoadBlocks(nextBlockToRead, lastBlock.blockHeaders, lastBlock.blocksDumps);
+        const auto additionalBlocksHashes = getterBlocks.addPreLoadBlocks(nextBlockToRead, lastBlock.blockHeaders, lastBlock.additionalBlockHashes, lastBlock.blocksDumps);
+        if (lastBlockInBlockchain == nextBlockToRead - 1) {
+            afterBlocksAdditings.cleared = false;
+            afterBlocksAdditings.file = lastFileName;
+            afterBlocksAdditings.blockNumber = lastBlockInBlockchain;
+            afterBlocksAdditings.hashes.assign(additionalBlocksHashes.begin(), additionalBlocksHashes.end());
+        }
     }
     
     return lastBlockInBlockchain;

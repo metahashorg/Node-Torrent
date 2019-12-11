@@ -13,6 +13,7 @@ struct MinimumBlockHeader;
 struct PreloadBlocksResponse {
     size_t countBlocks = 0;
     std::string blockHeaders;
+    std::string additingBlocksHashes;
     std::string blockDumps;
     
     std::optional<std::string> error;
@@ -39,6 +40,8 @@ PreloadBlocksResponse parsePreloadBlocksMessage(const std::string &response);
 std::string parseDumpBlockBinary(const std::string &response, bool isCompress);
 
 std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool isCompress);
+
+std::vector<std::string> parseAdditionalBlockHashes(const std::string &response);
 
 torrent_node_lib::MinimumBlockHeader parseBlockHeader(const std::string &response);
 

@@ -78,7 +78,7 @@ std::string genCountBlockJson(const RequestId &requestId, size_t countBlocks, bo
 
 std::string genCountBlockForP2PJson(const RequestId &requestId, size_t countBlocks, const std::vector<std::vector<unsigned char>> &signaturesBlocks, bool isFormat, const JsonVersion &version);
 
-std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version);
+std::string preLoadBlocksJson(const RequestId &requestId, size_t countBlocks, const std::vector<torrent_node_lib::BlockHeader> &bh, const std::vector<std::vector<std::vector<unsigned char>>> &blockSignatures, const std::vector<std::string> &blocks, bool isCompress, const JsonVersion &version);
 
 std::string genBlockDumpJson(const RequestId &requestId, const std::string &blockDump, bool isFormat);
 

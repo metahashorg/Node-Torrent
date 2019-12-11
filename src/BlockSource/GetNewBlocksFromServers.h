@@ -23,6 +23,7 @@ public:
         std::optional<std::string> error;
         
         std::string blockHeaders;
+        std::string additionalBlockHashes;
         std::string blocksDumps;
     };
     
@@ -65,10 +66,10 @@ public:
     {}
         
     LastBlockResponse getLastBlock() const;
-        
+
     LastBlockPreLoadResponse preLoadBlocks(size_t currentBlock, bool isSign) const;
     
-    void addPreLoadBlocks(size_t fromBlock, const std::string &blockHeadersStr, const std::string &blockDumpsStr);
+    std::vector<std::string> addPreLoadBlocks(size_t fromBlock, const std::string &blockHeadersStr, const std::string &additionalBlockHashsesStr, const std::string &blockDumpsStr);
     
     MinimumBlockHeader getBlockHeader(size_t blockNum, size_t maxBlockNum, const std::vector<std::string> &servers);
     

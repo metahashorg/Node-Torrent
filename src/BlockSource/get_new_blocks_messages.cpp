@@ -96,12 +96,16 @@ PreloadBlocksResponse parsePreloadBlocksMessage(const std::string &response) {
     
     size_t pos = 0;
     const size_t sizeHeaders = deserializeInt<size_t>(response, pos);
+    const size_t sizeAdditingBlocksHashes = deserializeInt<size_t>(response, pos);
     const size_t sizeBlocks = deserializeInt<size_t>(response, pos);
     result.countBlocks = deserializeInt<size_t>(response, pos);
     
     CHECK(pos + sizeHeaders <= response.size(), "Incorrect response");
     result.blockHeaders = response.substr(pos, sizeHeaders);
     pos += sizeHeaders;
+    CHECK(pos + sizeAdditingBlocksHashes <= response.size(), "Incorrect response");
+    result.additingBlocksHashes = response.substr(pos, sizeAdditingBlocksHashes);
+    pos += sizeAdditingBlocksHashes;
     CHECK(pos + sizeBlocks <= response.size(), "Incorrect response");
     result.blockDumps = response.substr(pos, sizeBlocks);
     pos += sizeBlocks;
@@ -126,6 +130,22 @@ std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool
         res.emplace_back(deserializeStringBigEndian(r, from));
     }
     return res;
+}
+
+std::vector<std::string> parseAdditionalBlockHashes(const std::string &response) {
+    rapidjson::Document doc;
+    const rapidjson::ParseResult pr = doc.Parse(response.c_str());
+    CHECK(pr, "rapidjson parse error. Data: " + response);
+    
+    std::vector<std::string> result;
+    
+    CHECK(!doc.HasMember("error") || doc["error"].IsNull(), jsonToString(doc["error"], false));
+    const auto &jsonArray = get<JsonArray>(doc, "result");
+    for (const auto &hashJson: jsonArray) {
+        result.emplace_back(get<std::string>(hashJson));
+    }
+    
+    return result;
 }
 
 static MinimumBlockHeader parseBlockHeader(const rapidjson::Value &resultJson) {    

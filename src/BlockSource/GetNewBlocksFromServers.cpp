@@ -101,6 +101,7 @@ GetNewBlocksFromServer::LastBlockPreLoadResponse GetNewBlocksFromServer::preLoad
                 answer.servers.emplace_back(server);
                 
                 answer.blockHeaders = response.blockHeaders;
+                answer.additionalBlockHashes = response.additingBlocksHashes;
                 answer.blocksDumps = response.blockDumps;
             } else if (answer.lastBlock == response.countBlocks) {
                 answer.servers.emplace_back(server);
@@ -124,9 +125,10 @@ void GetNewBlocksFromServer::clearAdvanced() {
     advancedLoadsBlocksDumps.clear();
 }
 
-void GetNewBlocksFromServer::addPreLoadBlocks(size_t fromBlock, const std::string &blockHeadersStr, const std::string &blockDumpsStr) {
+std::vector<std::string> GetNewBlocksFromServer::addPreLoadBlocks(size_t fromBlock, const std::string &blockHeadersStr, const std::string &additionalBlockHashsesStr, const std::string &blockDumpsStr) {
     try {
         const std::vector<MinimumBlockHeader> blocksHeaders = parseBlocksHeader(blockHeadersStr);
+        const std::vector<std::string> additingBlocksHashes = parseAdditionalBlockHashes(additionalBlockHashsesStr);
         const std::vector<std::string> blocksDumps = parseDumpBlocksBinary(blockDumpsStr, isCompress);
         CHECK(blocksHeaders.size() == blocksDumps.size(), "Not equals count block headers and dumps");
                
@@ -136,8 +138,28 @@ void GetNewBlocksFromServer::addPreLoadBlocks(size_t fromBlock, const std::strin
             
             advancedLoadsBlocksDumps[blocksHeaders[j].hash] = blocksDumps[j];
         }
+        
+        size_t i = blocksHeaders.size();
+        for (const MinimumBlockHeader &header: blocksHeaders) {
+            for (const std::string &hash: header.prevExtraBlocks) {
+                CHECK(i < blocksDumps.size(), "Incorrect index");
+                advancedLoadsBlocksDumps[hash] = blocksDumps[i];
+                i++;
+            }
+        }
+        
+        for (const std::string &hash: additingBlocksHashes) {
+            CHECK(i < blocksDumps.size(), "Incorrect index");
+            advancedLoadsBlocksDumps[hash] = blocksDumps[i];
+            i++;
+        }
+        
+        CHECK(i == blocksDumps.size(), "Incorrect blocks dumps array");
+        
+        return additingBlocksHashes;
     } catch (const exception &e) {
         LOGWARN << "Dont added preload blocks " << e;
+        return {};
     }
 }
 

@@ -218,6 +218,59 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
     }
 }
 
+static std::vector<std::vector<MinimumSignBlockHeader>> getBlocksSignaturesFull(const Sync &sync, const std::vector<BlockHeader> &bhs) {
+    std::vector<std::vector<MinimumSignBlockHeader>> blockSignatures;
+    
+    if (!bhs.empty()) {
+        std::optional<std::vector<unsigned char>> prevHash;
+        
+        const BlockHeader &fst = bhs.front();
+        CHECK(fst.blockNumber.value() != 0, "Incorrect block number");
+        if (fst.blockNumber.value() > 1) {
+            prevHash = sync.getBlockchain().getBlock(fst.blockNumber.value() - 1).hash;
+        }
+        
+        for (const BlockHeader &bh: bhs) {
+            const auto blockSigns = sync.getSignaturesBetween(prevHash, bh.hash);
+            CHECK(blockSigns.size() <= 10, "Too many block signatures");
+            blockSignatures.emplace_back(blockSigns);
+            
+            prevHash = bh.hash;
+        }
+        
+        const BlockHeader bck = bhs.back();
+        std::optional<std::vector<unsigned char>> nextHash;
+        if (bck.blockNumber.value() < sync.getBlockchain().countBlocks()) {
+            nextHash = sync.getBlockchain().getBlock(bck.blockNumber.value() + 1).hash;
+        }
+        
+        const auto blockSigns = sync.getSignaturesBetween(bck.hash, nextHash);
+        CHECK(blockSigns.size() <= 10, "Too many block signatures");
+        blockSignatures.emplace_back(blockSigns);
+    }
+    
+    return blockSignatures;
+}
+
+static std::vector<std::vector<std::vector<unsigned char>>> blockSignaturesConvert(const std::vector<std::vector<MinimumSignBlockHeader>> &blockSignatures) {
+    std::vector<std::vector<std::vector<unsigned char>>> result;
+    result.reserve(blockSignatures.size());
+    
+    std::transform(blockSignatures.begin(), blockSignatures.end(), std::back_inserter(result), [](const std::vector<MinimumSignBlockHeader> &elements) {
+        std::vector<std::vector<unsigned char>> res;
+        res.reserve(elements.size());
+        std::transform(elements.begin(), elements.end(), std::back_inserter(res), std::mem_fn(&MinimumSignBlockHeader::hash));
+        
+        return res;
+    });
+    
+    return result;
+}
+
+static std::vector<std::vector<std::vector<unsigned char>>> getBlocksSignatures(const Sync &sync, const std::vector<BlockHeader> &bhs) {
+    return blockSignaturesConvert(getBlocksSignaturesFull(sync, bhs));
+}
+
 static std::string getBlocks(const RequestId &requestId, const rapidjson::Document &doc, const Sync &sync, bool isFormat, const JsonVersion &version) {
     const auto &jsonParams = get<JsonObject>(doc, "params");
     
@@ -279,39 +332,7 @@ static std::string getBlocks(const RequestId &requestId, const rapidjson::Docume
     } else {
         CHECK_USER(isForward, "Incorrect direction for p2p");
         
-        std::vector<std::vector<std::vector<unsigned char>>> blockSignatures;
-        
-        if (!bhs.empty()) {
-            std::optional<std::vector<unsigned char>> prevHash;
-            
-            const BlockHeader &fst = bhs.front();
-            CHECK(fst.blockNumber.value() != 0, "Incorrect block number");
-            if (fst.blockNumber.value() > 1) {
-                prevHash = sync.getBlockchain().getBlock(fst.blockNumber.value() - 1).hash;
-            }
-            
-            for (const BlockHeader &bh: bhs) {
-                const auto blockSigns = sync.getSignaturesBetween(prevHash, bh.hash);
-                CHECK(blockSigns.size() <= 10, "Too many block signatures");
-                std::vector<std::vector<unsigned char>> bs;
-                std::transform(blockSigns.begin(), blockSigns.end(), std::back_inserter(bs), std::mem_fn(&MinimumSignBlockHeader::hash));
-                blockSignatures.emplace_back(bs);
-                
-                prevHash = bh.hash;
-            }
-            
-            const BlockHeader bck = bhs.back();
-            std::optional<std::vector<unsigned char>> nextHash;
-            if (bck.blockNumber.value() < sync.getBlockchain().countBlocks()) {
-                nextHash = sync.getBlockchain().getBlock(bck.blockNumber.value() + 1).hash;
-            }
-            
-            const auto blockSigns = sync.getSignaturesBetween(bck.hash, nextHash);
-            CHECK(blockSigns.size() <= 10, "Too many block signatures");
-            std::vector<std::vector<unsigned char>> bs;
-            std::transform(blockSigns.begin(), blockSigns.end(), std::back_inserter(bs), std::mem_fn(&MinimumSignBlockHeader::hash));
-            blockSignatures.emplace_back(bs);
-        }
+        const std::vector<std::vector<std::vector<unsigned char>>> blockSignatures = getBlocksSignatures(sync, bhs);
         
         return blockHeadersToP2PJson(requestId, bhs, blockSignatures, isFormat, version);
     }
@@ -629,11 +650,13 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const size_t preLoadBlocks = get<int>(jsonParams, "preLoad");
             const size_t maxBlockSize = get<int>(jsonParams, "maxBlockSize");
             
+            CHECK(currentBlock != 0, "Incorrect current block");
+            
             CHECK(preLoadBlocks <= MAX_PRELOAD_BLOCKS, "Incorrect preload parameter");
             
             const size_t countBlocks = sync.getBlockchain().countBlocks();
             
-            std::vector<torrent_node_lib::BlockHeader> bhs;
+            std::vector<BlockHeader> bhs;
             std::vector<std::string> blocks;
             if (countBlocks <= currentBlock + preLoadBlocks + MAX_PRELOAD_BLOCKS / 2) {
                 for (size_t i = currentBlock + 1; i < std::min(currentBlock + 1 + preLoadBlocks, countBlocks + 1); i++) {
@@ -648,7 +671,29 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
                 }
             }
             
-            response = preLoadBlocksJson(requestId, countBlocks, bhs, blocks, isCompress, jsonVersion);
+            std::vector<std::vector<std::vector<unsigned char>>> blockSignaturesHashes;
+            if (!bhs.empty()) {
+                const std::vector<std::vector<MinimumSignBlockHeader>> blockSignatures = getBlocksSignaturesFull(sync, bhs);
+                blockSignaturesHashes = blockSignaturesConvert(blockSignatures);
+                
+                for (const auto &elements: blockSignatures) {
+                    for (const MinimumSignBlockHeader &element: elements) {
+                        blocks.emplace_back(sync.getBlockDump(CommonMimimumBlockHeader(element.hash, element.filePos), 0, std::numeric_limits<size_t>::max(), false, isSign));
+                    }
+                }
+            } else {
+                if (countBlocks == currentBlock) {
+                    const BlockHeader &b = sync.getBlockchain().getBlock(countBlocks);
+                    const std::vector<MinimumSignBlockHeader> signatures = sync.getSignaturesBetween(b.hash, std::nullopt);
+                    for (const MinimumSignBlockHeader &element: signatures) {
+                        blocks.emplace_back(sync.getBlockDump(CommonMimimumBlockHeader(element.hash, element.filePos), 0, std::numeric_limits<size_t>::max(), false, isSign));
+                    }
+                    
+                    blockSignaturesHashes = blockSignaturesConvert({signatures});
+                }
+            }
+            
+            response = preLoadBlocksJson(requestId, countBlocks, bhs, blockSignaturesHashes, blocks, isCompress, jsonVersion);
         } else if (func == GET_ADDRESS_DELEGATIONS) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             
