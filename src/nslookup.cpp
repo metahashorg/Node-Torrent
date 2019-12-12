@@ -171,11 +171,15 @@ NsResult getBestIp(const std::string &address, const char* print) {
     std::vector<NsResult> pr;
     for (const std::string &r: result) {
         const std::string serv = scheme + r + ((port != 0) ? (":" + std::to_string(port)) : "");
-        common::Timer tt;
         try {
-            request(serv, "", "", "");
+            common::Timer tt;
+            const std::string response = request(serv + "/status", "", "", "");
             tt.stop();
-            pr.emplace_back(serv, tt.countMs());
+            if (response.empty()) {
+                pr.emplace_back(serv, milliseconds(999s).count());
+            } else {
+                pr.emplace_back(serv, tt.countMs());
+            }
         } catch (const common::exception &e) {
             pr.emplace_back(serv, milliseconds(999s).count());
         }
