@@ -36,7 +36,7 @@ BalanceInfo Sync::getBalance(const Address& address) const {
     return impl->getBalance(address);
 }
 
-std::string Sync::getBlockDump(const BlockHeader& bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
+std::string Sync::getBlockDump(const CommonMimimumBlockHeader& bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
     return impl->getBlockDump(bh, fromByte, toByte, isHex, isSign);
 }
 
@@ -132,14 +132,26 @@ bool Sync::verifyTechnicalAddressSign(const std::string &binary, const std::vect
     return impl->verifyTechnicalAddressSign(binary, signature, pubkey);
 }
 
-BlockInfo Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
-    BlockInfo bi;
-    readNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), 0, bi, isValidate, true, 0, 0);
-    return bi;
+std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
+    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
+    parseNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), 0, b, isValidate, true, 0, 0);
+    return b;
 }
 
 std::vector<Address> Sync::getRandomAddresses(size_t countAddresses) const {
     return impl->getRandomAddresses(countAddresses);
+}
+
+std::vector<SignTransactionInfo> Sync::findSignBlock(const BlockHeader &bh) const {
+    return impl->findSignBlock(bh);
+}
+
+std::vector<MinimumSignBlockHeader> Sync::getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const {
+    return impl->getSignaturesBetween(firstBlock, secondBlock);
+}
+
+std::optional<MinimumSignBlockHeader> Sync::findSignature(const std::vector<unsigned char> &hash) const {
+    return impl->findSignature(hash);
 }
 
 Sync::~Sync() = default;

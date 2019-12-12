@@ -25,10 +25,8 @@ public:
     
     void initialize() override;
     
-    std::pair<bool, size_t> doProcess(size_t countBlocks) override;
-    
-    size_t knownBlock() override;
-    
+    size_t doProcess(size_t countBlocks) override;
+       
     bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) override;
     
     static void getExistingBlockS(const std::string &folder, const BlockHeader &bh, BlockInfo &bi, std::string &blockDump, bool isValidate);

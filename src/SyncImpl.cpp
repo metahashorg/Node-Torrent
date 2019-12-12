@@ -49,7 +49,7 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
     } else {
         CHECK(getterBlocksOpt.p2p != nullptr, "p2p nullptr");
         isSaveBlockToFiles = modules[MODULE_BLOCK_RAW];
-        getBlockAlgorithm = std::make_unique<NetworkBlockSource>(folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, true, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign, getterBlocksOpt.isPreLoad);
+        getBlockAlgorithm = std::make_unique<NetworkBlockSource>(timeline, folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, true, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign, getterBlocksOpt.isPreLoad);
     }
         
     if (!signKeyName.empty()) {
@@ -105,7 +105,19 @@ void SyncImpl::saveTransactions(BlockInfo& bi, const std::string &binaryDump, bo
     }
 }
 
-void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
+void SyncImpl::saveTransactionsSignBlock(SignBlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile) {
+    if (!saveBlockToFile) {
+        return;
+    }
+    
+    const std::string &fileName = bi.header.filePos.fileNameRelative;
+    CHECK(!fileName.empty(), "File name not set");
+    
+    const size_t currPos = saveBlockToFileBinary(getFullPath(fileName, folderBlocks), binaryDump);
+    bi.header.filePos.pos = currPos;
+}
+
+void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement) {
     Batch batch;
     if (modules[MODULE_BLOCK]) {
         batch.addBlockHeader(bi.header.hash, bi.header);
@@ -125,6 +137,34 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi) {
     }
     batch.addBlockMetadata(newMetadata);
     
+    FileInfo fi;
+    fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
+    fi.filePos.pos = bi.header.endBlockPos();
+    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
+    
+    batch.saveBlockTimeline(timeLineKey, timelineElement);
+    
+    addBatch(batch, leveldb);
+}
+
+void SyncImpl::saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement) {
+    Batch batch;
+    if (modules[MODULE_BLOCK]) {
+        batch.addSignBlockHeader(bi.header.hash, bi.header);
+    }
+        
+    FileInfo fi;
+    fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
+    fi.filePos.pos = bi.header.endBlockPos();
+    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
+    
+    batch.saveBlockTimeline(timeLineKey, timelineElement);
+    
+    addBatch(batch, leveldb);
+}
+
+void SyncImpl::saveRejectedTxsBlockToLeveldb(const RejectedTxsBlockInfo &bi) {
+    Batch batch;
     FileInfo fi;
     fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
     fi.filePos.pos = bi.header.endBlockPos();
@@ -165,6 +205,10 @@ void SyncImpl::initialize() {
         const size_t countBlocks = blockchain.calcBlockchain(metadata.blockHash);
         LOGINFO << "Last block " << countBlocks << " " << toHex(metadata.blockHash);
     }
+    
+    const std::vector<std::pair<size_t, std::string>> timeLinesSerialized = leveldb.findAllBlocksTimeline();
+    timeline.deserialize(timeLinesSerialized);
+    LOGINFO << "Timeline size " << timeline.size();
 }
 
 std::vector<Worker*> SyncImpl::makeWorkers() {
@@ -233,80 +277,70 @@ std::vector<Worker*> SyncImpl::makeWorkers() {
 void SyncImpl::process(const std::vector<Worker*> &workers) {
     while (true) {
         const time_point beginWhileTime = ::now();
-        std::shared_ptr<BlockInfo> prevBi = nullptr;
-        std::shared_ptr<std::string> prevDump = nullptr;
         try {
-            auto [isContinue, knownLstBlk] = getBlockAlgorithm->doProcess(blockchain.countBlocks());
-            knownLastBlock = knownLstBlk;
-            while (isContinue) {
+            knownLastBlock = getBlockAlgorithm->doProcess(blockchain.countBlocks());
+            while (true) {
                 Timer tt;
                 
                 std::shared_ptr<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>> nextBi = std::make_shared<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>>();
                                
                 std::shared_ptr<std::string> nextBlockDump = std::make_shared<std::string>();
-                isContinue = getBlockAlgorithm->process(*nextBi, *nextBlockDump);
+                const bool isContinue = getBlockAlgorithm->process(*nextBi, *nextBlockDump);
                 if (!isContinue) {
                     break;
                 }
                 
-                if (!std::holds_alternative<BlockInfo>(*nextBi)) {
-                    continue;
-                }
-                
-                Timer tt2;
-                
-                if (prevBi == nullptr) {
-                    CHECK(prevDump == nullptr, "Ups");
-                    prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
-                    prevDump = nextBlockDump;
+                if (std::holds_alternative<BlockInfo>(*nextBi)) {
+                    BlockInfo &blockInfo = std::get<BlockInfo>(*nextBi);
                     
-                    if (isValidate) {
-                        continue;
+                    Timer tt2;
+                    
+                    saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles);
+                    
+                    const size_t currentBlockNum = blockchain.addBlock(blockInfo.header);
+                    CHECK(currentBlockNum != 0, "Incorrect block number");
+                    blockInfo.header.blockNumber = currentBlockNum;
+                    
+                    for (TransactionInfo &tx: blockInfo.txs) {
+                        tx.blockNumber = blockInfo.header.blockNumber.value();
                     }
+                    
+                    auto [timelineKey, timelineElement] = timeline.addSimpleBlock(blockInfo.header);
+                    
+                    tt.stop();
+                    tt2.stop();
+                    
+                    LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(blockInfo.header.hash) << ". Parent hash " << toHex(blockInfo.header.prevHash);
+                    
+                    std::shared_ptr<BlockInfo> blockInfoPtr(nextBi, &blockInfo);
+                    
+                    for (Worker* worker: workers) {
+                        worker->process(blockInfoPtr, nextBlockDump);
+                    }
+                    
+                    saveBlockToLeveldb(blockInfo, timelineKey, timelineElement);
+                } else if (std::holds_alternative<SignBlockInfo>(*nextBi)) {
+                    SignBlockInfo &blockInfo = std::get<SignBlockInfo>(*nextBi);
+                    Timer tt2;
+                    
+                    saveTransactionsSignBlock(blockInfo, *nextBlockDump, isSaveBlockToFiles);
+                    
+                    auto [timelineKey, timelineElement] = timeline.addSignBlock(blockInfo.header);
+                    
+                    tt.stop();
+                    tt2.stop();
+                
+                    LOGINFO << "Sign block " << toHex(blockInfo.header.hash) << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << ". Parent hash " << toHex(blockInfo.header.prevHash);
+                    
+                    saveSignBlockToLeveldb(blockInfo, timelineKey, timelineElement);
+                } else if (std::holds_alternative<RejectedTxsBlockInfo>(*nextBi)) {
+                    RejectedTxsBlockInfo &blockInfo = std::get<RejectedTxsBlockInfo>(*nextBi);
+                    
+                    saveRejectedTxsBlockToLeveldb(blockInfo);
                 } else {
-                    if (isValidate) {
-                        BlockInfo &nextB = std::get<BlockInfo>(*nextBi);
-                        
-                        const auto &thisHashFromHex = prevBi->header.hash;
-                        for (size_t i = 0; i < nextB.header.countSignTx; i++) {
-                            const TransactionInfo &tx = nextB.txs[i];
-                            if (tx.isSignBlockTx) {
-                                CHECK(thisHashFromHex == tx.data, "Block signatures not confirmed");
-                            }
-                        }
-                    } else {
-                        prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
-                        prevDump = nextBlockDump;
-                    }
+                    throwErr("Unknown block type");
                 }
                 
-                saveTransactions(*prevBi, *prevDump, isSaveBlockToFiles);
-                
-                const size_t currentBlockNum = blockchain.addBlock(prevBi->header);
-                CHECK(currentBlockNum != 0, "Incorrect block number");
-                prevBi->header.blockNumber = currentBlockNum;
-                
-                for (TransactionInfo &tx: prevBi->txs) {
-                    tx.blockNumber = prevBi->header.blockNumber.value();
-                }
-                
-                tt.stop();
-                tt2.stop();
-                
-                prevBi->times.timeEndGetBlock = ::now();
-                
-                LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << prevBi->txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(prevBi->header.hash) << ". Parent hash " << toHex(prevBi->header.prevHash);
-                
-                for (Worker* worker: workers) {
-                    worker->process(prevBi, prevDump);
-                }
-                
-                saveBlockToLeveldb(*prevBi);
-                
-                if (isValidate) {
-                    prevBi = std::shared_ptr<BlockInfo>(nextBi, &std::get<BlockInfo>(*nextBi));
-                    prevDump = nextBlockDump;
-                }
                 
                 checkStopSignal();
             }
@@ -369,7 +403,7 @@ BalanceInfo SyncImpl::getBalance(const Address &address) const {
     return mainWorker->getBalance(address);
 }
 
-std::string SyncImpl::getBlockDump(const BlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
+std::string SyncImpl::getBlockDump(const CommonMimimumBlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
     CHECK(modules[MODULE_BLOCK] && modules[MODULE_BLOCK_RAW], "modules " + MODULE_BLOCK_STR + " " + MODULE_BLOCK_RAW_STR + " not set");
        
     const std::optional<std::shared_ptr<std::string>> cache = caches.blockDumpCache.getValue(common::HashedString(bh.hash.data(), bh.hash.size()));
@@ -424,12 +458,35 @@ std::string SyncImpl::getBlockDump(const BlockHeader &bh, size_t fromByte, size_
     }
 }
 
+SignBlockInfo SyncImpl::readSignBlockInfo(const MinimumSignBlockHeader &bh) const {
+    CHECK(!bh.filePos.fileNameRelative.empty(), "Empty file name in block header");
+    IfStream file;
+    openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
+    std::string tmp;
+    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
+    const size_t nextPos = readNextBlockDump(file, bh.filePos.pos, tmp);
+    parseNextBlockInfo(tmp.data(), tmp.data() + tmp.size(), bh.filePos.pos, b, false, false, 0, std::numeric_limits<size_t>::max());
+    CHECK(nextPos != bh.filePos.pos, "Ups");
+    CHECK(std::holds_alternative<SignBlockInfo>(b), "Incorrect block type");
+    return std::get<SignBlockInfo>(b);
+}
+
 bool SyncImpl::verifyTechnicalAddressSign(const std::string &binary, const std::vector<unsigned char> &signature, const std::vector<unsigned char> &pubkey) const {
     const bool res = verifySignature(binary, signature, pubkey);
     if (!res) {
         return false;
     }
     return technicalAddress == getAddress(pubkey);
+}
+
+std::vector<SignTransactionInfo> SyncImpl::findSignBlock(const BlockHeader &bh) const {
+    const std::optional<MinimumSignBlockHeader> signBlockHeader = timeline.findSignForBlock(bh.hash);
+    if (!signBlockHeader.has_value()) {
+        return {};
+    }
+    
+    const SignBlockInfo signBlockInfo = readSignBlockInfo(signBlockHeader.value());
+    return signBlockInfo.txs;
 }
 
 BlockInfo SyncImpl::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const {
@@ -528,6 +585,14 @@ size_t SyncImpl::getLastBlockDay() const {
 std::vector<Address> SyncImpl::getRandomAddresses(size_t countAddresses) const {
     CHECK(mainWorker != nullptr, "Main worker not initialized");
     return mainWorker->getRandomAddresses(countAddresses);
+}
+
+std::vector<MinimumSignBlockHeader> SyncImpl::getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const {
+    return timeline.getSignaturesBetween(firstBlock, secondBlock);
+}
+
+std::optional<MinimumSignBlockHeader> SyncImpl::findSignature(const std::vector<unsigned char> &hash) const {
+    return timeline.findSignature(hash);
 }
 
 }

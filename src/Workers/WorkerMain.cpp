@@ -372,8 +372,6 @@ void WorkerMain::worker() {
             
             CHECK(prevHash.empty() || prevHash == bi.header.prevHash, "Incorrect prev hash. Expected " + toHex(prevHash) + ", received " + toHex(bi.header.prevHash));
             
-            bi.times.timeBeginSaveBlock = ::now();
-            
             CommonBalance commonBalance = leveldb.findCommonBalance();
             const bool updateCommonBalance = commonBalance.blockNumber < bi.header.blockNumber.value();
             
@@ -512,9 +510,6 @@ void WorkerMain::worker() {
             
             tt.stop();
             
-            bi.times.timeEndSaveBlock = ::now();
-            bi.times.timeEnd = ::now();
-            
             LOGINFO << "Block " << bi.header.blockNumber.value() << " saved. Count txs " << bi.txs.size() << ". Time ms " << tt.countMs();
             
             caches.txsStatusCache.remove(std::to_string(bi.header.blockNumber.value() - caches.maxCountElementsTxsCache));
@@ -563,7 +558,7 @@ std::vector<TransactionInfo> WorkerMain::readTxs(const std::vector<AddressInfo> 
             currFileName = addressInfo.filePos.fileNameRelative;
         }
         TransactionInfo tx;
-        const bool res = readOneTransactionInfo(file, addressInfo.filePos.pos, tx, false);
+        const bool res = readOneSimpleTransactionInfo(file, addressInfo.filePos.pos, tx, false);
         CHECK(res, "Incorrect read transaction info");
         tx.blockNumber = addressInfo.blockNumber;
         tx.blockIndex = addressInfo.blockIndex;
@@ -713,7 +708,7 @@ void WorkerMain::readTransactionInFile(TransactionInfo& tx) const {
     IfStream file;
     const std::string hash = tx.hash;
     openFile(file, getFullPath(tx.filePos.fileNameRelative, folderBlocks));
-    const bool res = readOneTransactionInfo(file, tx.filePos.pos, tx, false);
+    const bool res = readOneSimpleTransactionInfo(file, tx.filePos.pos, tx, false);
     CHECK(res, "Incorrect read transaction info");
     CHECK(hash == tx.hash, "Incorrect transaction");
 }
@@ -800,12 +795,15 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
         openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
         std::string tmp;
         std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
-        const size_t nextPos = readNextBlockInfo(file, bh.filePos.pos, b, tmp, false, false, beginTx, countTx);
+        const size_t nextPos = readNextBlockDump(file, bh.filePos.pos, tmp);
+        parseNextBlockInfo(tmp.data(), tmp.data() + tmp.size(), bh.filePos.pos, b, false, false, beginTx, countTx);
         bi = std::get<BlockInfo>(b);
         CHECK(nextPos != bh.filePos.pos, "Ups");
     } else {
         std::shared_ptr<std::string> element = cache.value();
-        readNextBlockInfo(element->data(), element->data() + element->size(), bh.filePos.pos, bi, true, false, beginTx, countTx);
+        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
+        parseNextBlockInfo(element->data(), element->data() + element->size(), bh.filePos.pos, b, true, false, beginTx, countTx);
+        bi = std::get<BlockInfo>(b);
     }
     
     bi.header = bh;

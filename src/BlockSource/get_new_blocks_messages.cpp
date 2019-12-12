@@ -3,6 +3,7 @@
 #include "check.h"
 #include "jsonUtils.h"
 #include "log.h"
+#include "convertStrings.h"
 
 #include "utils/serialize.h"
 #include "utils/compress.h"
@@ -14,7 +15,7 @@ using namespace common;
 namespace torrent_node_lib {
 
 std::string makeGetCountBlocksMessage() {
-    return "{\"method\": \"get-count-blocks\"}";
+    return "{\"method\": \"get-count-blocks\", \"params\": {\"type\": \"forP2P\"}}";
 }
 
 std::string makePreloadBlocksMessage(size_t currentBlock, bool isCompress, bool isSign, size_t preloadBlocks, size_t maxBlockSize) {
@@ -57,7 +58,7 @@ std::string makeGetDumpsBlocksMessage(std::vector<std::string>::const_iterator b
     return r;
 }
 
-size_t parseCountBlocksMessage(const std::string &response) {
+std::pair<size_t, std::set<std::string>> parseCountBlocksMessage(const std::string &response) {
     rapidjson::Document doc;
     const rapidjson::ParseResult pr = doc.Parse(response.c_str());
     CHECK(pr, "rapidjson parse error. Data: " + response);
@@ -68,7 +69,15 @@ size_t parseCountBlocksMessage(const std::string &response) {
     CHECK(resultJson.HasMember("count_blocks") && resultJson["count_blocks"].IsInt(), "count_blocks field not found");
     const size_t countBlocks = resultJson["count_blocks"].GetInt();
     
-    return countBlocks;
+    std::set<std::string> nextExtraBlocks;
+    if (resultJson.HasMember("next_extra_blocks") && resultJson["next_extra_blocks"].IsArray()) {
+        for (const auto &extraBlockJson: resultJson["next_extra_blocks"].GetArray()) {
+            const std::string extraBlock = get<std::string>(extraBlockJson);
+            nextExtraBlocks.emplace(extraBlock);
+        }
+    }
+    
+    return std::make_pair(countBlocks, nextExtraBlocks);
 }
 
 PreloadBlocksResponse parsePreloadBlocksMessage(const std::string &response) {
@@ -87,12 +96,16 @@ PreloadBlocksResponse parsePreloadBlocksMessage(const std::string &response) {
     
     size_t pos = 0;
     const size_t sizeHeaders = deserializeInt<size_t>(response, pos);
+    const size_t sizeAdditingBlocksHashes = deserializeInt<size_t>(response, pos);
     const size_t sizeBlocks = deserializeInt<size_t>(response, pos);
     result.countBlocks = deserializeInt<size_t>(response, pos);
     
     CHECK(pos + sizeHeaders <= response.size(), "Incorrect response");
     result.blockHeaders = response.substr(pos, sizeHeaders);
     pos += sizeHeaders;
+    CHECK(pos + sizeAdditingBlocksHashes <= response.size(), "Incorrect response");
+    result.additingBlocksHashes = response.substr(pos, sizeAdditingBlocksHashes);
+    pos += sizeAdditingBlocksHashes;
     CHECK(pos + sizeBlocks <= response.size(), "Incorrect response");
     result.blockDumps = response.substr(pos, sizeBlocks);
     pos += sizeBlocks;
@@ -119,6 +132,26 @@ std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool
     return res;
 }
 
+std::vector<std::string> parseAdditionalBlockHashes(const std::string &response) {
+    if (response.empty()) {
+        return {};
+    }
+    
+    rapidjson::Document doc;
+    const rapidjson::ParseResult pr = doc.Parse(response.c_str());
+    CHECK(pr, "rapidjson parse error. Data: " + response);
+    
+    std::vector<std::string> result;
+    
+    CHECK(!doc.HasMember("error") || doc["error"].IsNull(), jsonToString(doc["error"], false));
+    const auto &jsonArray = get<JsonArray>(doc, "result");
+    for (const auto &hashJson: jsonArray) {
+        result.emplace_back(get<std::string>(hashJson));
+    }
+    
+    return result;
+}
+
 static MinimumBlockHeader parseBlockHeader(const rapidjson::Value &resultJson) {    
     MinimumBlockHeader result;
     CHECK(resultJson.HasMember("number") && resultJson["number"].IsInt64(), "number field not found");
@@ -131,6 +164,20 @@ static MinimumBlockHeader parseBlockHeader(const rapidjson::Value &resultJson) {
     result.blockSize = resultJson["size"].GetInt64();
     CHECK(resultJson.HasMember("fileName") && resultJson["fileName"].IsString(), "fileName field not found");
     result.fileName = resultJson["fileName"].GetString();
+    
+    if (resultJson.HasMember("prev_extra_blocks") && resultJson["prev_extra_blocks"].IsArray()) {
+        for (const auto &prevExtraBlockJson: resultJson["prev_extra_blocks"].GetArray()) {
+            const std::string prevExtraBlock = get<std::string>(prevExtraBlockJson);
+            result.prevExtraBlocks.emplace(prevExtraBlock);
+        }
+    }
+    
+    if (resultJson.HasMember("next_extra_blocks") && resultJson["next_extra_blocks"].IsArray()) {
+        for (const auto &nextExtraBlockJson: resultJson["next_extra_blocks"].GetArray()) {
+            const std::string nextExtraBlock = get<std::string>(nextExtraBlockJson);
+            result.nextExtraBlocks.emplace(nextExtraBlock);
+        }
+    }
     
     return result;
 }

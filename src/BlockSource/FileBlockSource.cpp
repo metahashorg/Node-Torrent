@@ -20,11 +20,7 @@ void FileBlockSource::initialize() {
     allFiles = leveldb.getAllFiles();
 }
 
-std::pair<bool, size_t> FileBlockSource::doProcess(size_t countBlocks) {
-    return std::make_pair(true, 0);
-}
-
-size_t FileBlockSource::knownBlock() {
+size_t FileBlockSource::doProcess(size_t countBlocks) {
     return 0;
 }
 
@@ -39,18 +35,25 @@ bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockI
         currPos = fi.filePos.pos;
         LOGINFO << "Open next file " << fileName << " " << currPos;
     }
-    const size_t nextCurrPos = readNextBlockInfo(file, currPos, bi, binaryDump, isValidate, false, 0, 0);
+    const size_t nextCurrPos = readNextBlockDump(file, currPos, binaryDump);
     if (currPos == nextCurrPos) {
         closeFile(file);
         fileName.clear();
         return false;
     } else {
+        parseNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), currPos, bi, isValidate, false, 0, 0);
         if (std::holds_alternative<BlockInfo>(bi)) {
             BlockInfo &b = std::get<BlockInfo>(bi);
             b.header.filePos.fileNameRelative = fileName;
             for (auto &tx : b.txs) {
                 tx.filePos.fileNameRelative = fileName;
             }
+        } else if (std::holds_alternative<SignBlockInfo>(bi)) {
+            SignBlockInfo &b = std::get<SignBlockInfo>(bi);
+            b.header.filePos.fileNameRelative = fileName;
+        } else if (std::holds_alternative<RejectedTxsBlockInfo>(bi)) {
+            RejectedTxsBlockInfo &b = std::get<RejectedTxsBlockInfo>(bi);
+            b.header.filePos.fileNameRelative = fileName;
         }
     }
 
@@ -61,15 +64,18 @@ bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockI
     return true;
 }
 
-void FileBlockSource::getExistingBlockS(const std::string &folder, const BlockHeader& bh, BlockInfo& bi, std::string &blockDump, bool isValidate) {
+void FileBlockSource::getExistingBlockS(const std::string &folder, const BlockHeader& bh, BlockInfo &bi, std::string &blockDump, bool isValidate) {
     CHECK(!bh.filePos.fileNameRelative.empty(), "Incorrect file name");
     IfStream file;
     openFile(file, getFullPath(bh.filePos.fileNameRelative, folder));
+    
     std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
-    const size_t nextCurrPos = readNextBlockInfo(file, bh.filePos.pos, b, blockDump, isValidate, false, 0, 0);
+    const size_t nextCurrPos = readNextBlockDump(file, bh.filePos.pos, blockDump);
+    CHECK(nextCurrPos != bh.filePos.pos, "Incorrect existing block");
+    parseNextBlockInfo(blockDump.data(), blockDump.data() + blockDump.size(), bh.filePos.pos, b, isValidate, false, 0, 0);
     CHECK(std::holds_alternative<BlockInfo>(b), "Incorrect blockinfo");
     bi = std::get<BlockInfo>(b);
-    CHECK(nextCurrPos != bh.filePos.pos, "File incorrect");
+    
     bi.header.filePos.fileNameRelative = bh.filePos.fileNameRelative;
     for (auto &tx : bi.txs) {
         tx.filePos.fileNameRelative = bh.filePos.fileNameRelative;

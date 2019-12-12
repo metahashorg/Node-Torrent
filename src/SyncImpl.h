@@ -7,6 +7,7 @@
 #include "Cache/Cache.h"
 #include "LevelDb.h"
 #include "BlockChain.h"
+#include "BlocksTimeline.h"
 
 #include "ConfigOptions.h"
 
@@ -70,7 +71,7 @@ public:
     
     BalanceInfo getBalance(const Address &address) const;
     
-    std::string getBlockDump(const BlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
+    std::string getBlockDump(const CommonMimimumBlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
     
     BlockInfo getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const;
     
@@ -110,11 +111,25 @@ public:
     
     std::vector<Address> getRandomAddresses(size_t countAddresses) const;
     
+    std::vector<SignTransactionInfo> findSignBlock(const BlockHeader &bh) const;
+    
+    std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const;
+    
+    std::optional<MinimumSignBlockHeader> findSignature(const std::vector<unsigned char> &hash) const;
+    
 private:
    
     void saveTransactions(BlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
+    
+    void saveTransactionsSignBlock(SignBlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
         
-    void saveBlockToLeveldb(const BlockInfo &bi);
+    void saveBlockToLeveldb(const BlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement);
+    
+    void saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKey, const std::vector<char> &timelineElement);
+    
+    void saveRejectedTxsBlockToLeveldb(const RejectedTxsBlockInfo &bi);
+    
+    SignBlockInfo readSignBlockInfo(const MinimumSignBlockHeader &header) const;
     
 private:
     
@@ -132,6 +147,8 @@ private:
     
     BlockChain blockchain;
         
+    BlocksTimeline timeline;
+    
     int countThreads;
         
     std::unique_ptr<BlockSource> getBlockAlgorithm;

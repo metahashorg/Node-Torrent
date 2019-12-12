@@ -41,6 +41,11 @@ struct SerializerInt final: public Serializer {
     void serialize(std::vector<char> &buffer) const override {
         torrent_node_lib::serializeInt(t, buffer);
     }
+    
+    static T deserialize(const std::string &value) {
+        size_t fromPos = 0;
+        return torrent_node_lib::deserializeInt<T>(value, fromPos);
+    }
 };
 
 namespace torrent_node_lib {
@@ -82,6 +87,10 @@ const static std::string NODES_TESTED_STATS_ALL_DAY = "nsta_";
 const static std::string NODES_STATS_ALL = "nsaa2_";
 const static std::string NODE_STAT_RPS_PREFIX = "nrps_";
 const static std::string FORGING_SUMS_ALL = "fsa_";
+
+const static std::string SIGNS_BLOCK_NUMBER_PREFIX = "signs_";
+
+const static std::string BLOCKS_TIMELINE_PREFIX = "timeline_";
 
 thread_local std::vector<char> Batch::bufferKey;
 
@@ -305,6 +314,11 @@ void Batch::addBlockHeader(const std::vector<unsigned char>& blockHash, const Bl
     addKey(bufferKey, value);
 }
 
+void Batch::addSignBlockHeader(const std::vector<unsigned char> &blockHash, const SignBlockHeader &value) {
+    makeKey(bufferKey, SIGNS_BLOCK_NUMBER_PREFIX, blockHash);
+    addKey(bufferKey, value);
+}
+
 void Batch::addBlockMetadata(const BlocksMetadata& value) {
     addKey(KEY_BLOCK_METADATA, value);
 }
@@ -454,6 +468,11 @@ void Batch::addNodeStatBlock(const NodeStatBlockInfo &value) {
     addKey(NODE_STAT_BLOCK_NUMBER_PREFIX, value);
 }
 
+void Batch::saveBlockTimeline(size_t key, const std::vector<char> &data) {
+    makeKey(bufferKey, BLOCKS_TIMELINE_PREFIX, SerializerInt(key));
+    addKeyInternal(bufferKey, data);
+}
+
 void LevelDb::saveModules(const std::string& modules) {
     saveValue(MODULES_KEY, modules, true);
 }
@@ -555,6 +574,31 @@ void LevelDb::saveAddressStatus(const std::string& addressAndHash, const Transac
 
 void LevelDb::saveVersionDb(const std::string &value) {
     saveValue(VERSION_DB, value);
+}
+
+std::vector<std::pair<size_t, std::string>> LevelDb::findAllBlocksTimeline() {
+    const std::string &from = BLOCKS_TIMELINE_PREFIX;
+    std::string to = from.substr(0, from.size() - 1);
+    to += (char)(from.back() + 1);
+    
+    std::vector<std::pair<size_t, std::string>> result;
+    
+    const std::vector<std::pair<std::string, std::string>> found = findKey2(from, to);
+    for (const auto &[key, value]: found) {
+        CHECK(key.size() > BLOCKS_TIMELINE_PREFIX.size(), "Incorrect data");
+        const std::string keyPrefix = key.substr(0, BLOCKS_TIMELINE_PREFIX.size());
+        const std::string keySuffix = key.substr(BLOCKS_TIMELINE_PREFIX.size());
+        CHECK(keyPrefix == BLOCKS_TIMELINE_PREFIX, "Incorrect data");
+        const size_t keyInt = SerializerInt<size_t>::deserialize(keySuffix);
+        
+        result.emplace_back(keyInt, value);
+    }
+    
+    std::sort(result.begin(), result.end(), [](const auto &pair1, const auto &pair2) {
+        return pair1.first < pair2.first;
+    });
+    
+    return result;
 }
 
 std::string LevelDb::findModules() const {

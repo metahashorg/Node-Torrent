@@ -8,6 +8,7 @@
 #include <memory>
 #include <set>
 #include <unordered_map>
+#include <variant>
 
 #include "ConfigOptions.h"
 
@@ -29,6 +30,11 @@ struct NodeTestTrust;
 struct NodeTestCount;
 struct NodeTestExtendedStat;
 struct Token;
+struct SignBlockInfo;
+struct SignTransactionInfo;
+struct MinimumSignBlockHeader;
+struct CommonMimimumBlockHeader;
+struct RejectedTxsBlockInfo;
 
 struct TransactionsFilters;
 
@@ -51,7 +57,7 @@ public:
     
 public:
     
-    static BlockInfo parseBlockDump(const std::string &binaryDump, bool isValidate);
+    static std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> parseBlockDump(const std::string &binaryDump, bool isValidate);
     
 public:
     
@@ -67,7 +73,7 @@ public:
     
     BalanceInfo getBalance(const Address &address) const;
 
-    std::string getBlockDump(const BlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
+    std::string getBlockDump(const CommonMimimumBlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
 
     BlockInfo getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const;
 
@@ -106,6 +112,12 @@ public:
     bool verifyTechnicalAddressSign(const std::string &binary, const std::vector<unsigned char> &signature, const std::vector<unsigned char> &pubkey) const;
     
     std::vector<Address> getRandomAddresses(size_t countAddresses) const;
+    
+    std::vector<SignTransactionInfo> findSignBlock(const BlockHeader &bh) const;
+    
+    std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const;
+    
+    std::optional<MinimumSignBlockHeader> findSignature(const std::vector<unsigned char> &hash) const;
     
 private:
     

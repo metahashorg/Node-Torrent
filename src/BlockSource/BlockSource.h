@@ -16,9 +16,7 @@ public:
     
     virtual void initialize() = 0;
     
-    virtual std::pair<bool, size_t> doProcess(size_t countBlocks) = 0;
-    
-    virtual size_t knownBlock() = 0;
+    virtual size_t doProcess(size_t countBlocks) = 0;
     
     virtual bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) = 0;
     

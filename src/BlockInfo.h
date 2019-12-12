@@ -113,11 +113,6 @@ private:
     
     TransactionStatus() = default;
     
-    template <std::size_t ... I>
-    void parseVarint(const std::string &raw, size_t &fromPos, size_t number, std::index_sequence<I ... >);
-    
-    template<size_t I>
-    void tryParse(const std::string &raw, size_t &fromPos, size_t number);
 };
 
 struct Token {
@@ -400,6 +395,16 @@ struct CommonBalance {
     static CommonBalance deserialize(const std::string &raw);
 };
 
+struct CommonMimimumBlockHeader {
+    std::vector<unsigned char> hash;
+    FilePosition filePos;
+    
+    CommonMimimumBlockHeader(const std::vector<unsigned char> &hash, const FilePosition &filePos)
+        : hash(hash)
+        , filePos(filePos)
+    {}
+};
+
 struct BlockHeader {
     size_t timestamp;
     uint64_t blockSize = 0;
@@ -443,35 +448,95 @@ struct MinimumBlockHeader {
     std::string hash;
     std::string parentHash;
     std::string fileName;
+    
+    std::set<std::string> prevExtraBlocks;
+    std::set<std::string> nextExtraBlocks;
 };
 
-struct BlockTimes {
-    time_point timeBegin;
-    time_point timeEnd;
+struct MinimumSignBlockHeader {
+    std::vector<unsigned char> hash;
+    FilePosition filePos;
+    std::vector<unsigned char> prevHash;
     
-    time_point timeBeginGetBlock;
-    time_point timeEndGetBlock;
+    void serialize(std::vector<char> &buffer) const;
     
-    time_point timeBeginSaveBlock;
-    time_point timeEndSaveBlock;
+    static MinimumSignBlockHeader deserialize(const std::string &raw, size_t &fromPos);
+    
+};
+
+struct SignBlockHeader {
+    size_t timestamp;
+    uint64_t blockSize = 0;
+    
+    std::vector<unsigned char> hash;
+    std::vector<unsigned char> prevHash;
+    
+    FilePosition filePos;
+    
+    std::vector<unsigned char> senderSign;
+    std::vector<unsigned char> senderPubkey;
+    std::vector<unsigned char> senderAddress;
+    
+    std::string serialize() const;
+    
+    static SignBlockHeader deserialize(const std::string &raw);
+    
+    size_t endBlockPos() const;
+};
+
+struct SignTransactionInfo {
+    std::vector<unsigned char> blockHash;
+    std::vector<char> sign;
+    std::vector<unsigned char> pubkey;
+    Address address;
 };
 
 struct SignBlockInfo {
+    SignBlockHeader header;
+    
+    std::vector<SignTransactionInfo> txs;
+    
+    void saveSenderInfo(const std::vector<unsigned char> &senderSign, const std::vector<unsigned char> &senderPubkey, const std::vector<unsigned char> &senderAddress) {
+        header.senderSign = senderSign;
+        header.senderPubkey = senderPubkey;
+        header.senderAddress = senderAddress;
+    }
+    
+    void saveFilePath(const std::string &path) {
+        header.filePos.fileNameRelative = path;
+    }
     
 };
 
-struct RejectedTxsBlockInfo {
+struct RejectedTxsBlockHeader {
+    uint64_t blockSize = 0;
     
+    FilePosition filePos;
+       
+    size_t endBlockPos() const;
+};
+
+struct RejectedTxsBlockInfo {
+    RejectedTxsBlockHeader header;
 };
 
 struct BlockInfo {
     BlockHeader header;
     
-    BlockTimes times;
-    
     std::vector<TransactionInfo> txs;
     
     std::vector<TransactionInfo> getBlockSignatures() const;
+    
+    void saveSenderInfo(const std::vector<unsigned char> &senderSign, const std::vector<unsigned char> &senderPubkey, const std::vector<unsigned char> &senderAddress) {
+        header.senderSign = senderSign;
+        header.senderPubkey = senderPubkey;
+        header.senderAddress = senderAddress;
+    }
+    
+    void saveFilePath(const std::string &path) {
+        header.filePos.fileNameRelative = path;
+    }
+    
 };
 
 struct BlocksMetadata {

@@ -14,7 +14,7 @@ include(common_utils)
 
 add_definitions(-DSNIPER_LOG_TRACE -DSNIPER_LOG_DEBUG)
 
-add_definitions(-DVERSION="0.132")
+add_definitions(-DVERSION="0.133")
 
 set(COMMON_SOURCES
     ${COMMON_UTILS_SOURCES_WITHOUT_GITSHA}
@@ -35,6 +35,7 @@ set(COMMON_LIBRARY_HEADERS
     Thread.h
     logger/easylogging++.h
     logger/inc.h
+    curlWrapper.h
 )
 
 set(COMMON_LIBRARY_DIR
@@ -46,6 +47,13 @@ set(LIBRARY_HEADERS
     BlockChainReadInterface.h
     P2P/P2P.h
     P2P/P2P_Ips.h
+    P2P/P2PStructs.h
+    P2P/ReferenceWrapper.h
+    P2P/safe_ptr.h
+    P2P/P2P_Impl.h
+    P2P/P2PThread.h
+    P2P/QueueP2P.h
+    P2P/LimitArray.h
     Modules.h
     ConfigOptions.h
     synchronize_blockchain.h
@@ -103,6 +111,8 @@ set(LIBRARY_SOURCES
     utils/SystemInfo.cpp
     utils/IfStream.cpp
     utils/crypto.cpp
+    
+    BlocksTimeline.cpp
 )
 
 set(PROJECT_MAIN

@@ -306,7 +306,7 @@ NodeTestResult readNodeTestTransaction(const BestNodeElement &nodeTestElement, s
     IfStream file;
     openFile(file, getFullPath(nodeTestElement.txPos.fileNameRelative, folderBlocks));
     TransactionInfo tx;
-    const bool res = readOneTransactionInfo(file, nodeTestElement.txPos.pos, tx, false);
+    const bool res = readOneSimpleTransactionInfo(file, nodeTestElement.txPos.pos, tx, false);
     CHECK(res, "Incorrect read transaction info");
     
     std::optional<NodeTestResult> nodeTestResult = parseTestNodeTransaction(tx);

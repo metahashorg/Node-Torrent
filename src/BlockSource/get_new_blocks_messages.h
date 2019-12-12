@@ -4,6 +4,7 @@
 #include <string>
 #include <optional>
 #include <vector>
+#include <set>
 
 namespace torrent_node_lib {
 
@@ -12,6 +13,7 @@ struct MinimumBlockHeader;
 struct PreloadBlocksResponse {
     size_t countBlocks = 0;
     std::string blockHeaders;
+    std::string additingBlocksHashes;
     std::string blockDumps;
     
     std::optional<std::string> error;
@@ -31,13 +33,15 @@ std::string makeGetDumpBlockMessage(const std::string &blockHash, bool isSign, b
 
 std::string makeGetDumpsBlocksMessage(std::vector<std::string>::const_iterator begin, std::vector<std::string>::const_iterator end, bool isSign, bool isCompress);
 
-size_t parseCountBlocksMessage(const std::string &response);
+std::pair<size_t, std::set<std::string>> parseCountBlocksMessage(const std::string &response);
 
 PreloadBlocksResponse parsePreloadBlocksMessage(const std::string &response);
 
 std::string parseDumpBlockBinary(const std::string &response, bool isCompress);
 
 std::vector<std::string> parseDumpBlocksBinary(const std::string &response, bool isCompress);
+
+std::vector<std::string> parseAdditionalBlockHashes(const std::string &response);
 
 torrent_node_lib::MinimumBlockHeader parseBlockHeader(const std::string &response);
 
