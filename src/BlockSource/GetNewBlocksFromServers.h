@@ -26,33 +26,16 @@ public:
         std::string additionalBlockHashes;
         std::string blocksDumps;
     };
-    
-    struct AdditingBlock {
-        enum Type {
-            BeforeBlock = 0,
-            AfterBlock = 1
-        };
         
-        Type type;
-        size_t number = 0;
-        std::string hash;
-        std::string fileName;
-        
-        AdditingBlock(Type type, size_t number, const std::string &hash, const std::string &fileName)
-            : type(type)
-            , number(number)
-            , hash(hash)
-            , fileName(fileName)
-        {}
-        
-        std::string dump;
-    };
-    
 public:
     
     static std::pair<std::string, std::string> makeRequestForDumpBlock(const std::string &blockHash, size_t fromByte, size_t toByte);
     
+    static std::pair<std::string, std::string> makeRequestForDumpBlock2(const std::string &blockHash);
+    
     static std::pair<std::string, std::string> makeRequestForDumpBlockSign(const std::string &blockHash, size_t fromByte, size_t toByte);
+    
+    static std::pair<std::string, std::string> makeRequestForDumpBlockSign2(const std::string &blockHash);
     
     static ResponseParse parseDumpBlockResponse(bool manyBlocks, bool isSign, bool isCompress, const std::string &result, size_t fromByte, size_t toByte);
     
@@ -75,12 +58,12 @@ public:
     
     MinimumBlockHeader getBlockHeaderWithoutAdvanceLoad(size_t blockNum, const std::string &server) const;
     
-    std::string getBlockDump(const std::string &blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const;
+    std::string getBlockDump(const std::string &blockHash, size_t blockSize, bool isPrecisionSize, bool loadAll, const std::vector<std::string> &hintsServers, bool isSign) const;
     
-    std::string getBlockDumpWithoutAdvancedLoad(const std::string &blockHash, size_t blockSize, const std::vector<std::string> &hintsServers, bool isSign) const;
+    std::string getBlockDumpWithoutAdvancedLoad(const std::string &blockHash, size_t blockSize, bool isPrecisionSize, const std::vector<std::string> &hintsServers, bool isSign) const;
     
-    void loadAdditingBlocks(std::vector<AdditingBlock> &blocks, const std::vector<std::string> &hintsServers, bool isSign) const;
-    
+    std::string getBlockDumpWithoutAdvancedLoad(const std::string &blockHash, const std::vector<std::string> &hintsServers, bool isSign) const;
+        
     void clearAdvanced();
     
 private:

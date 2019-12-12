@@ -80,9 +80,9 @@ size_t NetworkBlockSource::doProcess(size_t countBlocks) {
     return lastBlockInBlockchain;
 }
 
-void NetworkBlockSource::processAdditingBlocks(std::vector<GetNewBlocksFromServer::AdditingBlock> &additingBlocks) {
+void NetworkBlockSource::processAdditingBlocks(std::vector<AdditingBlock> &additingBlocks) {
     std::set<std::string> existingHashs;
-    additingBlocks.erase(std::remove_if(additingBlocks.begin(), additingBlocks.end(), [&existingHashs](const GetNewBlocksFromServer::AdditingBlock &block) {
+    additingBlocks.erase(std::remove_if(additingBlocks.begin(), additingBlocks.end(), [&existingHashs](const AdditingBlock &block) {
         if (existingHashs.find(block.hash) != existingHashs.end()) {
             return true;
         } else {
@@ -91,20 +91,20 @@ void NetworkBlockSource::processAdditingBlocks(std::vector<GetNewBlocksFromServe
         }
     }), additingBlocks.end());
     
-    timeline.filter<GetNewBlocksFromServer::AdditingBlock>(additingBlocks, [](const GetNewBlocksFromServer::AdditingBlock &block) {
+    timeline.filter<AdditingBlock>(additingBlocks, [](const AdditingBlock &block) {
         return fromHex(block.hash);
     });
-    
-    getterBlocks.loadAdditingBlocks(additingBlocks, servers, isVerifySign);
-    
-    for (const GetNewBlocksFromServer::AdditingBlock &additingBlock: additingBlocks) {
+       
+    for (const AdditingBlock &additingBlock: additingBlocks) {
+        const std::string dump = getterBlocks.getBlockDump(additingBlock.hash, 0, false, true, servers, isVerifySign);
+        
         AdvancedBlock advanced;
-        advanced.header.blockSize = additingBlock.dump.size();
+        advanced.header.blockSize = dump.size();
         advanced.header.hash = additingBlock.hash;
         advanced.header.number = additingBlock.number;
         advanced.header.fileName = additingBlock.fileName;
-        advanced.dump = additingBlock.dump;
-        advanced.pos = additingBlock.type == GetNewBlocksFromServer::AdditingBlock::Type::AfterBlock ? AdvancedBlock::BlockPos::AfterBlock : AdvancedBlock::BlockPos::BeforeBlock;
+        advanced.dump = dump;
+        advanced.pos = additingBlock.type == AdditingBlock::Type::AfterBlock ? AdvancedBlock::BlockPos::AfterBlock : AdvancedBlock::BlockPos::BeforeBlock;
         advancedBlocks.emplace(advanced.key(), advanced);
     }
 }
@@ -178,7 +178,7 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
         return true;
     }
     
-    std::vector<GetNewBlocksFromServer::AdditingBlock> additingBlocks;
+    std::vector<AdditingBlock> additingBlocks;
     if (afterBlocksAdditings.isClear()) {
         CHECK(lastBlockInBlockchain >= nextBlockToRead, "New blocks absent");
         
@@ -193,7 +193,7 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
             advanced.pos = AdvancedBlock::BlockPos::Block;
             try {
                 advanced.header = getterBlocks.getBlockHeader(currBlock, lastBlockInBlockchain, servers);
-                advanced.dump = getterBlocks.getBlockDump(advanced.header.hash, advanced.header.blockSize, servers, isVerifySign);
+                advanced.dump = getterBlocks.getBlockDump(advanced.header.hash, advanced.header.blockSize, true, false, servers, isVerifySign);
             } catch (...) {
                 advanced.exception = std::current_exception();
             }
@@ -203,17 +203,17 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
         
         for (const auto &[key, advanced]: advancedBlocks) {
             for (const std::string &blockHash: advanced.header.prevExtraBlocks) {
-                additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::BeforeBlock, advanced.header.number, blockHash, advanced.header.fileName);
+                additingBlocks.emplace_back(AdditingBlock::Type::BeforeBlock, advanced.header.number, blockHash, advanced.header.fileName);
             }
             for (const std::string &blockHash: advanced.header.nextExtraBlocks) {
-                additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::AfterBlock, advanced.header.number, blockHash, advanced.header.fileName);
+                additingBlocks.emplace_back(AdditingBlock::Type::AfterBlock, advanced.header.number, blockHash, advanced.header.fileName);
             }
         }
     } else {
         CHECK(advancedBlocks.empty(), "Incorrect advanced blocks");
         
         for (const std::string &hash: afterBlocksAdditings.hashes) {
-            additingBlocks.emplace_back(GetNewBlocksFromServer::AdditingBlock::Type::AfterBlock, afterBlocksAdditings.blockNumber, hash, afterBlocksAdditings.file);
+            additingBlocks.emplace_back(AdditingBlock::Type::AfterBlock, afterBlocksAdditings.blockNumber, hash, afterBlocksAdditings.file);
         }
             
         afterBlocksAdditings.clear();
@@ -236,7 +236,7 @@ void NetworkBlockSource::getExistingBlock(const BlockHeader& bh, BlockInfo& bi, 
     const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
     CHECK(!lastBlock.error.has_value(), lastBlock.error.value());
     const MinimumBlockHeader nextBlockHeader = getterBlocks.getBlockHeaderWithoutAdvanceLoad(bh.blockNumber.value(), lastBlock.servers[0]);
-    blockDump = getterBlocks.getBlockDumpWithoutAdvancedLoad(nextBlockHeader.hash, nextBlockHeader.blockSize, lastBlock.servers, isVerifySign);
+    blockDump = getterBlocks.getBlockDumpWithoutAdvancedLoad(nextBlockHeader.hash, nextBlockHeader.blockSize, true, lastBlock.servers, isVerifySign);
     if (isVerifySign) {
         const BlockSignatureCheckResult signBlock = checkSignatureBlock(blockDump);
         blockDump = signBlock.block;

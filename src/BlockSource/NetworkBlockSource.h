@@ -83,9 +83,29 @@ private:
         }
     };
     
+    struct AdditingBlock {
+        enum Type {
+            BeforeBlock = 0,
+            AfterBlock = 1
+        };
+        
+        Type type;
+        size_t number = 0;
+        std::string hash;
+        std::string fileName;
+        
+        AdditingBlock(Type type, size_t number, const std::string &hash, const std::string &fileName)
+            : type(type)
+            , number(number)
+            , hash(hash)
+            , fileName(fileName)
+        {}
+        
+    };
+    
 private:
     
-    void processAdditingBlocks(std::vector<GetNewBlocksFromServer::AdditingBlock> &additingBlocks);
+    void processAdditingBlocks(std::vector<AdditingBlock> &additingBlocks);
     
     void parseBlockInfo();
     
