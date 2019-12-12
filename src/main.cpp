@@ -32,8 +32,6 @@
 #include "P2P/P2P_Ips.h"
 #include "P2P/P2P_Graph.h"
 
-#include "generate_json_v8.h"
-
 #include "nslookup.h"
 
 #include "Modules.h"
@@ -236,10 +234,6 @@ int main (int argc, char *const *argv) {
         parseModules(modulesStr);
         LOGINFO << "Modules " << modules;
         
-        if (!v8Server.empty()) {
-            setV8Server(v8Server, modules[MODULE_V8]);
-        }
-
         std::unique_ptr<P2P> p2p = nullptr;
         
         size_t otherPortTorrent = port;

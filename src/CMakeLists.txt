@@ -90,17 +90,6 @@ set(LIBRARY_SOURCES
     synchronize_blockchain.cpp
     SyncImpl.cpp
 
-    generate_json_v8.cpp
-    
-    Workers/ScriptBlockInfo.cpp
-    Workers/NodeTestsBlockInfo.cpp
-    Workers/WorkerMain.cpp
-    Workers/WorkerCache.cpp
-    Workers/WorkerScript.cpp
-    Workers/WorkerNodeTest.cpp
-
-    TestP2PNodes.cpp
-    
     LevelDb.cpp
     libeventWrapper.cpp
     

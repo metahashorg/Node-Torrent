@@ -5,8 +5,6 @@
 
 #include "synchronize_blockchain.h"
 #include "BlockInfo.h"
-#include "Workers/ScriptBlockInfo.h"
-#include "Workers/NodeTestsBlockInfo.h"
 
 #include "check.h"
 #include "duration.h"
@@ -29,36 +27,15 @@
 using namespace common;
 using namespace torrent_node_lib;
 
-const static std::string GET_ADDRESS_HISTORY = "fetch-history";
-const static std::string GET_ADDRESS_HISTORY_FILTER = "fetch-history-filter";
-const static std::string GET_ADDRESS_BALANCE = "fetch-balance";
-const static std::string GET_ADDRESS_BALANCES = "fetch-balances";
 const static std::string GET_BLOCK_BY_HASH = "get-block-by-hash";
 const static std::string GET_BLOCK_BY_NUMBER = "get-block-by-number";
 const static std::string GET_BLOCKS = "get-blocks";
-const static std::string GET_LAST_TXS = "get-last-txs";
 const static std::string GET_COUNT_BLOCKS = "get-count-blocks";
 const static std::string PRE_LOAD_BLOCKS = "pre-load";
 const static std::string GET_DUMP_BLOCK_BY_HASH = "get-dump-block-by-hash";
 const static std::string GET_DUMP_BLOCK_BY_NUMBER = "get-dump-block-by-number";
 const static std::string GET_DUMPS_BLOCKS_BY_HASH = "get-dumps-blocks-by-hash";
 const static std::string GET_DUMPS_BLOCKS_BY_NUMBER = "get-dumps-blocks-by-number";
-const static std::string GET_TRANSACTION_INFO = "get-tx";
-const static std::string GET_TOKEN_INFO = "get-token";
-const static std::string GET_TRANSACTIONS_INFO = "get-txs";
-const static std::string GET_ADDRESS_DELEGATIONS = "get-address-delegations";
-const static std::string GET_CONTRACT_DETAILS = "get-contract-details";
-const static std::string GET_CONTRACT_CODE = "get-contract-code";
-const static std::string GET_COMMON_BALANCE = "get-common-balance";
-const static std::string GET_FORGING_SUM = "get-forging-sum";
-const static std::string GET_FORGING_SUM_ALL = "get-forging-sum-all";
-const static std::string GET_LAST_NODE_STAT_RESULT = "get-last-node-stat-result";
-const static std::string GET_LAST_NODE_STAT_TRUST = "get-last-node-stat-trust";
-const static std::string GET_LAST_NODE_STAT_COUNT = "get-last-node-stat-count";
-const static std::string GET_LAST_NODES_STATS_RESULT = "get-last-nodes-stats-count";
-const static std::string GET_ALL_LAST_NODES_RESULT = "get-all-last-nodes-count";
-const static std::string GET_NODE_RAITING = "get-nodes-raiting";
-const static std::string GET_RANDOM_ADDRESSES = "get-random-addresses";
 
 const static int64_t MAX_BATCH_BLOCKS = 1000;
 const static size_t MAX_BATCH_TXS = 10000;
@@ -163,15 +140,7 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
     }
     
     if (type == BlockTypeInfo::Simple) {
-        const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
-        std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> signs;
-        if (nextBh.blockNumber.has_value() && nextBh.countSignTx) {
-            const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
-            signs = nextBi.getBlockSignatures();
-        } else {
-            signs = sync.findSignBlock(bh);
-        }
-        return blockHeaderToJson(requestId, bh, signs, isFormat, type, version);
+        return "";
     } else if (type == BlockTypeInfo::ForP2P) {
         std::vector<std::vector<unsigned char>> prevSignatures;
         if (bh.blockNumber.has_value()) {
@@ -189,18 +158,9 @@ std::string getBlock(const RequestId &requestId, const rapidjson::Document &doc,
         
         return blockHeaderToP2PJson(requestId, bh, prevSignatures, nextSignatures, isFormat, type, version);
     } else if (type == BlockTypeInfo::Small) {
-        return blockHeaderToJson(requestId, bh, {}, isFormat, type, version);
+        return "";
     } else {
-        const BlockHeader nextBh = sync.getBlockchain().getBlock(*bh.blockNumber + 1);
-        std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>> signs;
-        if (nextBh.blockNumber.has_value() && nextBh.countSignTx) {
-            const BlockInfo nextBi = sync.getFullBlock(nextBh, 0, nextBh.countSignTx);
-            signs = nextBi.getBlockSignatures();
-        } else {
-            signs = sync.findSignBlock(bh);
-        }
-        const BlockInfo bi = sync.getFullBlock(bh, beginTx, countTxs);
-        return blockInfoToJson(requestId, bi, signs, type, isFormat, version);
+        return "";
     }
 }
 
@@ -271,22 +231,10 @@ static std::string getBlocks(const RequestId &requestId, const rapidjson::Docume
     const bool isForward = getOpt<std::string>(jsonParams, "direction", "backgward") == std::string("forward");
     
     std::vector<BlockHeader> bhs;
-    std::vector<std::variant<std::vector<TransactionInfo>, std::vector<SignTransactionInfo>>> signs;
     bhs.reserve(countBlocks);
-    signs.reserve(countBlocks);
     
-    const auto processBlock = [&bhs, &signs, &sync, type](int64_t i) {
+    const auto processBlock = [&bhs, &sync, type](int64_t i) {
         bhs.emplace_back(sync.getBlockchain().getBlock(i));
-        if (type == BlockTypeInfo::Simple) {
-            if (bhs.back().countSignTx != 0) {
-                const BlockInfo bi = sync.getFullBlock(bhs.back(), 0, bhs.back().countSignTx);
-                signs.emplace_back(bi.getBlockSignatures());
-            } else {
-                signs.emplace_back(sync.findSignBlock(bhs.back()));
-            }
-        } else {
-            signs.push_back({});
-        }
     };
     
     if (!isForward) {
@@ -300,10 +248,9 @@ static std::string getBlocks(const RequestId &requestId, const rapidjson::Docume
             processBlock(i);
         }
     }
-    signs.emplace_back();
     
     if (type != BlockTypeInfo::ForP2P) {
-        return blockHeadersToJson(requestId, bhs, signs, type, isFormat, version);
+        return "";
     } else {
         CHECK_USER(isForward, "Incorrect direction for p2p");
         
@@ -489,58 +436,6 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             
             const SmallStatisticElement smallStat = smallRequestStatistics.getStatistic();
             response = genStatisticResponse(requestId, smallStat.stat, getProcLoad(), getTotalSystemMemory(), getOpenedConnections());
-        } else if (func == GET_ADDRESS_HISTORY) {            
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const std::string &addressString = get<std::string>(jsonParams, "address");
-            const Address address(addressString);
-            
-            const size_t countTxs = getOpt<int>(jsonParams, "countTxs", 0);
-            const size_t beginTx = getOpt<int>(jsonParams, "beginTx", 0);
-            
-            const std::vector<TransactionInfo> txs = sync.getTxsForAddress(address, beginTx, countTxs, MAX_HISTORY_SIZE);
-            CHECK(txs.size() <= MAX_HISTORY_SIZE, "Incorrect result size");
-            
-            response = addressesInfoToJson(requestId, addressString, txs, sync.getBlockchain(), 0, isFormatJson, jsonVersion);
-        } else if (func == GET_ADDRESS_HISTORY_FILTER) {            
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const std::string &addressString = get<std::string>(jsonParams, "address");
-            const Address address(addressString);
-            
-            const size_t countTxs = getOpt<int>(jsonParams, "countTxs", 0);
-            size_t beginTx = getOpt<int>(jsonParams, "beginTx", 0);
-            
-            const TransactionsFilters filters = parseFilters(jsonParams["filters"]);
-            
-            const std::vector<TransactionInfo> txs = sync.getTxsForAddress(address, beginTx, countTxs, MAX_HISTORY_SIZE, filters);
-            CHECK(txs.size() <= MAX_HISTORY_SIZE, "Incorrect result size");
-            
-            response = addressesInfoToJsonFilter(requestId, addressString, txs, beginTx, sync.getBlockchain(), 0, isFormatJson, jsonVersion);
-        } else if (func == GET_ADDRESS_BALANCE) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const std::string &addressString = get<std::string>(jsonParams, "address");
-            const Address address(addressString);
-            
-            const BalanceInfo balance = sync.getBalance(address);
-            
-            response = balanceInfoToJson(requestId, addressString, balance, sync.getBlockchain().countBlocks(), isFormatJson, jsonVersion);
-        } else if (func == GET_ADDRESS_BALANCES) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const auto &addressesJson = get<JsonArray>(jsonParams, "addresses");
-            
-            std::vector<std::pair<std::string, BalanceInfo>> balances;
-            CHECK_USER(addressesJson.Size() <= MAX_BATCH_BALANCES, "Too many transactions. Please, decrease count addresses");
-            for (const auto &addressJson: addressesJson) {
-                const std::string addressString = get<std::string>(addressJson);
-                const Address address(addressString);
-                const BalanceInfo balance = sync.getBalance(address);
-                balances.emplace_back(addressString, balance);
-            }
-            
-            response = balancesInfoToJson(requestId, balances, sync.getBlockchain().countBlocks(), isFormatJson, jsonVersion);
         } else if (func == GET_BLOCK_BY_HASH) {
             response = getBlock<std::string>(requestId, doc, "hash", sync, isFormatJson, jsonVersion);
         } else if (func == GET_BLOCK_BY_NUMBER) {
@@ -555,46 +450,6 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             response = getBlockDumps<std::string>(doc, requestId, "hashes", sync);
         } else if (func == GET_DUMPS_BLOCKS_BY_NUMBER) {
             response = getBlockDumps<size_t>(doc, requestId, "numbers", sync);
-        } else if (func == GET_LAST_TXS) {
-            response = transactionsToJson(requestId, sync.getLastTxs(), sync.getBlockchain(), isFormatJson, jsonVersion);
-        } else if (func == GET_TRANSACTION_INFO) {           
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-
-            const std::vector<unsigned char> &hash0 = fromHex(get<std::string>(jsonParams, "hash"));
-            const std::string hash(hash0.begin(), hash0.end());
-            
-            const std::optional<TransactionInfo> res = sync.getTransaction(hash);
-            
-            if (!res.has_value()) {
-                response = genTransactionNotFoundResponse(requestId, hash);
-            } else {
-                response = transactionToJson(requestId, res.value(), sync.getBlockchain(), sync.getBlockchain().countBlocks(), sync.getKnownBlock(), isFormatJson, jsonVersion);
-            }
-        } else if (func == GET_TOKEN_INFO) {           
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const Address &address = Address(get<std::string>(jsonParams, "address"));
-            
-            const Token res = sync.getTokenInfo(address);
-            
-            response = tokenToJson(requestId, res, isFormatJson, jsonVersion);
-        } else if (func == GET_TRANSACTIONS_INFO) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const auto &hashesJson = get<JsonArray>(jsonParams, "hashes");
-            CHECK_USER(hashesJson.Size() <= MAX_BATCH_TXS, "Too many transactions. Please, decrease count transactions");
-            std::vector<TransactionInfo> txsResult;
-            for (const auto &hashJson: hashesJson) {
-                const auto &hash0 = fromHex(get<std::string>(hashJson));
-                const std::string hash(hash0.begin(), hash0.end());
-                
-                const std::optional<TransactionInfo> res = sync.getTransaction(hash);
-                
-                if (res.has_value()) {
-                    txsResult.emplace_back(res.value());
-                }
-            }
-            response = transactionsToJson(requestId, txsResult, sync.getBlockchain(), isFormatJson, jsonVersion);
         } else if (func == GET_COUNT_BLOCKS) {
             bool forP2P = false;
             if (doc.HasMember("params") && doc["params"].IsObject()) {
@@ -667,99 +522,6 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             }
             
             response = preLoadBlocksJson(requestId, countBlocks, bhs, blockSignaturesHashes, blocks, isCompress, jsonVersion);
-        } else if (func == GET_ADDRESS_DELEGATIONS) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const Address address(get<std::string>(jsonParams, "address"));
-            
-            const auto result = sync.getDelegateStates(address);
-            
-            response = delegateStatesToJson(requestId, address.calcHexString(), result, isFormatJson, jsonVersion);
-        } else if (func == GET_CONTRACT_DETAILS) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const Address address(get<std::string>(jsonParams, "address"));
-            const std::string path = getOpt<std::string>(jsonParams, "path", "");
-            
-            const auto result = sync.getContractDetails(address);
-            
-            response = genV8DetailsJson(requestId, address.calcHexString(), result, path, isFormatJson);
-        } else if (func == GET_CONTRACT_CODE) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const Address address(get<std::string>(jsonParams, "address"));
-            
-            const auto result = sync.getContractCode(address);
-            
-            response = genV8CodeJson(requestId, address.calcHexString(), result, isFormatJson);
-        } else if (func == GET_COMMON_BALANCE) {
-            const auto result = sync.getCommonBalance();
-            response = genCommonBalanceJson(requestId, result, isFormatJson, jsonVersion);
-        } else if (func == GET_FORGING_SUM) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const int blockIndent = get<int>(jsonParams, "block_indent");
-            const ForgingSums forgingSum = sync.getForgingSumForLastBlock(blockIndent);
-            response = genForgingSumJson(requestId, forgingSum, isFormatJson, jsonVersion);
-        } else if (func == GET_FORGING_SUM_ALL) {
-            const ForgingSums forgingSum = sync.getForgingSumAll();
-            response = genForgingSumJson(requestId, forgingSum, isFormatJson, jsonVersion);
-        } else if (func == GET_LAST_NODE_STAT_RESULT) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const std::string &addressString = get<std::string>(jsonParams, "address");
-            
-            const auto result = sync.getLastNodeTestResult(addressString);
-            
-            response = genNodeStatResultJson(requestId, addressString, result.first, result.second, isFormatJson, jsonVersion);
-        } else if (func == GET_LAST_NODE_STAT_TRUST) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const std::string &addressString = get<std::string>(jsonParams, "address");
-            
-            const auto result = sync.getLastNodeTestTrust(addressString);
-            
-            response = genNodeStatTrustJson(requestId, addressString, result.first, result.second, isFormatJson, jsonVersion);
-        } else if (func == GET_LAST_NODE_STAT_COUNT) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const std::string &addressString = get<std::string>(jsonParams, "address");
-
-            const auto result = sync.getLastDayNodeTestCount(addressString);
-
-            const size_t lastBlockDay = sync.getLastBlockDay();
-            response = genNodeStatCountJson(requestId, addressString, lastBlockDay, result, isFormatJson, jsonVersion);
-        } else if (func == GET_ALL_LAST_NODES_RESULT) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const size_t &countTests = get<int>(jsonParams, "count_tests");
-            
-            const auto result = sync.filterLastNodes(countTests);
-            
-            const size_t lastBlockDay = sync.getLastBlockDay();
-            response = genAllNodesStatsCountJson(requestId, lastBlockDay, result, isFormatJson, jsonVersion);
-        } else if (func == GET_LAST_NODES_STATS_RESULT) {
-            const auto result = sync.getLastDayNodesTestsCount();
-            
-            const size_t lastBlockDay = sync.getLastBlockDay();
-            response = genNodesStatsCountJson(requestId, lastBlockDay, result, isFormatJson, jsonVersion);
-        } else if (func == GET_NODE_RAITING) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const size_t countTests = getOpt<int>(jsonParams, "count_tests", 10);
-            const std::string &addressString = get<std::string>(jsonParams, "address");
-            
-            const auto result = sync.calcNodeRaiting(addressString, countTests);
-            const size_t lastBlockDay = sync.getLastBlockDay();
-            response = genNodesRaitingJson(requestId, addressString, result.first, result.second, lastBlockDay, isFormatJson, jsonVersion);
-        } else if (func == GET_RANDOM_ADDRESSES) {
-            const auto &jsonParams = get<JsonObject>(doc, "params");
-            
-            const size_t countAddresses = get<size_t>(jsonParams, "count_addresses");
-            
-            const auto result = sync.getRandomAddresses(countAddresses);
-            
-            response = genRandomAddressesJson(requestId, result, isFormatJson);
         } else {
             throwUserErr("Incorrect func " + func);
         }
