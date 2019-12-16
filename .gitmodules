@@ -1,6 +1,3 @@
-[submodule "3rdParty/ubuntu14/libsniper"]
-	path = 3rdParty/ubuntu14/libsniper/libsniper
-	url = git@github.com:metahashorg/libsniper.git
 [submodule "3rdParty/ubuntu18/libsniper"]
 	path = 3rdParty/ubuntu18/libsniper
 	url = git@github.com:metahashorg/libsniper.git

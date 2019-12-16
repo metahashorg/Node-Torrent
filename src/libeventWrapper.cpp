@@ -1,6 +1,10 @@
 #include "libeventWrapper.h"
 
+#ifdef UBUNTU14
+#include <mh/libevent/LibEvent.h>
+#else
 #include <sniper/http/SyncClient.h>
+#endif
 
 #include "check.h"
 #include "OopUtils.h"
@@ -32,7 +36,11 @@ void LibEvent::destroy() {
 LibEvent::LibEventInstance LibEvent::getInstance() {
     CHECK(isInitialized.load(), "not initialized");
     
-    std::unique_ptr<sniper::http::SyncClient> libevent = std::make_unique<sniper::http::SyncClient>(10s);
+#ifdef UBUNTU14
+    std::unique_ptr<SyncClient> libevent = std::make_unique<SyncClient>();
+#else
+    std::unique_ptr<SyncClient> libevent = std::make_unique<SyncClient>(10s);
+#endif
     CHECK(libevent != nullptr, "libevent == nullptr");
     
     return LibEventInstance(std::move(libevent));
@@ -45,18 +53,38 @@ std::string LibEvent::request(const LibEvent::LibEventInstance& instance, const 
     CHECK(lock.owns_lock(), "Curl instanse one of thread");
     
     CHECK(instance.libevent != nullptr, "Incorrect curl instance");
-    sniper::http::SyncClient &libevent = *instance.libevent.get();
-
+    SyncClient &libevent = *instance.libevent.get();
+    
+#ifdef UBUNTU14
+    const size_t found = url.find_last_of(":");
+    std::string host = url;
+    int port = 80;
+    if (found != url.npos && url.substr(0, found) != "http" && url.substr(0, found) != "https") {
+        host = url.substr(0, found);
+        port = std::stoi(url.substr(found + 1));
+    }
+    std::string path;
+    const size_t foundPath = url.find("/");
+    if (foundPath != url.npos) {
+        host = url.substr(0, std::min(host.size(), foundPath));
+        path = url.substr(foundPath);
+    }
+    
+    std::string response;
+    libevent.post_keep_alive(host, port, host, path, postData, response, timeoutSec * 1000);
+    
+    return response;
+#else
     const auto response = libevent.post(url, postData);
-
     return std::string(response->data());
+#endif
 }
 
 LibEvent::LibEventInstance::LibEventInstance()
     : libevent(nullptr)
 {}
 
-LibEvent::LibEventInstance::LibEventInstance(std::unique_ptr<sniper::http::SyncClient> &&libevent)
+LibEvent::LibEventInstance::LibEventInstance(std::unique_ptr<SyncClient> &&libevent)
     : libevent(std::move(libevent))
 {}
 

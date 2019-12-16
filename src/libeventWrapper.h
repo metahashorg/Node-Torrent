@@ -6,11 +6,21 @@
 #include <atomic>
 #include <memory>
 
+#ifdef UBUNTU14
+namespace mh {
+namespace libevent {
+class LibEvent;
+}
+}
+using SyncClient = mh::libevent::LibEvent;
+#else
 namespace sniper {
 namespace http {
 class SyncClient;
 }
 }
+using SyncClient = sniper::http::SyncClient;
+#endif
 
 struct LibEvent {
 public:
@@ -20,7 +30,7 @@ public:
         
         LibEventInstance();
         
-        LibEventInstance(std::unique_ptr<sniper::http::SyncClient> &&libevent);
+        LibEventInstance(std::unique_ptr<SyncClient> &&libevent);
                 
         LibEventInstance(LibEventInstance &&second);
         
@@ -28,7 +38,7 @@ public:
         
         LibEventInstance& operator=(LibEventInstance &&second);
                 
-        std::unique_ptr<sniper::http::SyncClient> libevent;
+        std::unique_ptr<SyncClient> libevent;
         
     private:
         

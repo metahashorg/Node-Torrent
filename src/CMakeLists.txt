@@ -1,6 +1,10 @@
 include_directories(/usr/local/include)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+if (DEFINED UBUNTU14)
+add_definitions(-DUBUNTU14="")
+endif()
+
 if (NOT DEFINED UBUNTU14)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/secp256k1/include/)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/openssl/include/)
@@ -17,6 +21,7 @@ if (DEFINED UBUNTU14)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/rapidjson/)
     include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/libconfig/include/)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/lz4/include/)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/libsniper/)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../common_utils/")
@@ -171,6 +176,18 @@ if (DEFINED UBUNTU14)
 
     find_library(CONFIG1_LIB NAMES libconfig++.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/libconfig/lib/)
     find_library(CONFIG2_LIB NAMES libconfig.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/libconfig/lib/)
+endif()
+
+if (DEFINED UBUNTU14)
+    find_package(MHSupport)
+
+    SET(SNIPER_LIBRARIES
+        mh_mhd
+        mh_xxhash
+        mh_libevent
+        
+        uriparser.a
+    )
 endif()
 
 set(PROJECT_LIBS

@@ -1,8 +1,6 @@
 #ifndef SERVER_H_
 #define SERVER_H_
 
-#include <sniper/mhd/MHD.h>
-
 #include <string>
 #include <atomic>
 
@@ -12,7 +10,15 @@ namespace torrent_node_lib {
 class Sync;
 }
 
-class Server: public sniper::mhd::MHD {
+#ifdef UBUNTU14
+#include <mh/mhd/MHD.h>
+using MHD = mh::mhd::MHD;
+#else
+#include <sniper/mhd/MHD.h>
+using MHD = sniper::mhd::MHD;
+#endif
+
+class Server: public MHD {
 public:
     
     Server(const torrent_node_lib::Sync &sync, int port, std::atomic<int> &countRunningThreads, const std::string &serverPrivKey) 

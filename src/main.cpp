@@ -57,7 +57,8 @@ static void serverThreadFunc(const Sync &sync, int port, const std::string &serv
     try {
         Server server(sync, port, countRunningServerThreads, serverPrivKey);
         std::this_thread::sleep_for(1s); // Небольшая задержка сервера перед запуском
-        server.start("./");
+        const bool res = server.start("./");
+        CHECK(res, "Not started server");
     } catch (const exception &e) {
         LOGERR << e;
     } catch (const std::exception &e) {

@@ -802,9 +802,11 @@ bool Server::init() {
     
     set_threads(COUNT_THREADS);
     set_port(port);
-
+    
+#ifndef UBUNTU14
     set_connection_limit(200000);
     set_per_ip_connection_limit(100);
+#endif
 
     return true;
 }
