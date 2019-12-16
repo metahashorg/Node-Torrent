@@ -10,6 +10,14 @@ if (NOT DEFINED UBUNTU14)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/lz4/include/)
     include_directories(${SNIPER_INCLUDE_DIRS})
 endif()
+if (DEFINED UBUNTU14)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/secp256k1/include/)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/openssl/include/)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/leveldb/include/)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/rapidjson/)
+    include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/libconfig/include/)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/lz4/include/)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../common_utils/")
 include(common_utils)
@@ -148,6 +156,21 @@ if (NOT DEFINED UBUNTU14)
 
     find_library(CONFIG1_LIB NAMES libconfig++.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/libconfig/lib/)
     find_library(CONFIG2_LIB NAMES libconfig.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/libconfig/lib/)
+endif()
+if (DEFINED UBUNTU14)
+    find_library(LEVELDB NAMES libleveldb.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/leveldb/lib)
+    find_library(LEVELDB_SNAPPY NAMES libsnappy.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/leveldb/lib)
+    find_library(LEVELDB_MEMENV NAMES libmemenv.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/leveldb/lib)
+
+    find_library(SECP_LIB NAMES libsecp256k1.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/secp256k1/lib/)
+
+    find_library(SSL_LIB_1 NAMES libcrypto.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/openssl/lib/)
+    find_library(SSL_LIB_2 NAMES libssl.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/openssl/lib/)
+
+    find_library(LZ4_LIB NAMES lib_lz4.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/lz4/lib/)
+
+    find_library(CONFIG1_LIB NAMES libconfig++.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/libconfig/lib/)
+    find_library(CONFIG2_LIB NAMES libconfig.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/libconfig/lib/)
 endif()
 
 set(PROJECT_LIBS
