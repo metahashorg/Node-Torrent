@@ -14,6 +14,10 @@
 #include "stringUtils.h"
 #include "utils/serialize.h"
 #include "log.h"
+#include "blockchain_structs/AddressInfo.h"
+#include "blockchain_structs/Token.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 using namespace common;
 

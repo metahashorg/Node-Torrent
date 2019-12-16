@@ -21,6 +21,9 @@
 
 #include "Workers/ScriptBlockInfo.h"
 #include "Workers/NodeTestsBlockInfo.h"
+#include "blockchain_structs/Token.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 using namespace common;
 

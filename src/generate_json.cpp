@@ -16,6 +16,9 @@
 #include "BlockInfo.h"
 #include "Workers/ScriptBlockInfo.h"
 #include "Workers/NodeTestsBlockInfo.h"
+#include "blockchain_structs/Token.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 using namespace common;
 using namespace torrent_node_lib;
@@ -297,7 +300,7 @@ std::string transactionsToJson(const RequestId &requestId, const std::vector<Tra
     return jsonToString(doc, isFormat);
 }
 
-std::string tokenToJson(const RequestId &requestId, const torrent_node_lib::Token &info, bool isFormat, const JsonVersion &version) {
+std::string tokenToJson(const RequestId &requestId, const Token &info, bool isFormat, const JsonVersion &version) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
     addIdToResponse(requestId, doc, allocator);
@@ -327,7 +330,7 @@ std::string addressesInfoToJson(const RequestId &requestId, const std::string &a
     return jsonToString(doc, isFormat);
 }
 
-std::string addressesInfoToJsonFilter(const RequestId &requestId, const std::string &address, const std::vector<torrent_node_lib::TransactionInfo> &infos, size_t nextFrom, const torrent_node_lib::BlockChainReadInterface &blockchain, size_t currentBlock, bool isFormat, const JsonVersion &version) {
+std::string addressesInfoToJsonFilter(const RequestId &requestId, const std::string &address, const std::vector<TransactionInfo> &infos, size_t nextFrom, const torrent_node_lib::BlockChainReadInterface &blockchain, size_t currentBlock, bool isFormat, const JsonVersion &version) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
     addIdToResponse(requestId, doc, allocator);
@@ -376,8 +379,8 @@ static rapidjson::Value balanceInfoToJson(const std::string &address, const Bala
             
             const Address tokenAddress(token.begin(), token.end());
             tokenJson.AddMember("token", strToJson(tokenAddress.calcHexString(), allocator), allocator);
-            tokenJson.AddMember("received", intOrString(b.balance.received(), isStringValue, allocator), allocator);
-            tokenJson.AddMember("spent", intOrString(b.balance.spent(), isStringValue, allocator), allocator);
+            tokenJson.AddMember("received", intOrString(b.balance.balance(), isStringValue, allocator), allocator);
+            tokenJson.AddMember("spent", intOrString(b.balance.balance(), isStringValue, allocator), allocator);
             tokenJson.AddMember("countTokenOps", intOrString(b.countOp, isStringValue, allocator), allocator);
             
             tokens.PushBack(tokenJson, allocator);
@@ -395,7 +398,7 @@ std::string balanceInfoToJson(const RequestId &requestId, const std::string &add
     return jsonToString(doc, isFormat);
 }
 
-std::string balancesInfoToJson(const RequestId &requestId, const std::vector<std::pair<std::string, torrent_node_lib::BalanceInfo>> &balances, size_t currentBlock, bool isFormat, const JsonVersion &version) {
+std::string balancesInfoToJson(const RequestId &requestId, const std::vector<std::pair<std::string, BalanceInfo>> &balances, size_t currentBlock, bool isFormat, const JsonVersion &version) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
     addIdToResponse(requestId, doc, allocator);

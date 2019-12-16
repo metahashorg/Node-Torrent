@@ -18,6 +18,7 @@
 #include "BlockInfo.h"
 
 #include "BlockchainUtils.h"
+#include "blockchain_structs/TransactionInfo.h"
 
 using namespace common;
 

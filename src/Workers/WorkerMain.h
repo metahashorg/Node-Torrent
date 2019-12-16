@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <functional>
 
-#include "Address.h"
+#include "blockchain_structs/Address.h"
 #include "utils/Counter.h"
 #include "BlockedQueue.h"
 #include "Thread.h"
@@ -15,6 +15,10 @@
 #include "TransactionFilters.h"
 
 #include "Worker.h"
+#include "blockchain_structs/AddressInfo.h"
+#include "blockchain_structs/Token.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 namespace torrent_node_lib {
 

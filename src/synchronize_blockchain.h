@@ -11,6 +11,9 @@
 #include <variant>
 
 #include "ConfigOptions.h"
+#include "blockchain_structs/Token.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 namespace torrent_node_lib {
 

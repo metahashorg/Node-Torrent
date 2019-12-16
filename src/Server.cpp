@@ -25,6 +25,9 @@
 
 #include "stopProgram.h"
 #include "utils/SystemInfo.h"
+#include "blockchain_structs/Token.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 using namespace common;
 using namespace torrent_node_lib;

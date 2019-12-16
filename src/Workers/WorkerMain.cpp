@@ -15,6 +15,10 @@
 #include "utils/FileSystem.h"
 
 #include "Modules.h"
+#include "blockchain_structs/AddressInfo.h"
+#include "blockchain_structs/Token.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 #include <rapidjson/document.h>
 

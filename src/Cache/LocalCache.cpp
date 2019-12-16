@@ -6,6 +6,8 @@
 #include "convertStrings.h"
 #include "stopProgram.h"
 #include "parallel_for.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 #include <fstream>
 #include <functional>

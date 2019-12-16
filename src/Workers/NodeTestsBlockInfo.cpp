@@ -2,6 +2,7 @@
 
 #include "utils/serialize.h"
 #include "check.h"
+#include "blockchain_structs/FilePosition.h"
 
 #include <algorithm>
 #include <functional>

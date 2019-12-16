@@ -15,6 +15,8 @@
 #include "duration.h"
 
 #include "utils/Heap.h"
+#include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BalanceInfo.h"
 
 namespace torrent_node_lib {
 

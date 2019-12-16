@@ -72,7 +72,7 @@ set(LIBRARY_HEADERS
     Modules.h
     ConfigOptions.h
     synchronize_blockchain.h
-    Address.h
+    blockchain_structs/Address.h
     utils/compress.h
     utils/serialize.h
 )
@@ -96,7 +96,13 @@ set(LIBRARY_SOURCES
     BlockSource/NetworkBlockSource.cpp
     BlockSource/get_new_blocks_messages.cpp
 
-    Address.cpp
+    blockchain_structs/Address.cpp
+    blockchain_structs/FilePosition.cpp
+    blockchain_structs/AddressInfo.cpp
+    blockchain_structs/Token.cpp
+    blockchain_structs/TransactionInfo.cpp
+    blockchain_structs/BalanceInfo.cpp
+
     BlockInfo.cpp
 
     Cache/Cache.cpp
@@ -142,7 +148,7 @@ set(PROJECT_MAIN
 
     utils/Graph.cpp
     P2P/P2P_Graph.cpp
-)
+    blockchain_structs/FilePosition.h)
 
 #Threads
 find_package(Threads)

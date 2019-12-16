@@ -9,6 +9,7 @@
 #include "Cache/Cache.h"
 
 #include "generate_json_v8.h"
+#include "blockchain_structs/TransactionInfo.h"
 
 using namespace common;
 

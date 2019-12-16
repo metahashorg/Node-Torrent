@@ -6,7 +6,8 @@
 #include <set>
 #include <map>
 
-#include "Address.h"
+#include "blockchain_structs/Address.h"
+#include "blockchain_structs/FilePosition.h"
 
 #include "BlockInfo.h"
 

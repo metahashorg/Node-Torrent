@@ -13,6 +13,7 @@
 #include "LocalCache.h"
 
 #include "HashedString.h"
+#include "blockchain_structs/TransactionInfo.h"
 
 namespace torrent_node_lib {
 

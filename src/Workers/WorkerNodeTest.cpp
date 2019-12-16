@@ -16,6 +16,7 @@
 #include "jsonUtils.h"
 
 #include "utils/FileSystem.h"
+#include "blockchain_structs/TransactionInfo.h"
 
 using namespace common;
 

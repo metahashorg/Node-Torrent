@@ -5,6 +5,7 @@
 #include "convertStrings.h"
 
 #include "Cache/Cache.h"
+#include "blockchain_structs/TransactionInfo.h"
 
 using namespace common;
 
