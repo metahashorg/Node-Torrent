@@ -1,5 +1,5 @@
 [submodule "3rdParty/libsniper"]
-	path = 3rdParty/libsniper
+	path = 3rdParty/ubuntu18/libsniper
 	url = git@github.com:metahashorg/libsniper.git
 [submodule "common_utils"]
 	path = common_utils
