@@ -1,12 +1,10 @@
-//
-// Created by user on 16.12.2019.
-//
+#include "BalanceInfo.h"
 
 #include <blockchain_structs/TransactionInfo.h>
 #include <blockchain_structs/Address.h>
+
 #include <check.h>
 #include <utils/serialize.h>
-#include "BalanceInfo.h"
 
 namespace torrent_node_lib {
 

@@ -1,6 +1,7 @@
+#include "DelegateState.h"
+
 #include <check.h>
 #include <utils/serialize.h>
-#include "DelegateState.h"
 
 namespace torrent_node_lib {
 void DelegateState::serialize(std::vector<char> &buffer) const {

@@ -3,14 +3,10 @@
 
 #include <string>
 #include <vector>
-#include <optional>
-#include <variant>
-#include <set>
 #include <unordered_map>
-#include "duration.h"
-#include "blockchain_structs/Address.h"
-#include "blockchain_structs/FilePosition.h"
-#include "blockchain_structs/TransactionInfo.h"
+
+#include "FilePosition.h"
+#include "Address.h"
 
 namespace torrent_node_lib {
 struct MinimumSignBlockHeader {

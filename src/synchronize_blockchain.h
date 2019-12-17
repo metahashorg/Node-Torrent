@@ -11,16 +11,10 @@
 #include <variant>
 
 #include "ConfigOptions.h"
-#include "blockchain_structs/Token.h"
-#include "blockchain_structs/TransactionInfo.h"
-#include "blockchain_structs/BalanceInfo.h"
-#include "blockchain_structs/CommonBalance.h"
-#include "blockchain_structs/SignBlock.h"
-#include "blockchain_structs/RejectedTxsBlock.h"
-#include "blockchain_structs/DelegateState.h"
 
 namespace torrent_node_lib {
 
+struct FilePosition;
 class BlockChainReadInterface;
 class Address;
 struct TransactionInfo;
@@ -40,8 +34,8 @@ struct Token;
 struct SignBlockInfo;
 struct SignTransactionInfo;
 struct MinimumSignBlockHeader;
-struct CommonMimimumBlockHeader;
 struct RejectedTxsBlockInfo;
+struct V8Details;
 
 struct TransactionsFilters;
 

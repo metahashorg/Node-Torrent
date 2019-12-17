@@ -1,6 +1,6 @@
-#include <utils/serialize.h>
-#include <blockchain_structs/Address.h>
 #include "Token.h"
+
+#include "utils/serialize.h"
 
 namespace torrent_node_lib {
 void Token::serialize(std::vector<char> &buffer) const {

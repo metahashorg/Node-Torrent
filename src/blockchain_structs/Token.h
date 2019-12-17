@@ -3,9 +3,8 @@
 
 #include <string>
 #include <vector>
-#include <optional>
+
 #include "blockchain_structs/Address.h"
-#include "blockchain_structs/FilePosition.h"
 
 namespace torrent_node_lib {
 

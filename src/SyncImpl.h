@@ -24,7 +24,6 @@ namespace torrent_node_lib {
 
 extern bool isInitialized;
 
-class Statistics;
 class Worker;
 class WorkerCache;
 class WorkerScript;

@@ -1,17 +1,4 @@
-#include <log.h>
-#include "Workers/MainBlockInfo.h"
 #include "blockchain_structs/BlocksMetadata.h"
-#include "blockchain_structs/RejectedTxsBlock.h"
-#include "blockchain_structs/SignBlock.h"
-#include "blockchain_structs/CommonBalance.h"
-#include "blockchain_structs/BalanceInfo.h"
-#include "blockchain_structs/TransactionInfo.h"
-#include "blockchain_structs/Token.h"
-#include "blockchain_structs/AddressInfo.h"
-#include "stringUtils.h"
-#include "convertStrings.h"
-#include "BlockInfo.h"
-#include "BlocksMetadata.h"
 
 #include "check.h"
 #include "utils/serialize.h"

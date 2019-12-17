@@ -9,19 +9,6 @@
 #include <mutex>
 #include <vector>
 
-#include "blockchain_structs/BlockInfo.h"
-#include "Workers/NodeTestsBlockInfo.h"
-#include "Workers/ScriptBlockInfo.h"
-#include "blockchain_structs/AddressInfo.h"
-#include "blockchain_structs/Token.h"
-#include "blockchain_structs/TransactionInfo.h"
-#include "blockchain_structs/BalanceInfo.h"
-#include "blockchain_structs/CommonBalance.h"
-#include "blockchain_structs/SignBlock.h"
-#include "blockchain_structs/BlocksMetadata.h"
-#include "Workers/MainBlockInfo.h"
-#include "blockchain_structs/DelegateState.h"
-
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
 
@@ -35,6 +22,41 @@ struct hash<std::vector<char>> {
 }
 
 namespace torrent_node_lib {
+
+struct FilePosition;
+class BlockChainReadInterface;
+class Address;
+struct TransactionInfo;
+struct BlockHeader;
+struct BlockInfo;
+struct BalanceInfo;
+struct DelegateState;
+struct V8Details;
+struct CommonBalance;
+struct V8Code;
+struct ForgingSums;
+struct NodeTestResult;
+struct NodeTestTrust;
+struct NodeTestCount;
+struct NodeTestExtendedStat;
+struct Token;
+struct SignBlockInfo;
+struct SignTransactionInfo;
+struct MinimumSignBlockHeader;
+struct RejectedTxsBlockInfo;
+struct AddressInfo;
+struct V8State;
+struct BestNodeTest;
+struct NodeTestDayNumber;
+struct AllTestedNodes;
+struct NodeRps;
+struct MainBlockInfo;
+struct NodeStatBlockInfo;
+struct ScriptBlockInfo;
+struct AllNodes;
+struct SignBlockHeader;
+struct BlocksMetadata;
+struct TransactionStatus;
 
 struct FileInfo;
 struct CroppedFileName;

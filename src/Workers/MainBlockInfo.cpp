@@ -1,6 +1,7 @@
+#include "MainBlockInfo.h"
+
 #include <check.h>
 #include <utils/serialize.h>
-#include "MainBlockInfo.h"
 
 namespace torrent_node_lib {
 std::string MainBlockInfo::serialize() const {

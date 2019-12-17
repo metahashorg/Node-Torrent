@@ -7,7 +7,9 @@
 #include <variant>
 #include <set>
 #include <unordered_map>
+
 #include "duration.h"
+
 #include "blockchain_structs/Address.h"
 #include "blockchain_structs/FilePosition.h"
 

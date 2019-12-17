@@ -23,6 +23,8 @@
 #include "blockchain_structs/BlocksMetadata.h"
 #include "Workers/MainBlockInfo.h"
 #include "blockchain_structs/DelegateState.h"
+#include "Workers/ScriptBlockInfo.h"
+#include "Workers/NodeTestsBlockInfo.h"
 
 using namespace common;
 

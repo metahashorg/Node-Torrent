@@ -2,20 +2,9 @@
 
 #include "check.h"
 #include "utils/serialize.h"
-#include "convertStrings.h"
 #include "stringUtils.h"
 #include "blockchain_structs/AddressInfo.h"
-#include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
-#include "blockchain_structs/BalanceInfo.h"
-#include "blockchain_structs/CommonBalance.h"
-#include "blockchain_structs/SignBlock.h"
-#include "blockchain_structs/RejectedTxsBlock.h"
-#include "blockchain_structs/BlocksMetadata.h"
-#include "Workers/MainBlockInfo.h"
-#include "blockchain_structs/BlocksMetadata.h"
-#include "blockchain_structs/DelegateState.h"
-#include <log.h>
 
 using namespace common;
 

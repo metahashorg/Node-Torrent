@@ -15,12 +15,6 @@
 #include "TransactionFilters.h"
 
 #include "Worker.h"
-#include "blockchain_structs/AddressInfo.h"
-#include "blockchain_structs/Token.h"
-#include "blockchain_structs/TransactionInfo.h"
-#include "blockchain_structs/BalanceInfo.h"
-#include "blockchain_structs/CommonBalance.h"
-#include "blockchain_structs/DelegateState.h"
 
 namespace torrent_node_lib {
 
@@ -28,7 +22,6 @@ struct AllCaches;
 class LevelDb;
 class Batch;
 class BlockChain;
-class Statistics;
 struct TransactionInfo;
 struct BalanceInfo;
 struct CommonBalance;

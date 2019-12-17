@@ -9,17 +9,12 @@
 
 #include "Workers/ScriptBlockInfo.h"
 #include "Workers/NodeTestsBlockInfo.h"
-#include "blockchain_structs/Token.h"
-#include "blockchain_structs/TransactionInfo.h"
-#include "blockchain_structs/BalanceInfo.h"
-#include "blockchain_structs/CommonBalance.h"
-#include "blockchain_structs/SignBlock.h"
-#include "blockchain_structs/RejectedTxsBlock.h"
-#include "blockchain_structs/DelegateState.h"
 
 using namespace common;
 
 namespace torrent_node_lib {
+
+struct V8Details;
 
 void initBlockchainUtils() {
     initBlockchainUtilsImpl();

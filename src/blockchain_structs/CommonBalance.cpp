@@ -1,20 +1,8 @@
-#include <log.h>
-#include "blockchain_structs/DelegateState.h"
-#include "Workers/MainBlockInfo.h"
-#include "blockchain_structs/BlocksMetadata.h"
-#include "blockchain_structs/RejectedTxsBlock.h"
-#include "blockchain_structs/SignBlock.h"
-#include "blockchain_structs/CommonBalance.h"
-#include "blockchain_structs/BalanceInfo.h"
-#include "blockchain_structs/TransactionInfo.h"
-#include "blockchain_structs/Token.h"
-#include "blockchain_structs/AddressInfo.h"
-#include "stringUtils.h"
-#include "convertStrings.h"
-#include "check.h"
-#include "BlockInfo.h"
-#include <utils/serialize.h>
 #include "CommonBalance.h"
+
+#include "stringUtils.h"
+#include "check.h"
+#include <utils/serialize.h>
 
 namespace torrent_node_lib {
 void CommonBalance::serialize(std::vector<char>& buffer) const {

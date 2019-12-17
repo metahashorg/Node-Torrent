@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <optional>
-#include "duration.h"
+
 #include "blockchain_structs/FilePosition.h"
 
 namespace torrent_node_lib {

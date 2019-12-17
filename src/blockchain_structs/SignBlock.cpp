@@ -1,6 +1,7 @@
+#include "SignBlock.h"
+
 #include <check.h>
 #include <utils/serialize.h>
-#include "SignBlock.h"
 
 namespace torrent_node_lib {
 std::string SignBlockHeader::serialize() const {

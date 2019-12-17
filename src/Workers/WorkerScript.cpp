@@ -10,6 +10,7 @@
 
 #include "generate_json_v8.h"
 #include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 using namespace common;
 

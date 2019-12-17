@@ -1,7 +1,8 @@
+#include "TransactionInfo.h"
+
 #include <check.h>
 #include <utils/serialize.h>
 #include <blockchain_structs/FilePosition.h>
-#include "TransactionInfo.h"
 
 namespace torrent_node_lib {
 

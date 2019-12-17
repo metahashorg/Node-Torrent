@@ -6,6 +6,7 @@
 
 #include "Cache/Cache.h"
 #include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 using namespace common;
 

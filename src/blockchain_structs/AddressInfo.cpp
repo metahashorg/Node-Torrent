@@ -2,7 +2,6 @@
 
 #include <check.h>
 #include <utils/serialize.h>
-#include <blockchain_structs/FilePosition.h>
 
 namespace torrent_node_lib {
 

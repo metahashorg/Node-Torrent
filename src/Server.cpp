@@ -29,6 +29,9 @@
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
 #include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/Address.h"
+#include "blockchain_structs/DelegateState.h"
+#include "blockchain_structs/CommonBalance.h"
 
 using namespace common;
 using namespace torrent_node_lib;
