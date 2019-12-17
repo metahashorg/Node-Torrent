@@ -8,6 +8,8 @@
 
 #include "utils/IfStream.h"
 #include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
 
 namespace torrent_node_lib {
 

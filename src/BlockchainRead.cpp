@@ -15,10 +15,12 @@
 #include "utils/serialize.h"
 
 #include "Modules.h"
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 #include "BlockchainUtils.h"
 #include "blockchain_structs/TransactionInfo.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
 
 using namespace common;
 

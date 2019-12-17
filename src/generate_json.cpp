@@ -13,12 +13,15 @@
 #include "convertStrings.h"
 #include "utils/compress.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 #include "Workers/ScriptBlockInfo.h"
 #include "Workers/NodeTestsBlockInfo.h"
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/DelegateState.h"
 
 using namespace common;
 using namespace torrent_node_lib;
@@ -642,7 +645,7 @@ std::string genBlockDumpJson(const RequestId &requestId, const std::string &bloc
     return jsonToString(doc, isFormat);
 }
 
-std::string delegateStatesToJson(const RequestId &requestId, const std::string &address, const std::vector<std::pair<torrent_node_lib::Address, torrent_node_lib::DelegateState>> &states, bool isFormat, const JsonVersion &version) {
+std::string delegateStatesToJson(const RequestId &requestId, const std::string &address, const std::vector<std::pair<torrent_node_lib::Address, DelegateState>> &states, bool isFormat, const JsonVersion &version) {
     const bool isStringValue = version == JsonVersion::V2;
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();

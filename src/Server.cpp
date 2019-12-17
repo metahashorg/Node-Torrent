@@ -4,7 +4,7 @@
 #include <variant>
 
 #include "synchronize_blockchain.h"
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 #include "Workers/ScriptBlockInfo.h"
 #include "Workers/NodeTestsBlockInfo.h"
 
@@ -28,6 +28,7 @@
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/SignBlock.h"
 
 using namespace common;
 using namespace torrent_node_lib;
@@ -332,14 +333,14 @@ std::string getBlockDump(const rapidjson::Document &doc, const RequestId &reques
     std::string blockDump;
     if constexpr (!std::is_same_v<std::decay_t<T>, std::string>) {
         CHECK_USER(bh.blockNumber.has_value(), "block " + to_string(hashOrNumber) + " not found");
-        blockDump = sync.getBlockDump(CommonMimimumBlockHeader(bh.hash, bh.filePos), fromByte, toByte, isHex, isSign);
+        blockDump = sync.getBlockDump(bh.hash, bh.filePos, fromByte, toByte, isHex, isSign);
     } else {
         if (bh.blockNumber.has_value()) {
-            blockDump = sync.getBlockDump(CommonMimimumBlockHeader(bh.hash, bh.filePos), fromByte, toByte, false, isSign);
+            blockDump = sync.getBlockDump(bh.hash, bh.filePos, fromByte, toByte, false, isSign);
         } else {
             const std::optional<MinimumSignBlockHeader> foundSignBlock = sync.findSignature(fromHex(hashOrNumber));
             CHECK(foundSignBlock.has_value(), "block " + to_string(hashOrNumber) + " not found");
-            blockDump = sync.getBlockDump(CommonMimimumBlockHeader(foundSignBlock->hash, foundSignBlock->filePos), fromByte, toByte, isHex, isSign);
+            blockDump = sync.getBlockDump(foundSignBlock->hash, foundSignBlock->filePos, fromByte, toByte, isHex, isSign);
         }
     }
     const std::string res = genDumpBlockBinary(blockDump, isCompress);
@@ -372,14 +373,14 @@ std::string getBlockDumps(const rapidjson::Document &doc, const RequestId &reque
         std::string blockDump;
         if constexpr (!std::is_same_v<std::decay_t<T>, std::string>) {
             CHECK_USER(bh.blockNumber.has_value(), "block " + to_string(hashOrNumber) + " not found");
-            blockDump = sync.getBlockDump(CommonMimimumBlockHeader(bh.hash, bh.filePos), fromByte, toByte, false, isSign);
+            blockDump = sync.getBlockDump(bh.hash, bh.filePos, fromByte, toByte, false, isSign);
         } else {
             if (bh.blockNumber.has_value()) {
-                blockDump = sync.getBlockDump(CommonMimimumBlockHeader(bh.hash, bh.filePos), fromByte, toByte, false, isSign);
+                blockDump = sync.getBlockDump(bh.hash, bh.filePos, fromByte, toByte, false, isSign);
             } else {
                 const std::optional<MinimumSignBlockHeader> foundSignBlock = sync.findSignature(fromHex(hashOrNumber));
                 CHECK(foundSignBlock.has_value(), "block " + to_string(hashOrNumber) + " not found");
-                blockDump = sync.getBlockDump(CommonMimimumBlockHeader(foundSignBlock->hash, foundSignBlock->filePos), fromByte, toByte, false, isSign);
+                blockDump = sync.getBlockDump(foundSignBlock->hash, foundSignBlock->filePos, fromByte, toByte, false, isSign);
             }
         }
         const std::string &res = blockDump;
@@ -643,7 +644,7 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
                     }
                     
                     bhs.emplace_back(bh);
-                    blocks.emplace_back(sync.getBlockDump(CommonMimimumBlockHeader(bh.hash, bh.filePos), 0, std::numeric_limits<size_t>::max(), false, isSign));
+                    blocks.emplace_back(sync.getBlockDump(bh.hash, bh.filePos, 0, std::numeric_limits<size_t>::max(), false, isSign));
                 }
             }
             
@@ -654,7 +655,7 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
                 
                 for (const auto &elements: blockSignatures) {
                     for (const MinimumSignBlockHeader &element: elements) {
-                        blocks.emplace_back(sync.getBlockDump(CommonMimimumBlockHeader(element.hash, element.filePos), 0, std::numeric_limits<size_t>::max(), false, isSign));
+                        blocks.emplace_back(sync.getBlockDump(element.hash, element.filePos, 0, std::numeric_limits<size_t>::max(), false, isSign));
                     }
                 }
             } else {
@@ -662,7 +663,7 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
                     const BlockHeader &b = sync.getBlockchain().getBlock(countBlocks);
                     const std::vector<MinimumSignBlockHeader> signatures = sync.getSignaturesBetween(b.hash, std::nullopt);
                     for (const MinimumSignBlockHeader &element: signatures) {
-                        blocks.emplace_back(sync.getBlockDump(CommonMimimumBlockHeader(element.hash, element.filePos), 0, std::numeric_limits<size_t>::max(), false, isSign));
+                        blocks.emplace_back(sync.getBlockDump(element.hash, element.filePos, 0, std::numeric_limits<size_t>::max(), false, isSign));
                     }
                     
                     blockSignaturesHashes = blockSignaturesConvert({signatures});

@@ -5,6 +5,9 @@
 
 #include "log.h"
 #include "check.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
+#include "blockchain_structs/BlocksMetadata.h"
 
 using namespace common;
 

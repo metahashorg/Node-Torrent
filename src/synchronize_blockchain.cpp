@@ -12,6 +12,10 @@
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
+#include "blockchain_structs/DelegateState.h"
 
 using namespace common;
 
@@ -39,8 +43,8 @@ BalanceInfo Sync::getBalance(const Address& address) const {
     return impl->getBalance(address);
 }
 
-std::string Sync::getBlockDump(const CommonMimimumBlockHeader& bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
-    return impl->getBlockDump(bh, fromByte, toByte, isHex, isSign);
+std::string Sync::getBlockDump(const std::vector<unsigned char> &hash, const FilePosition &filePos, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
+    return impl->getBlockDump(hash, filePos, fromByte, toByte, isHex, isSign);
 }
 
 BlockInfo Sync::getFullBlock(const BlockHeader& bh, size_t beginTx, size_t countTx) const {

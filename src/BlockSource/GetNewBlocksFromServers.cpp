@@ -5,7 +5,7 @@ using namespace std::placeholders;
 
 #include <mutex>
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 #include "check.h"
 #include "log.h"

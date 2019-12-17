@@ -1,7 +1,8 @@
 #ifndef BLOCKS_TIMELINE_H_
 #define BLOCKS_TIMELINE_H_
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
+#include "blockchain_structs/SignBlock.h"
 
 #include <map>
 #include <list>

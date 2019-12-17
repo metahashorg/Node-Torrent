@@ -6,13 +6,16 @@
 #include "OopUtils.h"
 #include "utils/FileSystem.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 #include <string>
 #include <fstream>
 #include <unordered_map>
 
 #include "utils/IfStream.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
+#include "blockchain_structs/BlocksMetadata.h"
 
 namespace torrent_node_lib {
    

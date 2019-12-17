@@ -58,7 +58,7 @@ set(COMMON_LIBRARY_DIR
 )
 
 set(LIBRARY_HEADERS
-    BlockInfo.h
+    blockchain_structs/BlockInfo.h
     BlockChainReadInterface.h
     P2P/P2P.h
     P2P/P2P_Ips.h
@@ -103,7 +103,7 @@ set(LIBRARY_SOURCES
     blockchain_structs/TransactionInfo.cpp
     blockchain_structs/BalanceInfo.cpp
 
-    BlockInfo.cpp
+    blockchain_structs/BlockInfo.cpp
 
     Cache/Cache.cpp
     Cache/LocalCache.cpp
@@ -148,7 +148,7 @@ set(PROJECT_MAIN
 
     utils/Graph.cpp
     P2P/P2P_Graph.cpp
-    blockchain_structs/FilePosition.h)
+    blockchain_structs/FilePosition.h blockchain_structs/CommonBalance.cpp blockchain_structs/CommonBalance.h blockchain_structs/SignBlock.cpp blockchain_structs/SignBlock.h blockchain_structs/RejectedTxsBlock.cpp blockchain_structs/RejectedTxsBlock.h blockchain_structs/BlocksMetadata.cpp blockchain_structs/BlocksMetadata.h Workers/MainBlockInfo.cpp Workers/MainBlockInfo.h blockchain_structs/DelegateState.cpp blockchain_structs/DelegateState.h)
 
 #Threads
 find_package(Threads)

@@ -9,13 +9,18 @@
 #include <mutex>
 #include <vector>
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 #include "Workers/NodeTestsBlockInfo.h"
 #include "Workers/ScriptBlockInfo.h"
 #include "blockchain_structs/AddressInfo.h"
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/BlocksMetadata.h"
+#include "Workers/MainBlockInfo.h"
+#include "blockchain_structs/DelegateState.h"
 
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>

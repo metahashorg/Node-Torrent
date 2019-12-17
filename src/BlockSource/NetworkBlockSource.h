@@ -5,9 +5,11 @@
 
 #include "OopUtils.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 #include "GetNewBlocksFromServers.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
 
 #include <string>
 #include <map>

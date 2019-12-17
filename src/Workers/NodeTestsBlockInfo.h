@@ -9,7 +9,7 @@
 #include "blockchain_structs/Address.h"
 #include "blockchain_structs/FilePosition.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 namespace torrent_node_lib {
 

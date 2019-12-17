@@ -436,4 +436,47 @@ static bool isGreater(const std::variant<size_t, std::vector<VectorElement>> &in
     }
 }
 
+size_t getMaxBlockNumber(const std::vector<TransactionInfo> &infos) {
+    if (!infos.empty()) {
+        const TransactionInfo &first = infos.front();
+        const TransactionInfo &last = infos.back();
+        const size_t maxBlockNum = std::max(first.blockNumber, last.blockNumber); // хз уже помнит, где находится последняя транзакция, спереди или сзади, так что поверим обе
+        return maxBlockNum;
+    } else {
+        return 0;
+    }
+}
+
+size_t getMaxBlockNumber(const std::vector<TransactionStatus> &infos) {
+    if (!infos.empty()) {
+        const TransactionStatus &first = infos.front();
+        const TransactionStatus &last = infos.back();
+        const size_t maxBlockNum = std::max(first.blockNumber, last.blockNumber); // хз уже помнит, где находится последняя транзакция, спереди или сзади, так что поверим обе
+        return maxBlockNum;
+    } else {
+        return 0;
+    }
+}
+
+template<>
+bool isGreater<std::vector<TransactionInfo>>(const std::vector<TransactionInfo> &infos, size_t blockNumber) {
+    if (infos.empty()) {
+        return false;
+    }
+    return getMaxBlockNumber(infos) > blockNumber;
+}
+
+template<>
+bool isGreater<std::vector<TransactionStatus>>(const std::vector<TransactionStatus> &infos, size_t blockNumber) {
+    if (infos.empty()) {
+        return false;
+    }
+    return getMaxBlockNumber(infos) > blockNumber;
+}
+
+template<>
+bool isGreater<BalanceInfo>(const BalanceInfo &info, size_t blockNumber) {
+    return info.blockNumber > blockNumber;
+}
+
 }

@@ -9,7 +9,7 @@
 
 #include "stringUtils.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlocksMetadata.h"
 
 using namespace common;
 

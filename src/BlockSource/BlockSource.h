@@ -3,6 +3,8 @@
 
 #include <string>
 #include <variant>
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
 
 namespace torrent_node_lib {
 

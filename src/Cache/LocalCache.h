@@ -1,7 +1,6 @@
 #ifndef LOCAL_CACHE_H_
 #define LOCAL_CACHE_H_
 
-#include "BlockInfo.h"
 #include "HashedString.h"
 
 #include <unordered_map>
@@ -19,6 +18,14 @@
 #include "blockchain_structs/BalanceInfo.h"
 
 namespace torrent_node_lib {
+
+template<class ValueType>
+struct BatchResults {
+    using Address = std::string;
+
+    std::vector<std::pair<Address, ValueType>> elements;
+    size_t lastBlockNum;
+};
 
 template<class Value>
 struct LocalCacheElement {
@@ -213,6 +220,13 @@ private:
         
     mutable std::mutex mut;
 };
+
+size_t getMaxBlockNumber(const std::vector<TransactionInfo> &infos);
+
+size_t getMaxBlockNumber(const std::vector<TransactionStatus> &infos);
+
+template<class Info>
+bool isGreater(const Info &info, size_t blockNumber);
 
 }
 

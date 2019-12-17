@@ -6,12 +6,14 @@
 #include "parallel_for.h"
 #include "convertStrings.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 #include "BlockchainRead.h"
 #include "GetNewBlocksFromServers.h"
 #include "PrivateKey.h"
 
 #include "BlocksTimeline.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
 
 using namespace common;
 

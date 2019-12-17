@@ -3,6 +3,7 @@
 #include "check.h"
 #include "utils/serialize.h"
 #include "convertStrings.h"
+#include "blockchain_structs/SignBlock.h"
 
 #include <algorithm>
 

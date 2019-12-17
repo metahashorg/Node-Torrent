@@ -1,7 +1,7 @@
 #ifndef BLOCKCHAIN_H_
 #define BLOCKCHAIN_H_
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 #include <unordered_map>
 #include <shared_mutex>

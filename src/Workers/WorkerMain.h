@@ -19,6 +19,8 @@
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/DelegateState.h"
 
 namespace torrent_node_lib {
 

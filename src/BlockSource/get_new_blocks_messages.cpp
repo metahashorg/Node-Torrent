@@ -8,7 +8,7 @@
 #include "utils/serialize.h"
 #include "utils/compress.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 using namespace common;
 

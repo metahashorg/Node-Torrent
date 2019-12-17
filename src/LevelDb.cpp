@@ -8,7 +8,7 @@
 
 #include "check.h"
 
-#include "BlockInfo.h"
+#include "blockchain_structs/BlockInfo.h"
 
 #include "utils/FileSystem.h"
 #include "stringUtils.h"
@@ -18,6 +18,11 @@
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/BlocksMetadata.h"
+#include "Workers/MainBlockInfo.h"
+#include "blockchain_structs/DelegateState.h"
 
 using namespace common;
 

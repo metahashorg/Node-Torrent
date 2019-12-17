@@ -24,6 +24,11 @@
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
+#include "blockchain_structs/BlocksMetadata.h"
+#include "blockchain_structs/DelegateState.h"
 
 using namespace common;
 
@@ -406,18 +411,18 @@ BalanceInfo SyncImpl::getBalance(const Address &address) const {
     return mainWorker->getBalance(address);
 }
 
-std::string SyncImpl::getBlockDump(const CommonMimimumBlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
+std::string SyncImpl::getBlockDump(const std::vector<unsigned char> &hash, const FilePosition &filePos, size_t fromByte, size_t toByte, bool isHex, bool isSign) const {
     CHECK(modules[MODULE_BLOCK] && modules[MODULE_BLOCK_RAW], "modules " + MODULE_BLOCK_STR + " " + MODULE_BLOCK_RAW_STR + " not set");
        
-    const std::optional<std::shared_ptr<std::string>> cache = caches.blockDumpCache.getValue(common::HashedString(bh.hash.data(), bh.hash.size()));
+    const std::optional<std::shared_ptr<std::string>> cache = caches.blockDumpCache.getValue(common::HashedString(hash.data(), hash.size()));
     std::string res;
     size_t realSizeBlock;
     std::string fullBlockDump;
     if (!cache.has_value()) {
-        CHECK(!bh.filePos.fileNameRelative.empty(), "Empty file name in block header");
+        CHECK(!filePos.fileNameRelative.empty(), "Empty file name in block header");
         IfStream file;
-        openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
-        const auto &[size_block, dumpBlock] = torrent_node_lib::getBlockDump(file, bh.filePos.pos, fromByte, toByte);
+        openFile(file, getFullPath(filePos.fileNameRelative, folderBlocks));
+        const auto &[size_block, dumpBlock] = torrent_node_lib::getBlockDump(file, filePos.pos, fromByte, toByte);
         res = dumpBlock;
         realSizeBlock = size_block;
         
@@ -426,7 +431,7 @@ std::string SyncImpl::getBlockDump(const CommonMimimumBlockHeader &bh, size_t fr
                 if (fromByte == 0) {
                     fullBlockDump = res;
                 } else {
-                    const auto &[size_block, dumpBlock] = torrent_node_lib::getBlockDump(file, bh.filePos.pos, 0, toByte);
+                    const auto &[size_block, dumpBlock] = torrent_node_lib::getBlockDump(file, filePos.pos, 0, toByte);
                     fullBlockDump = dumpBlock;
                 }
             }

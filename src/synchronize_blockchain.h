@@ -14,6 +14,10 @@
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
 #include "blockchain_structs/BalanceInfo.h"
+#include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/SignBlock.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
+#include "blockchain_structs/DelegateState.h"
 
 namespace torrent_node_lib {
 
@@ -76,7 +80,7 @@ public:
     
     BalanceInfo getBalance(const Address &address) const;
 
-    std::string getBlockDump(const CommonMimimumBlockHeader &bh, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
+    std::string getBlockDump(const std::vector<unsigned char> &hash, const FilePosition &filePos, size_t fromByte, size_t toByte, bool isHex, bool isSign) const;
 
     BlockInfo getFullBlock(const BlockHeader &bh, size_t beginTx, size_t countTx) const;
 

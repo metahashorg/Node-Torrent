@@ -6,7 +6,9 @@
 using namespace common;
 
 namespace torrent_node_lib {
-    
+
+const std::string Address::INITIAL_WALLET_TRANSACTION = "InitialWalletTransaction";
+
 Address::Address(const std::vector<unsigned char> &address, bool isBlockedAddress)
     : address(address.begin(), address.end())
     , isSet(true)
@@ -81,5 +83,8 @@ bool Address::isTokenAddress() const {
     CHECK(isSet, "Address not set");
     return address[0] == 6;
 }
-    
+
+template Address::Address<const char*>(const char*, const char*);
+template Address::Address<std::string::const_iterator>(std::string::const_iterator, std::string::const_iterator);
+
 }
