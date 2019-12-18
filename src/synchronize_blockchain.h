@@ -36,6 +36,7 @@ struct SignTransactionInfo;
 struct MinimumSignBlockHeader;
 struct RejectedTxsBlockInfo;
 struct V8Details;
+struct RejectedTxsMinimumBlockHeader;
 
 struct TransactionsFilters;
 
@@ -58,7 +59,7 @@ public:
     
 public:
     
-    static std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> parseBlockDump(const std::string &binaryDump, bool isValidate);
+    static std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> parseBlockDump(const std::string &binaryDump, bool isValidate);
     
 public:
     

@@ -52,6 +52,8 @@ struct SignBlockInfo {
 
     std::vector<SignTransactionInfo> txs;
 
+    void applyFileNameRelative(const std::string &fileNameRelative);
+
     void saveSenderInfo(const std::vector<unsigned char> &senderSign, const std::vector<unsigned char> &senderPubkey, const std::vector<unsigned char> &senderAddress) {
         header.senderSign = senderSign;
         header.senderPubkey = senderPubkey;

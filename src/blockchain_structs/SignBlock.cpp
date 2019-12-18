@@ -4,6 +4,11 @@
 #include <utils/serialize.h>
 
 namespace torrent_node_lib {
+
+void SignBlockInfo::applyFileNameRelative(const std::string &fileNameRelative) {
+    header.filePos.fileNameRelative = fileNameRelative;
+}
+
 std::string SignBlockHeader::serialize() const {
     CHECK(!hash.empty(), "empty hash");
     CHECK(!prevHash.empty(), "empty prevHash");
@@ -63,6 +68,7 @@ MinimumSignBlockHeader MinimumSignBlockHeader::deserialize(const std::string &ra
 }
 
 size_t SignBlockHeader::endBlockPos() const {
+    CHECK(blockSize != 0, "Incorrect block size");
     return filePos.pos + blockSize + sizeof(uint64_t);
 }
 

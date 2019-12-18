@@ -803,15 +803,15 @@ BlockInfo WorkerMain::getFullBlock(const BlockHeader &bh, size_t beginTx, size_t
         IfStream file;
         openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
         std::string tmp;
-        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
         const size_t nextPos = readNextBlockDump(file, bh.filePos.pos, tmp);
-        parseNextBlockInfo(tmp.data(), tmp.data() + tmp.size(), bh.filePos.pos, b, false, false, beginTx, countTx);
+        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> b =
+            parseNextBlockInfo(tmp.data(), tmp.data() + tmp.size(), bh.filePos.pos, false, false, beginTx, countTx);
         bi = std::get<BlockInfo>(b);
         CHECK(nextPos != bh.filePos.pos, "Ups");
     } else {
         std::shared_ptr<std::string> element = cache.value();
-        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
-        parseNextBlockInfo(element->data(), element->data() + element->size(), bh.filePos.pos, b, true, false, beginTx, countTx);
+        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> b =
+            parseNextBlockInfo(element->data(), element->data() + element->size(), bh.filePos.pos, true, false, beginTx, countTx);
         bi = std::get<BlockInfo>(b);
     }
     

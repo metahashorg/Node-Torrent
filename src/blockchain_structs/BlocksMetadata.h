@@ -32,6 +32,10 @@ struct FileInfo {
         : filePos("", 0)
     {}
 
+    FileInfo(const std::string &fileNameRelative, size_t pos)
+        : filePos(fileNameRelative, pos)
+    {}
+
     std::string serialize() const;
 
     static FileInfo deserialize(const std::string &raw);

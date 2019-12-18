@@ -125,24 +125,31 @@ void NetworkBlockSource::parseBlockInfo() {
             }
             CHECK(advanced.dump.size() == advanced.header.blockSize, "binaryDump.size() == nextBlockHeader.blockSize");
             const std::vector<unsigned char> hashBlockForRequest = fromHex(advanced.header.hash);
-            parseNextBlockInfo(advanced.dump.data(), advanced.dump.data() + advanced.dump.size(), 0, advanced.bi, isValidate, saveAllTx, 0, 0);
-            std::visit([&hashBlockForRequest, &signBlock, &advanced, this](auto &element) {
-                if constexpr (std::is_same_v<std::decay_t<decltype(element)>, BlockInfo>) {
+            auto tmp = parseNextBlockInfo(advanced.dump.data(), advanced.dump.data() + advanced.dump.size(), 0, isValidate, saveAllTx, 0, 0);
+            advanced.bi = std::visit([&hashBlockForRequest, &signBlock, &advanced, this](auto &element) -> std::variant<BlockInfo, SignBlockInfo> {
+                using T = std::decay_t<decltype(element)>;
+                if constexpr (std::is_same_v<T, BlockInfo>) {
                     CHECK(element.header.hash == hashBlockForRequest, "Incorrect block dump");
                     element.saveFilePath(getBasename(advanced.header.fileName));
                     
                     if (isVerifySign) {
                         element.saveSenderInfo(std::vector<unsigned char>(signBlock.sign.begin(), signBlock.sign.end()), std::vector<unsigned char>(signBlock.pubkey.begin(), signBlock.pubkey.end()), std::vector<unsigned char>(signBlock.address.begin(), signBlock.address.end()));
                     }
-                } else if constexpr (std::is_same_v<std::decay_t<decltype(element)>, SignBlockInfo>) {
+
+                    return element;
+                } else if constexpr (std::is_same_v<T, SignBlockInfo>) {
                     CHECK(element.header.hash == hashBlockForRequest, "Incorrect block dump");
                     element.saveFilePath(getBasename(advanced.header.fileName));
                     
                     if (isVerifySign) {
                         element.saveSenderInfo(std::vector<unsigned char>(signBlock.sign.begin(), signBlock.sign.end()), std::vector<unsigned char>(signBlock.pubkey.begin(), signBlock.pubkey.end()), std::vector<unsigned char>(signBlock.address.begin(), signBlock.address.end()));
                     }
+
+                    return element;
+                } else {
+                    throwErr("Incorrect block type");
                 }
-            }, advanced.bi);
+            }, tmp);
         } catch (...) {
             advanced.exception = std::current_exception();
         }
@@ -151,18 +158,20 @@ void NetworkBlockSource::parseBlockInfo() {
     currentProcessedBlock = advancedBlocks.begin();
 }
 
-bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
+bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo> &bi, std::string &binaryDump) {
     const bool isContinue = currentProcessedBlock != advancedBlocks.end() || !afterBlocksAdditings.isClear() || lastBlockInBlockchain >= nextBlockToRead;
     if (!isContinue) {
         return false;
     }
         
-    const auto processAdvanced = [this](std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump, std::map<AdvancedBlock::Key, AdvancedBlock>::iterator &iter) {
+    const auto processAdvanced = [this](std::variant<std::monostate, BlockInfo, SignBlockInfo> &bi, std::string &binaryDump, std::map<AdvancedBlock::Key, AdvancedBlock>::iterator &iter) {
         const AdvancedBlock &advanced = iter->second;
         if (advanced.exception) {
             std::rethrow_exception(advanced.exception);
         }
-        bi = advanced.bi;
+        bi = std::visit([](const auto &element) -> std::variant<std::monostate, BlockInfo, SignBlockInfo>{
+            return element;
+        }, advanced.bi);
         binaryDump = advanced.dump;
         
         lastFileName = advanced.header.fileName;
@@ -233,6 +242,10 @@ bool NetworkBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlo
     }
 }
 
+void NetworkBlockSource::confirmBlock(const torrent_node_lib::FileInfo &filepos) {
+    // empty
+}
+
 void NetworkBlockSource::getExistingBlock(const BlockHeader& bh, BlockInfo& bi, std::string &blockDump) const {
     CHECK(bh.blockNumber.has_value(), "Block number not set");
     const GetNewBlocksFromServer::LastBlockResponse lastBlock = getterBlocks.getLastBlock();
@@ -247,8 +260,8 @@ void NetworkBlockSource::getExistingBlock(const BlockHeader& bh, BlockInfo& bi, 
         bi.header.senderAddress.assign(signBlock.address.begin(), signBlock.address.end());
     }
     CHECK(blockDump.size() == nextBlockHeader.blockSize, "binaryDump.size() == nextBlockHeader.blockSize");
-    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
-    parseNextBlockInfo(blockDump.data(), blockDump.data() + blockDump.size(), bh.filePos.pos, b, isValidate, saveAllTx, 0, 0);
+    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> b =
+        parseNextBlockInfo(blockDump.data(), blockDump.data() + blockDump.size(), bh.filePos.pos, isValidate, saveAllTx, 0, 0);
     CHECK(std::holds_alternative<BlockInfo>(b), "Incorrect blockinfo");
     bi = std::get<BlockInfo>(b);
     

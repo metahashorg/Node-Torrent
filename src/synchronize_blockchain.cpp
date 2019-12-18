@@ -134,9 +134,9 @@ bool Sync::verifyTechnicalAddressSign(const std::string &binary, const std::vect
     return impl->verifyTechnicalAddressSign(binary, signature, pubkey);
 }
 
-std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
-    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
-    parseNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), 0, b, isValidate, true, 0, 0);
+std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> Sync::parseBlockDump(const std::string &binaryDump, bool isValidate) {
+    const std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> b =
+        parseNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), 0, isValidate, true, 0, 0);
     return b;
 }
 

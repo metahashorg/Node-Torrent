@@ -27,44 +27,71 @@ size_t FileBlockSource::doProcess(size_t countBlocks) {
     return 0;
 }
 
-bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) {
-    if (fileName.empty()) {
-        const FileInfo fi = getNextFile(allFiles, folderPath);
-        fileName = fi.filePos.fileNameRelative;
+bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo> &bi, std::string &binaryDump) {
+    while (true) {
         if (fileName.empty()) {
-            return false;
-        }
-        openFile(file, getFullPath(fileName, folderPath));
-        currPos = fi.filePos.pos;
-        LOGINFO << "Open next file " << fileName << " " << currPos;
-    }
-    const size_t nextCurrPos = readNextBlockDump(file, currPos, binaryDump);
-    if (currPos == nextCurrPos) {
-        closeFile(file);
-        fileName.clear();
-        return false;
-    } else {
-        parseNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), currPos, bi, isValidate, false, 0, 0);
-        if (std::holds_alternative<BlockInfo>(bi)) {
-            BlockInfo &b = std::get<BlockInfo>(bi);
-            b.header.filePos.fileNameRelative = fileName;
-            for (auto &tx : b.txs) {
-                tx.filePos.fileNameRelative = fileName;
+            const FileInfo fi = getNextFile(allFiles, folderPath);
+            fileName = fi.filePos.fileNameRelative;
+            if (fileName.empty()) {
+                return false;
             }
-        } else if (std::holds_alternative<SignBlockInfo>(bi)) {
-            SignBlockInfo &b = std::get<SignBlockInfo>(bi);
-            b.header.filePos.fileNameRelative = fileName;
-        } else if (std::holds_alternative<RejectedTxsBlockInfo>(bi)) {
-            RejectedTxsBlockInfo &b = std::get<RejectedTxsBlockInfo>(bi);
-            b.header.filePos.fileNameRelative = fileName;
+            openFile(file, getFullPath(fileName, folderPath));
+            currPos = fi.filePos.pos;
+            LOGINFO << "Open next file " << fileName << " " << currPos;
+        }
+        const size_t nextCurrPos = readNextBlockDump(file, currPos, binaryDump);
+        if (currPos == nextCurrPos) {
+            closeFile(file);
+            fileName.clear();
+            continue;
+        }
+
+        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> blockInfo =
+            parseNextBlockInfo(binaryDump.data(), binaryDump.data() + binaryDump.size(), currPos, isValidate, false, 0, 0);
+        std::visit([this](auto &b) {
+            using T = std::decay_t<decltype(b)>;
+            if constexpr (!std::is_same_v<T, std::monostate>) {
+                b.applyFileNameRelative(fileName);
+            }
+        }, blockInfo);
+
+        const bool isRejectedBlock = std::visit([&bi](const auto &b) {
+            using T = std::decay_t<decltype(b)>;
+            if constexpr (std::is_same_v<T, RejectedTxsMinimumBlockHeader>) {
+                return true;
+            } else {
+                bi = b;
+                return false;
+            }
+        }, blockInfo);
+
+        currPos = nextCurrPos;
+        allFiles[CroppedFileName(fileName)].filePos.pos = currPos;
+        allFiles[CroppedFileName(fileName)].filePos.fileNameRelative = fileName;
+
+        if (!isRejectedBlock) {
+            return true;
+        } else {
+            const RejectedTxsMinimumBlockHeader &bi = std::get<RejectedTxsMinimumBlockHeader>(blockInfo);
+            FileInfo fi;
+            fi.filePos.fileNameRelative = bi.filePos.fileNameRelative;
+            fi.filePos.pos = bi.endBlockPos();
+
+            confirmBlockImpl(fi);
+            continue;
         }
     }
+}
 
-    currPos = nextCurrPos;
-    allFiles[CroppedFileName(fileName)].filePos.pos = currPos;
-    allFiles[CroppedFileName(fileName)].filePos.fileNameRelative = fileName;
+void FileBlockSource::confirmBlock(const FileInfo &filepos) {
+    confirmBlockImpl(filepos);
+}
 
-    return true;
+void FileBlockSource::confirmBlockImpl(const FileInfo &filepos) {
+    Batch batch;
+    batch.addFileMetadata(CroppedFileName(filepos.filePos.fileNameRelative), filepos);
+
+    addBatch(batch, leveldb);
 }
 
 void FileBlockSource::getExistingBlockS(const std::string &folder, const BlockHeader& bh, BlockInfo &bi, std::string &blockDump, bool isValidate) {
@@ -72,10 +99,9 @@ void FileBlockSource::getExistingBlockS(const std::string &folder, const BlockHe
     IfStream file;
     openFile(file, getFullPath(bh.filePos.fileNameRelative, folder));
     
-    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
     const size_t nextCurrPos = readNextBlockDump(file, bh.filePos.pos, blockDump);
     CHECK(nextCurrPos != bh.filePos.pos, "Incorrect existing block");
-    parseNextBlockInfo(blockDump.data(), blockDump.data() + blockDump.size(), bh.filePos.pos, b, isValidate, false, 0, 0);
+    const std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> b = parseNextBlockInfo(blockDump.data(), blockDump.data() + blockDump.size(), bh.filePos.pos, isValidate, false, 0, 0);
     CHECK(std::holds_alternative<BlockInfo>(b), "Incorrect blockinfo");
     bi = std::get<BlockInfo>(b);
     

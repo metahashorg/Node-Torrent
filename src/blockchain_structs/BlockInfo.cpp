@@ -1,6 +1,7 @@
 #include "BlockInfo.h"
 
 #include "check.h"
+#include "log.h"
 #include "utils/serialize.h"
 #include "stringUtils.h"
 #include "blockchain_structs/AddressInfo.h"
@@ -44,6 +45,7 @@ std::string BlockHeader::getBlockType() const {
 }
 
 size_t BlockHeader::endBlockPos() const {
+    CHECK(blockSize != 0, "Incorrect block size");
     return filePos.pos + blockSize + sizeof(uint64_t);
 }
 
@@ -97,6 +99,13 @@ BlockHeader BlockHeader::deserialize(const std::string& raw) {
     result.senderAddress = std::vector<unsigned char>(senderAddress.begin(), senderAddress.end());
     
     return result;
+}
+
+void BlockInfo::applyFileNameRelative(const std::string &fileNameRelative) {
+    header.filePos.fileNameRelative = fileNameRelative;
+    for (auto &tx : txs) {
+        tx.filePos.fileNameRelative = fileNameRelative;
+    }
 }
 
 std::vector<TransactionInfo> BlockInfo::getBlockSignatures() const {

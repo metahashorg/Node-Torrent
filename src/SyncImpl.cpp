@@ -144,12 +144,7 @@ void SyncImpl::saveBlockToLeveldb(const BlockInfo &bi, size_t timeLineKey, const
         newMetadata.blockHash = bi.header.hash;
     }
     batch.addBlockMetadata(newMetadata);
-    
-    FileInfo fi;
-    fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
-    fi.filePos.pos = bi.header.endBlockPos();
-    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
-    
+
     batch.saveBlockTimeline(timeLineKey, timelineElement);
     
     addBatch(batch, leveldb);
@@ -160,23 +155,8 @@ void SyncImpl::saveSignBlockToLeveldb(const SignBlockInfo &bi, size_t timeLineKe
     if (modules[MODULE_BLOCK]) {
         batch.addSignBlockHeader(bi.header.hash, bi.header);
     }
-        
-    FileInfo fi;
-    fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
-    fi.filePos.pos = bi.header.endBlockPos();
-    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
-    
-    batch.saveBlockTimeline(timeLineKey, timelineElement);
-    
-    addBatch(batch, leveldb);
-}
 
-void SyncImpl::saveRejectedTxsBlockToLeveldb(const RejectedTxsBlockInfo &bi) {
-    Batch batch;
-    FileInfo fi;
-    fi.filePos.fileNameRelative = bi.header.filePos.fileNameRelative;
-    fi.filePos.pos = bi.header.endBlockPos();
-    batch.addFileMetadata(CroppedFileName(fi.filePos.fileNameRelative), fi);
+    batch.saveBlockTimeline(timeLineKey, timelineElement);
     
     addBatch(batch, leveldb);
 }
@@ -290,7 +270,7 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
             while (true) {
                 Timer tt;
                 
-                std::shared_ptr<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>> nextBi = std::make_shared<std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo>>();
+                std::shared_ptr<std::variant<std::monostate, BlockInfo, SignBlockInfo>> nextBi = std::make_shared<std::variant<std::monostate, BlockInfo, SignBlockInfo>>();
                                
                 std::shared_ptr<std::string> nextBlockDump = std::make_shared<std::string>();
                 const bool isContinue = getBlockAlgorithm->process(*nextBi, *nextBlockDump);
@@ -327,6 +307,7 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     }
                     
                     saveBlockToLeveldb(blockInfo, timelineKey, timelineElement);
+                    getBlockAlgorithm->confirmBlock(FileInfo(blockInfo.header.filePos.fileNameRelative, blockInfo.header.endBlockPos()));
                 } else if (std::holds_alternative<SignBlockInfo>(*nextBi)) {
                     SignBlockInfo &blockInfo = std::get<SignBlockInfo>(*nextBi);
                     Timer tt2;
@@ -341,15 +322,11 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     LOGINFO << "Sign block " << toHex(blockInfo.header.hash) << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << ". Parent hash " << toHex(blockInfo.header.prevHash);
                     
                     saveSignBlockToLeveldb(blockInfo, timelineKey, timelineElement);
-                } else if (std::holds_alternative<RejectedTxsBlockInfo>(*nextBi)) {
-                    RejectedTxsBlockInfo &blockInfo = std::get<RejectedTxsBlockInfo>(*nextBi);
-                    
-                    saveRejectedTxsBlockToLeveldb(blockInfo);
+                    getBlockAlgorithm->confirmBlock(FileInfo(blockInfo.header.filePos.fileNameRelative, blockInfo.header.endBlockPos()));
                 } else {
                     throwErr("Unknown block type");
                 }
-                
-                
+
                 checkStopSignal();
             }
         } catch (const exception &e) {
@@ -471,9 +448,9 @@ SignBlockInfo SyncImpl::readSignBlockInfo(const MinimumSignBlockHeader &bh) cons
     IfStream file;
     openFile(file, getFullPath(bh.filePos.fileNameRelative, folderBlocks));
     std::string tmp;
-    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> b;
     const size_t nextPos = readNextBlockDump(file, bh.filePos.pos, tmp);
-    parseNextBlockInfo(tmp.data(), tmp.data() + tmp.size(), bh.filePos.pos, b, false, false, 0, std::numeric_limits<size_t>::max());
+    std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> b =
+        parseNextBlockInfo(tmp.data(), tmp.data() + tmp.size(), bh.filePos.pos, false, false, 0, std::numeric_limits<size_t>::max());
     CHECK(nextPos != bh.filePos.pos, "Ups");
     CHECK(std::holds_alternative<SignBlockInfo>(b), "Incorrect block type");
     return std::get<SignBlockInfo>(b);

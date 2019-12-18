@@ -486,30 +486,32 @@ size_t readNextBlockDump(IfStream &ifile, size_t currPos, std::string &blockDump
     return currPos + pairRes.first + BLOCK_SIZE_SIZE;
 }
 
-void parseNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx) {
+std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> parseNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx) {
     const uint64_t block_type = *((const uint64_t *)begin_pos);
     if (block_type == SIGN_BLOCK_TYPE) {
-        bi = SignBlockInfo();
-        SignBlockInfo &b = std::get<SignBlockInfo>(bi);
-        
+        SignBlockInfo b;
+
         readSignBlockHeaderWithoutSize(begin_pos, end_pos, b.header);
         readSignBlockTxs(begin_pos, end_pos, posInFile, b);
         b.header.blockSize = std::distance(begin_pos, end_pos);
         b.header.filePos.pos = posInFile;
+
+        return b;
     } else if (block_type == REJECTED_TXS_BLOCK_TYPE) {
-        bi = RejectedTxsBlockInfo();
-        RejectedTxsBlockInfo &b = std::get<RejectedTxsBlockInfo>(bi);
-        
-        b.header.blockSize = std::distance(begin_pos, end_pos);
-        b.header.filePos.pos = posInFile;
+        RejectedTxsMinimumBlockHeader b;
+
+        b.blockSize = std::distance(begin_pos, end_pos);
+        b.filePos.pos = posInFile;
+        return b;
     } else {
-        bi = BlockInfo();
-        BlockInfo &b = std::get<BlockInfo>(bi);
+        BlockInfo b;
         
         readSimpleBlockHeaderWithoutSize(begin_pos, end_pos, b.header);
         readSimpleBlockTxs(begin_pos, end_pos, posInFile, b, isSaveAllTx, beginTx, countTx, isValidate);
         b.header.blockSize = std::distance(begin_pos, end_pos);
         b.header.filePos.pos = posInFile;
+
+        return b;
     }
 }
 

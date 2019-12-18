@@ -31,8 +31,10 @@ public:
     
     size_t doProcess(size_t countBlocks) override;
     
-    bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) override;
-    
+    bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo> &bi, std::string &binaryDump) override;
+
+    void confirmBlock(const FileInfo &filepos) override;
+
     void getExistingBlock(const BlockHeader &bh, BlockInfo &bi, std::string &blockDump) const override;
     
     ~NetworkBlockSource() override = default;
@@ -62,7 +64,7 @@ private:
         
         BlockPos pos = BlockPos::Block;
         MinimumBlockHeader header;
-        std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> bi;
+        std::variant<BlockInfo, SignBlockInfo> bi;
         std::string dump;
         std::exception_ptr exception;
         

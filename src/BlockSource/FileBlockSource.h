@@ -30,14 +30,20 @@ public:
     
     size_t doProcess(size_t countBlocks) override;
        
-    bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsBlockInfo> &bi, std::string &binaryDump) override;
-    
+    bool process(std::variant<std::monostate, BlockInfo, SignBlockInfo> &bi, std::string &binaryDump) override;
+
+    void confirmBlock(const FileInfo &filepos) override;
+
     static void getExistingBlockS(const std::string &folder, const BlockHeader &bh, BlockInfo &bi, std::string &blockDump, bool isValidate);
     
     void getExistingBlock(const BlockHeader &bh, BlockInfo &bi, std::string &blockDump) const override;
     
     ~FileBlockSource() override = default;
-    
+
+private:
+
+    void confirmBlockImpl(const FileInfo &filepos);
+
 private:
     
     LevelDb &leveldb;

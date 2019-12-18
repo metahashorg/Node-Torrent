@@ -68,7 +68,9 @@ struct BlockInfo {
     BlockHeader header;
     
     std::vector<TransactionInfo> txs;
-    
+
+    void applyFileNameRelative(const std::string &fileNameRelative);
+
     std::vector<TransactionInfo> getBlockSignatures() const;
     
     void saveSenderInfo(const std::vector<unsigned char> &senderSign, const std::vector<unsigned char> &senderPubkey, const std::vector<unsigned char> &senderAddress) {
