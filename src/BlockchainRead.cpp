@@ -169,7 +169,7 @@ static std::tuple<bool, SizeTransactinType, const char*> readSignTransactionInfo
     
     CHECK(crypto_check_sign_data(txInfo.sign, txInfo.pubkey, (const unsigned char*)txInfo.blockHash.data(), txInfo.blockHash.size()), "Not validate");
     
-    return std::make_tuple(true, tx_size, end_pos);
+    return std::make_tuple(true, tx_size, cur_pos);
 }
 
 static std::tuple<bool, SizeTransactinType, const char*> readSimpleTransactionInfo(const char *cur_pos, const char *end_pos, TransactionInfo &txInfo, bool isParseTx, bool isSaveAllTx, const PrevTransactionSignHelper &helper, bool isValidate) {    
