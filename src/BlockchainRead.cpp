@@ -10,6 +10,7 @@
 
 #include "check.h"
 #include "log.h"
+#include "convertStrings.h"
 
 #include "Modules.h"
 #include "blockchain_structs/BlockInfo.h"
@@ -194,7 +195,7 @@ static std::tuple<bool, SizeTransactinType, const char*> readSignTransactionInfo
     
     CHECK(crypto_check_sign_data(txInfo.sign, txInfo.pubkey, (const unsigned char*)txInfo.blockHash.data(), txInfo.blockHash.size()), "Not validate");
     
-    return std::make_tuple(true, tx_size, end_pos);
+    return std::make_tuple(true, tx_size, cur_pos);
 }
 
 static std::tuple<bool, SizeTransactinType, const char*> readRedjectedTransactionInfo(const char *cur_pos, const char *end_pos, RejectedTransactionInfo &txInfo) {
@@ -213,7 +214,7 @@ static std::tuple<bool, SizeTransactinType, const char*> readRedjectedTransactio
 
     txInfo.error = readVarInt(cur_pos, end_pos);
 
-    return std::make_tuple(true, tx_size, end_pos);
+    return std::make_tuple(true, tx_size, cur_pos);
 }
 
 static std::tuple<bool, SizeTransactinType, const char*> readSimpleTransactionInfo(const char *cur_pos, const char *end_pos, TransactionInfo &txInfo, bool isParseTx, bool isSaveAllTx, const PrevTransactionSignHelper &helper, bool isValidate) {    
@@ -507,7 +508,7 @@ static void readSignBlockTxs(const char *begin_pos, const char *end_pos, size_t 
     SizeTransactinType tx_size = 0;
     do {
         SignTransactionInfo txInfo;
-        
+
         const auto &[isInitialized, newSize, newPos] = readSignTransactionInfo(cur_pos, end_pos, txInfo);
         
         tx_size = newSize;

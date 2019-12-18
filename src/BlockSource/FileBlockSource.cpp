@@ -5,6 +5,9 @@
 
 #include "log.h"
 #include "check.h"
+#include "convertStrings.h"
+#include "stopProgram.h"
+
 #include "blockchain_structs/SignBlock.h"
 #include "blockchain_structs/RejectedTxsBlock.h"
 #include "blockchain_structs/BlocksMetadata.h"
@@ -29,6 +32,8 @@ size_t FileBlockSource::doProcess(size_t countBlocks) {
 
 bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockInfo> &bi, std::string &binaryDump) {
     while (true) {
+        checkStopSignal();
+
         if (fileName.empty()) {
             const FileInfo fi = getNextFile(allFiles, folderPath);
             fileName = fi.filePos.fileNameRelative;
@@ -78,6 +83,13 @@ bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockI
             fi.filePos.pos = bi.endBlockPos();
 
             confirmBlockImpl(fi);
+
+            /*std::string dump;
+            const size_t newPos = readNextBlockDump(file, bi.filePos.pos, dump);
+            CHECK(newPos != bi.filePos.pos, "Incorrect rejected block");
+            const RejectedTxsBlockInfo blockInfo = parseRejectedTxsBlockInfo(dump.data(), dump.data() + dump.size(), bi.filePos.pos, true);
+            LOGWARN << "Rejected txs " << blockInfo.txs.size() << " " << toHex(blockInfo.header.hash.begin(), blockInfo.header.hash.end()) << " " << blockInfo.header.blockSize << " " << bi.blockSize << " " << toHex(dump.begin(), dump.end());
+            */
             continue;
         }
     }
