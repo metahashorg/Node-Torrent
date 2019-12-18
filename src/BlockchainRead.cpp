@@ -126,6 +126,31 @@ static void readSignBlockHeaderWithoutSize(const char *begin_pos, const char *en
     cur_pos += 32; //prev block
 }
 
+static const char* readRejectedTxsBlockHeaderWithoutSize(const char *begin_pos, const char *end_pos, RejectedTxsBlockHeader &bi) {
+    const char *cur_pos = begin_pos;
+
+    const uint64_t blockType = readInt<uint64_t>(cur_pos, end_pos);
+    CHECK(blockType == REJECTED_TXS_BLOCK_TYPE, "Incorrect block type");
+
+    bi.timestamp = readInt<uint64_t>(cur_pos, end_pos);
+
+    CHECK(cur_pos + 32 <= end_pos, "Out of the array");
+    bi.prevHash.assign(cur_pos, cur_pos + 32);
+    cur_pos += 32;
+
+    const size_t txsSignSize = readVarInt(cur_pos, end_pos);
+    CHECK(cur_pos + txsSignSize <= end_pos, "Out of the array");
+    bi.txsSign.assign(cur_pos, cur_pos + txsSignSize);
+    cur_pos += txsSignSize;
+
+    const size_t txsPubkeySize = readVarInt(cur_pos, end_pos);
+    CHECK(cur_pos + txsPubkeySize <= end_pos, "Out of the array");
+    bi.txsPubkey.assign(cur_pos, cur_pos + txsPubkeySize);
+    cur_pos += txsPubkeySize;
+
+    return cur_pos;
+}
+
 struct PrevTransactionSignHelper {
     bool isFirst = false;
     bool isPrevSign = false;
@@ -169,6 +194,25 @@ static std::tuple<bool, SizeTransactinType, const char*> readSignTransactionInfo
     
     CHECK(crypto_check_sign_data(txInfo.sign, txInfo.pubkey, (const unsigned char*)txInfo.blockHash.data(), txInfo.blockHash.size()), "Not validate");
     
+    return std::make_tuple(true, tx_size, end_pos);
+}
+
+static std::tuple<bool, SizeTransactinType, const char*> readRedjectedTransactionInfo(const char *cur_pos, const char *end_pos, RejectedTransactionInfo &txInfo) {
+    const SizeTransactinType tx_size = readVarInt(cur_pos, end_pos);
+
+    if (tx_size == 0) {
+        return std::make_tuple(false, 0, cur_pos);
+    }
+    CHECK(cur_pos + tx_size <= end_pos, "Out of the array");
+    end_pos = cur_pos + tx_size;
+
+    const size_t hash_size = 32;
+    CHECK(cur_pos + hash_size <= end_pos, "Out of the array");
+    txInfo.hash = std::vector<unsigned char>(cur_pos, cur_pos + hash_size);
+    cur_pos += hash_size;
+
+    txInfo.error = readVarInt(cur_pos, end_pos);
+
     return std::make_tuple(true, tx_size, end_pos);
 }
 
@@ -474,6 +518,26 @@ static void readSignBlockTxs(const char *begin_pos, const char *end_pos, size_t 
     } while (tx_size > 0);
 }
 
+static void readRejectedTxs(const char *begin_pos, const char *txs_pos, const char *end_pos, size_t posInFile, RejectedTxsBlockInfo &bi) {
+    const char *cur_pos = txs_pos;
+
+    std::array<unsigned char, 32> block_hash = get_double_sha256((unsigned char *)begin_pos, std::distance(begin_pos, end_pos));
+    bi.header.hash.assign(block_hash.cbegin(), block_hash.cend());
+
+    SizeTransactinType tx_size = 0;
+    do {
+        RejectedTransactionInfo txInfo;
+
+        const auto &[isInitialized, newSize, newPos] = readRedjectedTransactionInfo(cur_pos, end_pos, txInfo);
+
+        tx_size = newSize;
+        cur_pos = newPos;
+        if (isInitialized) {
+            bi.txs.push_back(txInfo);
+        }
+    } while (tx_size > 0);
+}
+
 size_t readNextBlockDump(IfStream &ifile, size_t currPos, std::string &blockDump) {
     auto pairRes = getBlockDump(ifile, currPos, 0, std::numeric_limits<size_t>::max());
 
@@ -513,6 +577,17 @@ std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHe
 
         return b;
     }
+}
+
+RejectedTxsBlockInfo parseRejectedTxsBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, bool isValidate) {
+    RejectedTxsBlockInfo b;
+
+    const char* cur_pos = readRejectedTxsBlockHeaderWithoutSize(begin_pos, end_pos, b.header);
+    readRejectedTxs(begin_pos, cur_pos, end_pos, posInFile, b);
+    b.header.blockSize = std::distance(begin_pos, end_pos);
+    b.header.filePos.pos = posInFile;
+
+    return b;
 }
 
 std::pair<size_t, std::string> getBlockDump(IfStream &ifile, size_t currPos, size_t fromByte, size_t toByte) {

@@ -20,11 +20,26 @@ struct RejectedTxsMinimumBlockHeader {
 struct RejectedTxsBlockHeader {
     uint64_t blockSize = 0;
 
+    size_t timestamp;
+
     FilePosition filePos;
+
+    std::vector<unsigned char> hash;
+
+    std::vector<unsigned char> prevHash;
+    std::vector<unsigned char> txsSign;
+    std::vector<unsigned char> txsPubkey;
+};
+
+struct RejectedTransactionInfo {
+    std::vector<unsigned char> hash;
+    size_t error;
 };
 
 struct RejectedTxsBlockInfo {
     RejectedTxsBlockHeader header;
+
+    std::vector<RejectedTransactionInfo> txs;
 };
 
 }

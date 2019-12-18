@@ -33,6 +33,8 @@ bool readOneSimpleTransactionInfo(IfStream &ifile, size_t currPos, TransactionIn
 
 std::variant<std::monostate, BlockInfo, SignBlockInfo, RejectedTxsMinimumBlockHeader> parseNextBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, bool isValidate, bool isSaveAllTx, size_t beginTx, size_t countTx);
 
+RejectedTxsBlockInfo parseRejectedTxsBlockInfo(const char *begin_pos, const char *end_pos, size_t posInFile, bool isValidate);
+
 size_t readNextBlockDump(IfStream &ifile, size_t currPos, std::string &blockDump);
 
 std::pair<size_t, std::string> getBlockDump(IfStream &ifile, size_t currPos, size_t fromByte, size_t toByte);
