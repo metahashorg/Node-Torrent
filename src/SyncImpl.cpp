@@ -57,7 +57,7 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
 
     if (getterBlocksOpt.getBlocksFromFile) {
         isSaveBlockToFiles = false;
-        std::unique_ptr<FileRejectedBlockSource> fileRejectedBlockSource = std::make_unique<FileRejectedBlockSource>(blockchain);
+        std::unique_ptr<FileRejectedBlockSource> fileRejectedBlockSource = std::make_unique<FileRejectedBlockSource>(blockchain, folderBlocks);
         getBlockAlgorithm = std::make_unique<FileBlockSource>(*fileRejectedBlockSource, leveldb, folderBlocks, isValidate);
 
         rejectedBlockSource = std::move(fileRejectedBlockSource);

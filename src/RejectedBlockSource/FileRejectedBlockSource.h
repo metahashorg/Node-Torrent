@@ -87,8 +87,9 @@ private:
 
 public:
 
-    FileRejectedBlockSource(const BlockChain &blockchain)
+    FileRejectedBlockSource(const BlockChain &blockchain, std::string folderPath)
         : blockchain(blockchain)
+        , folderPath(folderPath)
     {}
 
 public:
@@ -104,6 +105,8 @@ public:
 private:
 
     const BlockChain &blockchain;
+
+    const std::string folderPath;
 
     BlocksContainer blocks;
 

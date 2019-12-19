@@ -3,6 +3,7 @@
 #include "check.h"
 #include "log.h"
 #include "convertStrings.h"
+#include "utils/FileSystem.h"
 
 #include "utils/IfStream.h"
 #include "BlockchainRead.h"
@@ -43,7 +44,7 @@ std::vector<RejectedBlockResult> FileRejectedBlockSource::calcLastBlocks(size_t 
             continue;
         }
 
-        file.reopen(holder.minimumHeader.filePos.fileNameRelative);
+        file.reopen(getFullPath(holder.minimumHeader.filePos.fileNameRelative, folderPath));
 
         std::string dump;
         const size_t newPos = readNextBlockDump(file, holder.minimumHeader.filePos.pos, dump);
@@ -54,10 +55,6 @@ std::vector<RejectedBlockResult> FileRejectedBlockSource::calcLastBlocks(size_t 
         CHECK(header.blockNumber.has_value(), "Block not found in blockchain");
 
         holder.block = BlockHolder::Block(dump, blockInfo, header.blockNumber.value());
-
-        LOGWARN << "Rejected txs " << blockInfo.txs.size() << " "
-                << toHex(blockInfo.header.hash.begin(), blockInfo.header.hash.end()) << " "
-                << blockInfo.header.blockSize;
     }
 
     lock.lock();
