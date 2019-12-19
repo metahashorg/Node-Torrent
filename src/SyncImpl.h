@@ -39,6 +39,7 @@ struct NodeTestResult;
 struct NodeTestTrust;
 struct NodeTestCount;
 struct NodeTestExtendedStat;
+struct RejectedBlockResult;
 
 struct TransactionsFilters;
 struct Token;
@@ -127,6 +128,10 @@ public:
     std::optional<MinimumSignBlockHeader> findSignature(const std::vector<unsigned char> &hash) const;
 
     std::optional<RejectedTransactionHistory> findRejectedTx(const std::vector<unsigned char> &txHash) const;
+
+    std::vector<std::string> getRejectedDumps(const std::vector<std::vector<unsigned char>> &hashes) const;
+
+    std::vector<RejectedBlockResult> calcLastRejectedBlocks(size_t count) const;
 
 private:
    

@@ -18,6 +18,7 @@ namespace torrent_node_lib {
 class RejectedBlockSource;
 
 struct RejectedBlock;
+struct RejectedBlockResult;
 
 class RejectedTxsWorker {
 private:

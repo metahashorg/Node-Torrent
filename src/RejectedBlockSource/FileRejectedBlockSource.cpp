@@ -103,4 +103,22 @@ std::vector<RejectedBlock> FileRejectedBlockSource::getBlocks(const std::vector<
     return result;
 }
 
+std::vector<std::string> FileRejectedBlockSource::getDumps(const std::vector<std::vector<unsigned char>> &hashes) const {
+    std::vector<std::string> result;
+
+    std::lock_guard<std::mutex> lock(mut);
+
+    const auto &iterHashFabric = blocks.get<BlockHolder::HashTag>();
+
+    for (const std::vector<unsigned char> &hash: hashes) {
+        const auto iter = iterHashFabric.find(hash);
+        if (iter != iterHashFabric.end()) {
+            CHECK(iter->block.has_value(), "Block not filled");
+            result.emplace_back(iter->block->dump);
+        }
+    }
+
+    return result;
+}
+
 } // namespace torrent_node_lib

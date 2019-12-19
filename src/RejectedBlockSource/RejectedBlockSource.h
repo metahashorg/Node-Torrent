@@ -40,6 +40,8 @@ public:
 
     virtual std::vector<RejectedBlock> getBlocks(const std::vector<std::vector<unsigned char>> &hashes) const = 0;
 
+    virtual std::vector<std::string> getDumps(const std::vector<std::vector<unsigned char>> &hashes) const = 0;
+
 };
 
 } // namespace torrent_node_lib {

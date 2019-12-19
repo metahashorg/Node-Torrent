@@ -102,6 +102,8 @@ public:
 
     std::vector<RejectedBlock> getBlocks(const std::vector<std::vector<unsigned char>> &hashes) const override;
 
+    std::vector<std::string> getDumps(const std::vector<std::vector<unsigned char>> &hashes) const override;
+
 private:
 
     const BlockChain &blockchain;

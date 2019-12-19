@@ -24,6 +24,7 @@ struct NodeTestExtendedStat;
 struct Token;
 struct SignTransactionInfo;
 struct RejectedTransactionHistory;
+struct RejectedBlockResult;
 }
 
 struct RequestId {
@@ -114,5 +115,7 @@ std::string genDumpBlocksBinary(const std::vector<std::string> &blocks, bool isC
 std::string genRandomAddressesJson(const RequestId &requestId, const std::vector<torrent_node_lib::Address> &addresses, bool isFormat);
 
 std::string genRejectedTxHistoryJson(const RequestId &requestId, const std::optional<torrent_node_lib::RejectedTransactionHistory> &history, bool isFormat);
+
+std::string genRejectedBlocksInfo(const std::vector<torrent_node_lib::RejectedBlockResult> &info);
 
 #endif // GENERATE_JSON_H_

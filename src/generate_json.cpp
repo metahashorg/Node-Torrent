@@ -24,6 +24,8 @@
 #include "blockchain_structs/SignBlock.h"
 #include "blockchain_structs/DelegateState.h"
 
+#include "RejectedBlockSource/RejectedBlockSource.h"
+
 using namespace common;
 using namespace torrent_node_lib;
 
@@ -923,4 +925,24 @@ std::string genRejectedTxHistoryJson(const RequestId &requestId, const std::opti
         doc.AddMember("result", resultJson, allocator);
     }
     return jsonToString(doc, isFormat);
+}
+
+std::string genRejectedBlocksInfo(const std::vector<RejectedBlockResult> &info) {
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+
+    rapidjson::Value nodesJson(rapidjson::kArrayType);
+    for (const RejectedBlockResult &element: info) {
+        rapidjson::Value elementJson(rapidjson::kObjectType);
+        elementJson.AddMember("blockNumber", element.blockNumber, allocator);
+        elementJson.AddMember("timestamp", element.timestamp, allocator);
+        elementJson.AddMember("hash", strToJson(toHex(element.hash), allocator), allocator);
+
+        nodesJson.PushBack(elementJson, allocator);
+    }
+    rapidjson::Value resultJson(rapidjson::kObjectType);
+    resultJson.AddMember("elements", nodesJson, allocator);
+
+    doc.AddMember("result", resultJson, allocator);
+    return jsonToString(doc, false);
 }

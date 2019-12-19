@@ -34,6 +34,8 @@
 #include "blockchain_structs/CommonBalance.h"
 #include "blockchain_structs/RejectedTxsBlock.h"
 
+#include "RejectedBlockSource/RejectedBlockSource.h"
+
 using namespace common;
 using namespace torrent_node_lib;
 
@@ -68,12 +70,15 @@ const static std::string GET_ALL_LAST_NODES_RESULT = "get-all-last-nodes-count";
 const static std::string GET_NODE_RAITING = "get-nodes-raiting";
 const static std::string GET_RANDOM_ADDRESSES = "get-random-addresses";
 const static std::string GET_REJECTED_TX_INFO = "get-rejected-tx";
+const static std::string GET_REJECTED_BLOCKS = "get-rejected-blocks";
+const static std::string GET_REJECTED_DUMPS = "get-rejected-dumps";
 
 const static int64_t MAX_BATCH_BLOCKS = 1000;
 const static size_t MAX_BATCH_TXS = 10000;
 const static size_t MAX_BATCH_BALANCES = 10000;
 const static size_t MAX_HISTORY_SIZE = 10000;
 const static size_t MAX_BATCH_DUMPS = 1000;
+const static size_t MAX_REJECTED_BLOCKS = 200;
 const static size_t MAX_PRELOAD_BLOCKS = 10;
 
 const static int HTTP_STATUS_OK = 200;
@@ -777,6 +782,31 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const auto result = sync.findRejectedTx(fromHex(hash));
 
             response = genRejectedTxHistoryJson(requestId, result, isFormatJson);
+        } else if (func == GET_REJECTED_BLOCKS) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+
+            const size_t count = get<size_t>(jsonParams, "count");
+
+            CHECK_USER(count <= MAX_REJECTED_BLOCKS, "Incorrect count value");
+
+            const auto result = sync.calcLastRejectedBlocks(count);
+
+            response = genRejectedBlocksInfo(result);
+        } else if (func == GET_REJECTED_DUMPS) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+
+            const bool isCompress = get<bool>(jsonParams, "isCompress");
+            const auto &hashesJson = get<JsonArray>(jsonParams, "hashes");
+            std::vector<std::vector<unsigned char>> hashes;
+            std::transform(hashesJson.Begin(), hashesJson.End(), std::back_inserter(hashes), [](const auto &hashJson) {
+                return fromHex(get<std::string>(hashJson));
+            });
+
+            CHECK_USER(hashes.size() <= MAX_REJECTED_BLOCKS, "Incorrect count value");
+
+            const auto result = sync.getRejectedDumps(hashes);
+
+            response = genDumpBlocksBinary(result, isCompress);
         } else {
             throwUserErr("Incorrect func " + func);
         }

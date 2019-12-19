@@ -9,6 +9,7 @@
 
 #include "Workers/ScriptBlockInfo.h"
 #include "Workers/NodeTestsBlockInfo.h"
+#include "RejectedBlockSource/RejectedBlockSource.h"
 
 using namespace common;
 
@@ -158,6 +159,14 @@ std::optional<MinimumSignBlockHeader> Sync::findSignature(const std::vector<unsi
 
 std::optional<RejectedTransactionHistory> Sync::findRejectedTx(const std::vector<unsigned char> &txHash) const {
     return impl->findRejectedTx(txHash);
+}
+
+std::vector<std::string> Sync::getRejectedDumps(const std::vector<std::vector<unsigned char>> &hashes) const {
+    return impl->getRejectedDumps(hashes);
+}
+
+std::vector<RejectedBlockResult> Sync::calcLastRejectedBlocks(size_t count) const {
+    return impl->calcLastRejectedBlocks(count);
 }
 
 Sync::~Sync() = default;
