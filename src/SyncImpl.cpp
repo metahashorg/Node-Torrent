@@ -30,6 +30,10 @@
 #include "blockchain_structs/BlocksMetadata.h"
 #include "blockchain_structs/DelegateState.h"
 
+#include "RejectedBlockSource/FileRejectedBlockSource.h"
+
+#include "Workers/RejectedTxsWorker.h"
+
 using namespace common;
 
 namespace torrent_node_lib {
@@ -50,16 +54,21 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
     if (getterBlocksOpt.isValidate) {
         CHECK(!getterBlocksOpt.getBlocksFromFile, "validate and get_blocks_from_file options not compatible");
     }
-    
+
     if (getterBlocksOpt.getBlocksFromFile) {
         isSaveBlockToFiles = false;
-        getBlockAlgorithm = std::make_unique<FileBlockSource>(leveldb, folderBlocks, isValidate);
+        std::unique_ptr<FileRejectedBlockSource> fileRejectedBlockSource = std::make_unique<FileRejectedBlockSource>(blockchain);
+        getBlockAlgorithm = std::make_unique<FileBlockSource>(*fileRejectedBlockSource, leveldb, folderBlocks, isValidate);
+
+        rejectedBlockSource = std::move(fileRejectedBlockSource);
     } else {
         CHECK(getterBlocksOpt.p2p != nullptr, "p2p nullptr");
         isSaveBlockToFiles = modules[MODULE_BLOCK_RAW];
         getBlockAlgorithm = std::make_unique<NetworkBlockSource>(timeline, folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, true, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign, getterBlocksOpt.isPreLoad);
     }
-        
+
+    rejectedTxsWorker = std::make_unique<RejectedTxsWorker>(*rejectedBlockSource);
+
     if (!signKeyName.empty()) {
         const std::string signKeyPath = signKeyName + ".raw.prv";
         const std::string result = trim(loadFile("./", signKeyPath));
@@ -91,6 +100,9 @@ SyncImpl::~SyncImpl() {
         }
         if (scriptWorker != nullptr) {
             scriptWorker->join();
+        }
+        if (rejectedTxsWorker != nullptr) {
+            rejectedTxsWorker->join();
         }
     } catch (...) {
         LOGERR << "Error while stoped thread";
@@ -220,6 +232,7 @@ std::vector<Worker*> SyncImpl::makeWorkers() {
     for (Worker* &worker: workers) {
         worker->start();
     }
+    rejectedTxsWorker->start();
     
     testNodes.start();
     
@@ -578,6 +591,11 @@ std::vector<MinimumSignBlockHeader> SyncImpl::getSignaturesBetween(const std::op
 
 std::optional<MinimumSignBlockHeader> SyncImpl::findSignature(const std::vector<unsigned char> &hash) const {
     return timeline.findSignature(hash);
+}
+
+std::optional<RejectedTransactionHistory> SyncImpl::findRejectedTx(const std::vector<unsigned char> &txHash) const {
+    CHECK(rejectedTxsWorker != nullptr, "Rejected worker not set");
+    return rejectedTxsWorker->findTx(txHash);
 }
 
 }

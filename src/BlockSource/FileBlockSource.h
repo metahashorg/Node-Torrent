@@ -21,10 +21,12 @@ namespace torrent_node_lib {
    
 class LevelDb;
 
+class FileRejectedBlockSource;
+
 class FileBlockSource final: public BlockSource, common::no_copyable, common::no_moveable {
 public:
     
-    FileBlockSource(LevelDb &leveldb, const std::string &folderPath, bool isValidate);
+    FileBlockSource(FileRejectedBlockSource &rejectedBlockSource, LevelDb &leveldb, const std::string &folderPath, bool isValidate);
     
     void initialize() override;
     
@@ -45,7 +47,9 @@ private:
     void confirmBlockImpl(const FileInfo &filepos);
 
 private:
-    
+
+    FileRejectedBlockSource &rejectedBlockSource;
+
     LevelDb &leveldb;
     
     const std::string folderPath;

@@ -3,6 +3,8 @@
 
 #include <string>
 #include <vector>
+#include <deque>
+
 #include "blockchain_structs/FilePosition.h"
 
 namespace torrent_node_lib {
@@ -29,6 +31,28 @@ struct RejectedTxsBlockHeader {
     std::vector<unsigned char> prevHash;
     std::vector<unsigned char> txsSign;
     std::vector<unsigned char> txsPubkey;
+};
+
+struct RejectedTransactionHistory {
+    struct Element {
+        size_t blockNumber;
+        size_t timestamp;
+        size_t errorCode;
+
+        Element(size_t blockNumber, size_t timestamp, size_t errorCode)
+            : blockNumber(blockNumber)
+            , timestamp(timestamp)
+            , errorCode(errorCode)
+        {}
+    };
+
+    explicit RejectedTransactionHistory(const std::vector<unsigned char> &hash)
+        : hash(hash)
+    {}
+
+    std::vector<unsigned char> hash;
+
+    std::deque<Element> history;
 };
 
 struct RejectedTransactionInfo {

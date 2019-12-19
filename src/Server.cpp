@@ -32,6 +32,7 @@
 #include "blockchain_structs/Address.h"
 #include "blockchain_structs/DelegateState.h"
 #include "blockchain_structs/CommonBalance.h"
+#include "blockchain_structs/RejectedTxsBlock.h"
 
 using namespace common;
 using namespace torrent_node_lib;
@@ -66,6 +67,7 @@ const static std::string GET_LAST_NODES_STATS_RESULT = "get-last-nodes-stats-cou
 const static std::string GET_ALL_LAST_NODES_RESULT = "get-all-last-nodes-count";
 const static std::string GET_NODE_RAITING = "get-nodes-raiting";
 const static std::string GET_RANDOM_ADDRESSES = "get-random-addresses";
+const static std::string GET_REJECTED_TX_INFO = "get-rejected-tx";
 
 const static int64_t MAX_BATCH_BLOCKS = 1000;
 const static size_t MAX_BATCH_TXS = 10000;
@@ -767,6 +769,14 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const auto result = sync.getRandomAddresses(countAddresses);
             
             response = genRandomAddressesJson(requestId, result, isFormatJson);
+        } else if (func == GET_REJECTED_TX_INFO) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+
+            const std::string hash = get<std::string>(jsonParams, "hash");
+
+            const auto result = sync.findRejectedTx(fromHex(hash));
+
+            response = genRejectedTxHistoryJson(requestId, result, isFormatJson);
         } else {
             throwUserErr("Incorrect func " + func);
         }

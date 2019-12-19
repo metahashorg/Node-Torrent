@@ -37,6 +37,7 @@ struct MinimumSignBlockHeader;
 struct RejectedTxsBlockInfo;
 struct V8Details;
 struct RejectedTxsMinimumBlockHeader;
+struct RejectedTransactionHistory;
 
 struct TransactionsFilters;
 
@@ -120,7 +121,9 @@ public:
     std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const;
     
     std::optional<MinimumSignBlockHeader> findSignature(const std::vector<unsigned char> &hash) const;
-    
+
+    std::optional<RejectedTransactionHistory> findRejectedTx(const std::vector<unsigned char> &txHash) const;
+
 private:
     
     std::unique_ptr<SyncImpl> impl;

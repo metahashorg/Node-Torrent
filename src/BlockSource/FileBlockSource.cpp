@@ -12,12 +12,15 @@
 #include "blockchain_structs/RejectedTxsBlock.h"
 #include "blockchain_structs/BlocksMetadata.h"
 
+#include "RejectedBlockSource/FileRejectedBlockSource.h"
+
 using namespace common;
 
 namespace torrent_node_lib {
 
-FileBlockSource::FileBlockSource(LevelDb &leveldb, const std::string &folderPath, bool isValidate)
-    : leveldb(leveldb)
+FileBlockSource::FileBlockSource(FileRejectedBlockSource &rejectedBlockSource, LevelDb &leveldb, const std::string &folderPath, bool isValidate)
+    : rejectedBlockSource(rejectedBlockSource)
+    , leveldb(leveldb)
     , folderPath(folderPath)
     , isValidate(isValidate)
 {}
@@ -84,12 +87,8 @@ bool FileBlockSource::process(std::variant<std::monostate, BlockInfo, SignBlockI
 
             confirmBlockImpl(fi);
 
-            /*std::string dump;
-            const size_t newPos = readNextBlockDump(file, bi.filePos.pos, dump);
-            CHECK(newPos != bi.filePos.pos, "Incorrect rejected block");
-            const RejectedTxsBlockInfo blockInfo = parseRejectedTxsBlockInfo(dump.data(), dump.data() + dump.size(), bi.filePos.pos, true);
-            LOGWARN << "Rejected txs " << blockInfo.txs.size() << " " << toHex(blockInfo.header.hash.begin(), blockInfo.header.hash.end()) << " " << blockInfo.header.blockSize << " " << bi.blockSize << " " << toHex(dump.begin(), dump.end());
-            */
+            rejectedBlockSource.addBlock(bi);
+
             continue;
         }
     }

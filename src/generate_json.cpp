@@ -4,6 +4,7 @@
 
 #include <rapidjson/document.h>
 #include <rapidjson/writer.h>
+#include <blockchain_structs/RejectedTxsBlock.h>
 
 #include "BlockChainReadInterface.h"
 
@@ -893,5 +894,33 @@ std::string genRandomAddressesJson(const RequestId &requestId, const std::vector
     rapidjson::Value resultJson(rapidjson::kObjectType);
     resultJson.AddMember("addresses", nodesJson, allocator);
     doc.AddMember("result", resultJson, allocator);
+    return jsonToString(doc, isFormat);
+}
+
+std::string genRejectedTxHistoryJson(const RequestId &requestId, const std::optional<RejectedTransactionHistory> &history, bool isFormat) {
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    addIdToResponse(requestId, doc, allocator);
+
+    if (!history.has_value()) {
+        doc.AddMember("result", strToJson("NotFound", allocator), allocator);
+    } else {
+
+        rapidjson::Value nodesJson(rapidjson::kArrayType);
+        for (const RejectedTransactionHistory::Element &element: history->history) {
+            rapidjson::Value elementJson(rapidjson::kObjectType);
+            elementJson.AddMember("blockNumber", element.blockNumber, allocator);
+            elementJson.AddMember("timestamp", element.timestamp, allocator);
+            elementJson.AddMember("code", element.errorCode, allocator);
+
+            nodesJson.PushBack(elementJson, allocator);
+        }
+        rapidjson::Value resultJson(rapidjson::kObjectType);
+        resultJson.AddMember("history", nodesJson, allocator);
+
+        resultJson.AddMember("hash", strToJson(toHex(history->hash), allocator), allocator);
+
+        doc.AddMember("result", resultJson, allocator);
+    }
     return jsonToString(doc, isFormat);
 }

@@ -156,6 +156,10 @@ std::optional<MinimumSignBlockHeader> Sync::findSignature(const std::vector<unsi
     return impl->findSignature(hash);
 }
 
+std::optional<RejectedTransactionHistory> Sync::findRejectedTx(const std::vector<unsigned char> &txHash) const {
+    return impl->findRejectedTx(txHash);
+}
+
 Sync::~Sync() = default;
 
 }

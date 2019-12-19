@@ -148,7 +148,7 @@ set(PROJECT_MAIN
 
     utils/Graph.cpp
     P2P/P2P_Graph.cpp
-    blockchain_structs/FilePosition.h blockchain_structs/CommonBalance.cpp blockchain_structs/CommonBalance.h blockchain_structs/SignBlock.cpp blockchain_structs/SignBlock.h blockchain_structs/RejectedTxsBlock.cpp blockchain_structs/RejectedTxsBlock.h blockchain_structs/BlocksMetadata.cpp blockchain_structs/BlocksMetadata.h Workers/MainBlockInfo.cpp Workers/MainBlockInfo.h blockchain_structs/DelegateState.cpp blockchain_structs/DelegateState.h)
+    blockchain_structs/FilePosition.h blockchain_structs/CommonBalance.cpp blockchain_structs/CommonBalance.h blockchain_structs/SignBlock.cpp blockchain_structs/SignBlock.h blockchain_structs/RejectedTxsBlock.cpp blockchain_structs/RejectedTxsBlock.h blockchain_structs/BlocksMetadata.cpp blockchain_structs/BlocksMetadata.h Workers/MainBlockInfo.cpp Workers/MainBlockInfo.h blockchain_structs/DelegateState.cpp blockchain_structs/DelegateState.h RejectedBlockSource/FileRejectedBlockSource.cpp RejectedBlockSource/FileRejectedBlockSource.h RejectedBlockSource/RejectedBlockSource.h Workers/RejectedTxsWorker.cpp Workers/RejectedTxsWorker.h)
 
 #Threads
 find_package(Threads)

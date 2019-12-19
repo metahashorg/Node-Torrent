@@ -31,6 +31,7 @@ class WorkerNodeTest;
 class WorkerMain;
 class BlockSource;
 class PrivateKey;
+class RejectedTxsWorker;
 
 struct V8Details;
 struct V8Code;
@@ -41,6 +42,8 @@ struct NodeTestExtendedStat;
 
 struct TransactionsFilters;
 struct Token;
+
+class RejectedBlockSource;
 
 class SyncImpl {  
 public:
@@ -122,7 +125,9 @@ public:
     std::vector<MinimumSignBlockHeader> getSignaturesBetween(const std::optional<std::vector<unsigned char>> &firstBlock, const std::optional<std::vector<unsigned char>> &secondBlock) const;
     
     std::optional<MinimumSignBlockHeader> findSignature(const std::vector<unsigned char> &hash) const;
-    
+
+    std::optional<RejectedTransactionHistory> findRejectedTx(const std::vector<unsigned char> &txHash) const;
+
 private:
    
     void saveTransactions(BlockInfo &bi, const std::string &binaryDump, bool saveBlockToFile);
@@ -172,11 +177,15 @@ private:
     std::unique_ptr<WorkerScript> scriptWorker;
     std::unique_ptr<WorkerNodeTest> nodeTestWorker;
     std::unique_ptr<WorkerMain> mainWorker;
-    
+
+    std::unique_ptr<RejectedTxsWorker> rejectedTxsWorker;
+
     std::unique_ptr<PrivateKey> privateKey;
         
     TestP2PNodes testNodes;
-    
+
+    std::unique_ptr<RejectedBlockSource> rejectedBlockSource;
+
 };
 
 }
