@@ -53,17 +53,6 @@ struct BlockHeader {
     size_t endBlockPos() const;
 };
 
-struct MinimumBlockHeader {
-    size_t number;
-    size_t blockSize;
-    std::string hash;
-    std::string parentHash;
-    std::string fileName;
-    
-    std::set<std::string> prevExtraBlocks;
-    std::set<std::string> nextExtraBlocks;
-};
-
 struct BlockInfo {
     BlockHeader header;
     

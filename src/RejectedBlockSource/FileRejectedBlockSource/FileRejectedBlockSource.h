@@ -17,7 +17,7 @@
 
 #include "blockchain_structs/RejectedTxsBlock.h"
 
-#include "RejectedBlockSource.h"
+#include "RejectedBlockSource/RejectedBlockSource.h"
 
 namespace torrent_node_lib {
 

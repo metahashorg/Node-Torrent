@@ -3,12 +3,11 @@
 #include "check.h"
 #include "jsonUtils.h"
 #include "log.h"
-#include "convertStrings.h"
 
 #include "utils/serialize.h"
 #include "utils/compress.h"
 
-#include "blockchain_structs/BlockInfo.h"
+#include "GetNewBlocksFromServers.h"
 
 using namespace common;
 

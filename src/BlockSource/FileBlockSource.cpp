@@ -12,7 +12,7 @@
 #include "blockchain_structs/RejectedTxsBlock.h"
 #include "blockchain_structs/BlocksMetadata.h"
 
-#include "RejectedBlockSource/FileRejectedBlockSource.h"
+#include "RejectedBlockSource/FileRejectedBlockSource/FileRejectedBlockSource.h"
 
 using namespace common;
 

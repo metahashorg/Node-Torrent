@@ -30,7 +30,7 @@
 #include "blockchain_structs/BlocksMetadata.h"
 #include "blockchain_structs/DelegateState.h"
 
-#include "RejectedBlockSource/FileRejectedBlockSource.h"
+#include "RejectedBlockSource/FileRejectedBlockSource/FileRejectedBlockSource.h"
 
 #include "Workers/RejectedTxsWorker.h"
 

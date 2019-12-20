@@ -5,7 +5,16 @@
 
 namespace torrent_node_lib {
 
-struct MinimumBlockHeader;
+struct MinimumBlockHeader {
+    size_t number;
+    size_t blockSize;
+    std::string hash;
+    std::string parentHash;
+    std::string fileName;
+
+    std::set<std::string> prevExtraBlocks;
+    std::set<std::string> nextExtraBlocks;
+};
     
 class GetNewBlocksFromServer {
 public:
