@@ -12,7 +12,7 @@ namespace torrent_node_lib {
 static const size_t MAXIMUM_REJECTED_BLOCKS = 1000;
 
 NetworkRejectedBlockSource::NetworkRejectedBlockSource(P2P &p2p, bool isCompress)
-    : getterBlocks(GetNewRejectedBlocksFromServer(p2p, isCompress))
+    : getterBlocks(p2p, isCompress)
 {
 }
 
@@ -25,7 +25,7 @@ std::pair<std::vector<std::vector<unsigned char>>, std::vector<size_t>> NetworkR
         const RejectedBlockMessage &block = headers[i];
         const auto &hash = block.hash;
         const auto found = iterHashFabric.find(hash);
-        if (found != iterHashFabric.end()) {
+        if (found == iterHashFabric.end()) {
             missingHashes.emplace_back(hash);
             missingIndices.emplace_back(i);
         }

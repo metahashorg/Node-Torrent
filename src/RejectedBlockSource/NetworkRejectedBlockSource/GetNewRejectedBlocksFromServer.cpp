@@ -40,6 +40,9 @@ std::vector<RejectedBlockMessage> GetNewRejectedBlocksFromServer::getLastRejecte
         } catch (const exception &e) {
             std::lock_guard<std::mutex> lock(mut);
             error = e;
+        } catch (const UserException &e) {
+            std::lock_guard<std::mutex> lock(mut);
+            error = e.exception;
         }
     };
 

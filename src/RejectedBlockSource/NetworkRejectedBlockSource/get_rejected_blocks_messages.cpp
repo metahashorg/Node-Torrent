@@ -11,7 +11,7 @@ using namespace common;
 namespace torrent_node_lib {
 
 std::string makeGetLastRejectedBlocksMessage(size_t count) {
-    return "\"method\": \"get-rejected-blocks\", \"params\": {\"count\": " + std::to_string(count) + "}";
+    return "{\"method\": \"get-rejected-blocks\", \"params\": {\"count\": " + std::to_string(count) + "}}";
 }
 
 std::string makeGetRejectedBlocksDumpsMessage(std::vector<std::vector<unsigned char>>::const_iterator hashesBegin, std::vector<std::vector<unsigned char>>::const_iterator hashesEnd, bool isCompress) {

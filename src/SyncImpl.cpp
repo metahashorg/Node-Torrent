@@ -64,6 +64,7 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
         rejectedBlockSource = std::move(fileRejectedBlockSource);
     } else {
         CHECK(getterBlocksOpt.p2p != nullptr, "p2p nullptr");
+        CHECK(getterBlocksOpt.p2p2 != nullptr, "p2p nullptr");
         isSaveBlockToFiles = modules[MODULE_BLOCK_RAW];
         getBlockAlgorithm = std::make_unique<NetworkBlockSource>(timeline, folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, true, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign, getterBlocksOpt.isPreLoad);
 
