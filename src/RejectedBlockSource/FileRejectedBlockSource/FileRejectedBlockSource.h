@@ -106,6 +106,16 @@ public:
 
 private:
 
+    std::vector<BlockHolder> getLastHolders(size_t count) const;
+
+    void fillHolders(std::vector<BlockHolder> &holders);
+
+    void replaceBlocks(const std::vector<BlockHolder> &holders);
+
+    std::vector<RejectedBlockResult> getLastBlocks(const std::vector<BlockHolder> &holders) const;
+
+private:
+
     const BlockChain &blockchain;
 
     const std::string folderPath;

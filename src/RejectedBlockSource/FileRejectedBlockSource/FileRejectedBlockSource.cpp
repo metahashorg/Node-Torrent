@@ -25,19 +25,14 @@ void FileRejectedBlockSource::addBlock(const torrent_node_lib::RejectedTxsMinimu
     }
 }
 
-std::vector<RejectedBlockResult> FileRejectedBlockSource::calcLastBlocks(size_t count) {
-    CHECK(count <= MAXIMUM_BLOCKS, "Incorrect count");
-
+std::vector<FileRejectedBlockSource::BlockHolder> FileRejectedBlockSource::getLastHolders(size_t count) const {
     std::vector<BlockHolder> holders;
-
-    std::unique_lock<std::mutex> lock(mut);
-
     const auto &iterSequenceFabric = blocks.get<BlockHolder::SequenceTag>();
-
     std::copy_n(iterSequenceFabric.rbegin(), std::min(count, iterSequenceFabric.size()), std::back_inserter(holders));
+    return holders;
+}
 
-    lock.unlock();
-
+void FileRejectedBlockSource::fillHolders(std::vector<BlockHolder> &holders) {
     IfStream file;
     for (BlockHolder &holder: holders) {
         if (holder.block.has_value()) {
@@ -56,9 +51,9 @@ std::vector<RejectedBlockResult> FileRejectedBlockSource::calcLastBlocks(size_t 
 
         holder.block = BlockHolder::Block(dump, blockInfo, header.blockNumber.value());
     }
+}
 
-    lock.lock();
-
+void FileRejectedBlockSource::replaceBlocks(const std::vector<BlockHolder> &holders) {
     for (const BlockHolder &block: holders) {
         const auto &iterIndexFabric = blocks.get<BlockHolder::IndexTag>();
         auto &iterHashFabric = blocks.get<BlockHolder::HashTag>();
@@ -72,17 +67,31 @@ std::vector<RejectedBlockResult> FileRejectedBlockSource::calcLastBlocks(size_t 
             }
         }
     }
+}
 
-    lock.unlock();
-
-    lock.lock();
-
+std::vector<RejectedBlockResult> FileRejectedBlockSource::getLastBlocks(const std::vector<BlockHolder> &holders) const {
     std::vector<RejectedBlockResult> result;
     result.reserve(holders.size());
     std::transform(holders.begin(), holders.end(), std::back_inserter(result), [](const BlockHolder &holder) {
         return RejectedBlockResult(holder.block->info.header.hash, holder.block->number, holder.block->info.header.timestamp);
     });
     return result;
+}
+
+std::vector<RejectedBlockResult> FileRejectedBlockSource::calcLastBlocks(size_t count) {
+    CHECK(count <= MAXIMUM_BLOCKS, "Incorrect count");
+
+    std::unique_lock<std::mutex> lock(mut);
+    std::vector<BlockHolder> holders = getLastHolders(count);
+    lock.unlock();
+
+    fillHolders(holders);
+
+    lock.lock();
+    replaceBlocks(holders);
+    lock.unlock();
+
+    return getLastBlocks(holders);
 }
 
 std::vector<RejectedBlock> FileRejectedBlockSource::getBlocks(const std::vector<std::vector<unsigned char>> &hashes) const {
