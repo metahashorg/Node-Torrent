@@ -818,8 +818,8 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
         mhd_resp.data = genErrorResponse(requestId, -32603, e);
         mhd_resp.code = HTTP_STATUS_INTERNAL_SERVER_ERROR;
     } catch (const UserException &e) {
-        LOGDEBUG << e.exception;
-        mhd_resp.data = genErrorResponse(requestId, -32602, e.exception + ". Url: " + url);
+        LOGDEBUG << e.what();
+        mhd_resp.data = genErrorResponse(requestId, -32602, std::string(e.what()) + ". Url: " + url);
         mhd_resp.code = HTTP_STATUS_BAD_REQUEST;
     } catch (const std::exception &e) {
         LOGERR << e.what();

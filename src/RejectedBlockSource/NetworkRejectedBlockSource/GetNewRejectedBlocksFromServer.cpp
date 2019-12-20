@@ -42,7 +42,7 @@ std::vector<RejectedBlockMessage> GetNewRejectedBlocksFromServer::getLastRejecte
             error = e;
         } catch (const UserException &e) {
             std::lock_guard<std::mutex> lock(mut);
-            error = e.exception;
+            error = e.what();
         }
     };
 
