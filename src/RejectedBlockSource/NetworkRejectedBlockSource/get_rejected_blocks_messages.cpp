@@ -14,16 +14,17 @@ std::string makeGetLastRejectedBlocksMessage(size_t count) {
     return "\"method\": \"get-rejected-blocks\", \"params\": {\"count\": " + std::to_string(count) + "}";
 }
 
-std::string makeGetRejectedBlocksDumpsMessage(const std::vector<std::vector<unsigned char>> &hashes) {
+std::string makeGetRejectedBlocksDumpsMessage(std::vector<std::vector<unsigned char>>::const_iterator hashesBegin, std::vector<std::vector<unsigned char>>::const_iterator hashesEnd, bool isCompress) {
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
 
     rapidjson::Value nodesJson(rapidjson::kArrayType);
-    for (const std::vector<unsigned char> &hash: hashes) {
-        nodesJson.PushBack(strToJson(toHex(hash), allocator), allocator);
+    for (auto iter = hashesBegin; iter != hashesEnd; iter++) {
+        nodesJson.PushBack(strToJson(toHex(*iter), allocator), allocator);
     }
     rapidjson::Value resultJson(rapidjson::kObjectType);
     resultJson.AddMember("hashes", nodesJson, allocator);
+    resultJson.AddMember("isCompress", isCompress, allocator);
 
     doc.AddMember("params", resultJson, allocator);
     doc.AddMember("method", "get-rejected-dumps", allocator);
@@ -61,6 +62,22 @@ std::vector<std::string> parseRejectedDumpBlocksBinary(const std::string &respon
         res.emplace_back(deserializeStringBigEndian(r, from));
     }
     return res;
+}
+
+std::optional<std::string> checkErrorGetRejectedBlockDumpResponse(const std::string &response) {
+    if (response.size() <= 512 && response[0] == '{' && response[response.size() - 1] == '}') {
+        try {
+            rapidjson::Document doc;
+            const rapidjson::ParseResult pr = doc.Parse(response.c_str());
+            CHECK(pr, "rapidjson parse error. Data: " + response);
+
+            CHECK(!doc.HasMember("error") || doc["error"].IsNull(), jsonToString(doc["error"], false));
+        } catch (const exception &e) {
+            return e;
+        }
+    }
+
+    return std::nullopt;
 }
 
 } // namespace torrent_node_lib {
