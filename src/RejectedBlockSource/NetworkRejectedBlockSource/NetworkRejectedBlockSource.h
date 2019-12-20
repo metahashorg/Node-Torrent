@@ -24,6 +24,8 @@
 
 namespace torrent_node_lib {
 
+class P2P;
+
 class NetworkRejectedBlockSource: public RejectedBlockSource {
 private:
 
@@ -62,6 +64,10 @@ private:
             >
         >
     >;
+
+public:
+
+    NetworkRejectedBlockSource(P2P &p2p, bool isCompress);
 
 public:
 

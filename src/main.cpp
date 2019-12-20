@@ -242,6 +242,7 @@ int main (int argc, char *const *argv) {
         }
 
         std::unique_ptr<P2P> p2p = nullptr;
+        std::unique_ptr<P2P> p2p2 = nullptr;
         
         size_t otherPortTorrent = port;
         if (allSettings.exists("other_torrent_port")) {
@@ -256,15 +257,18 @@ int main (int argc, char *const *argv) {
                 serversStr.push_back(serverStr);
             }
             p2p = std::make_unique<P2P_Ips>(serversStr, countConnections);
+            p2p2 = std::make_unique<P2P_Ips>(serversStr, countConnections);
         } else {
             const std::string &fileName = allSettings["servers"];
             if (beginWith(fileName, "http")) {
                 const NsResult bestIp = getBestIp(fileName);
                 std::vector<std::string> serversStr{bestIp.server};
                 p2p = std::make_unique<P2P_Ips>(serversStr, countConnections);
+                p2p2 = std::make_unique<P2P_Ips>(serversStr, countConnections);
             } else {
                 const std::vector<std::pair<std::string, std::string>> serversGraph = readServers(fileName, otherPortTorrent);
                 p2p = std::make_unique<P2P_Graph>(serversGraph, myIp, countConnections);
+                p2p2 = std::make_unique<P2P_Graph>(serversGraph, myIp, countConnections);
             }
         }
        
@@ -273,7 +277,7 @@ int main (int argc, char *const *argv) {
             technicalAddress,
             LevelDbOptions(settingsDb.writeBufSizeMb, settingsDb.isBloomFilter, settingsDb.isChecks, getFullPath("simple", pathToBd), settingsDb.lruCacheMb),
             CachesOptions(maxCountElementsBlockCache, maxCountElementsTxsCache, maxLocalCacheElements),
-            GetterBlockOptions(maxAdvancedLoadBlocks, countBlocksInBatch, p2p.get(), getBlocksFromFile, isValidate, isValidateSign, isCompress, isPreLoad),
+            GetterBlockOptions(maxAdvancedLoadBlocks, countBlocksInBatch, p2p.get(), p2p2.get(), getBlocksFromFile, isValidate, isValidateSign, isCompress, isPreLoad),
             signKey,
             TestNodesOptions(otherPortTorrent, myIp, testNodesServer),
             isValidateState

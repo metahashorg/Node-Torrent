@@ -11,6 +11,11 @@ namespace torrent_node_lib {
 
 static const size_t MAXIMUM_REJECTED_BLOCKS = 1000;
 
+NetworkRejectedBlockSource::NetworkRejectedBlockSource(P2P &p2p, bool isCompress)
+    : getterBlocks(GetNewRejectedBlocksFromServer(p2p, isCompress))
+{
+}
+
 std::pair<std::vector<std::vector<unsigned char>>, std::vector<size_t>> NetworkRejectedBlockSource::getMissingBlocks(const std::vector<RejectedBlockMessage> &headers) const {
     std::vector<std::vector<unsigned char>> missingHashes;
     std::vector<size_t> missingIndices;
@@ -95,6 +100,40 @@ std::vector<RejectedBlockResult> NetworkRejectedBlockSource::calcLastBlocks(size
 
     lock.lock();
     return getLastBlocks(count);
+}
+
+std::vector<RejectedBlock> NetworkRejectedBlockSource::getBlocks(const std::vector<std::vector<unsigned char>> &hashes) const {
+    std::vector<RejectedBlock> result;
+
+    std::lock_guard<std::mutex> lock(mut);
+
+    const auto &iterHashFabric = blocks.get<BlockHolder::HashTag>();
+
+    for (const std::vector<unsigned char> &hash: hashes) {
+        const auto iter = iterHashFabric.find(hash);
+        if (iter != iterHashFabric.end()) {
+            result.emplace_back(iter->info, iter->number);
+        }
+    }
+
+    return result;
+}
+
+std::vector<std::string> NetworkRejectedBlockSource::getDumps(const std::vector<std::vector<unsigned char>> &hashes) const {
+    std::vector<std::string> result;
+
+    std::lock_guard<std::mutex> lock(mut);
+
+    const auto &iterHashFabric = blocks.get<BlockHolder::HashTag>();
+
+    for (const std::vector<unsigned char> &hash: hashes) {
+        const auto iter = iterHashFabric.find(hash);
+        if (iter != iterHashFabric.end()) {
+            result.emplace_back(iter->dump);
+        }
+    }
+
+    return result;
 }
 
 } // namespace torrent_node_lib {

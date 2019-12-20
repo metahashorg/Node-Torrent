@@ -31,6 +31,7 @@
 #include "blockchain_structs/DelegateState.h"
 
 #include "RejectedBlockSource/FileRejectedBlockSource/FileRejectedBlockSource.h"
+#include "RejectedBlockSource/NetworkRejectedBlockSource/NetworkRejectedBlockSource.h"
 
 #include "Workers/RejectedTxsWorker.h"
 
@@ -65,6 +66,8 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
         CHECK(getterBlocksOpt.p2p != nullptr, "p2p nullptr");
         isSaveBlockToFiles = modules[MODULE_BLOCK_RAW];
         getBlockAlgorithm = std::make_unique<NetworkBlockSource>(timeline, folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, true, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign, getterBlocksOpt.isPreLoad);
+
+        rejectedBlockSource = std::make_unique<NetworkRejectedBlockSource>(*getterBlocksOpt.p2p2, getterBlocksOpt.isCompress);
     }
 
     rejectedTxsWorker = std::make_unique<RejectedTxsWorker>(*rejectedBlockSource);
