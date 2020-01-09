@@ -101,6 +101,11 @@ void RejectedTxsWorker::worker() {
 
             clearOldHistory();
 
+            if (!blocks.empty()) {
+                LOGINFO << "Rejected txs block processed, count blocks " << blocks.size() << ". Number "
+                        << blocks[0].blockNumber << ". Count txs " << blocks[0].block.txs.size();
+            }
+
             sleep(1s);
         }
     } catch (const StopException &e) {
