@@ -143,14 +143,12 @@ std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const s
         CHECK(found != hashes.end(), "Block not found in timeline");
         iterSecond = found->second;
     } else {
-        const auto found = hashes.find(firstBlock.value());
-        CHECK(found != hashes.end(), "Block not found in timeline");
-        Iterator iter = found->second;
+        Iterator iter = iterFirst;
         while (iter != timeline.cend()) {
-            iter++;
             if (std::holds_alternative<SimpleBlockElement>(*iter)) {
                 break;
             }
+            iter++;
         }
         iterSecond = iter; // dont prev;
     }
