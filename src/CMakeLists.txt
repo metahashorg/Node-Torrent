@@ -214,8 +214,10 @@ set(PROJECT_LIBS
 
     event.a
     microhttpd.a
-    gcrypt
+    gcrypt.a
+    gpg-error.a
     gnutls
+
     tcmalloc
 
     curl
