@@ -1,0 +1,14 @@
+prefix=/home/user/libmicrohttpd2/lib
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libmicrohttpd
+Description: A library for creating an embedded HTTP server
+Version: 0.9.49
+Requires:
+Requires.private: 
+Conflicts:
+Libs: -L${libdir} -lmicrohttpd
+Libs.private: -lgnutls -lgcrypt  
+Cflags: -I${includedir}
