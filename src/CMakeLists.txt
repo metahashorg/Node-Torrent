@@ -163,7 +163,7 @@ if (NOT DEFINED UBUNTU14)
     find_library(CONFIG1_LIB NAMES libconfig++.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/libconfig/lib/)
     find_library(CONFIG2_LIB NAMES libconfig.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/libconfig/lib/)
 
-    find_library(MICROHTTPD_LIB NAMES microhttpd.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/microhttpd/lib/)
+    find_library(MICROHTTPD_LIB NAMES libmicrohttpd.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/microhttpd/lib/)
 endif()
 if (DEFINED UBUNTU14)
     find_library(LEVELDB NAMES libleveldb.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/leveldb/lib)
@@ -216,7 +216,7 @@ set(PROJECT_LIBS
     dl
 
     event.a
-    microhttpd.a
+    ${MICROHTTPD_LIB}
     gcrypt.a
     gpg-error.a
     gnutls
