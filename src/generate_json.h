@@ -46,7 +46,7 @@ std::string genStatisticResponse(const RequestId &requestId, size_t statistic, d
 
 std::string genStatisticResponse(size_t statistic);
 
-std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &privkey);
+std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &type, const std::string &privkey);
 
 std::string genTransactionNotFoundResponse(const RequestId &requestId, const std::string &transaction);
 

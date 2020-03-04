@@ -131,6 +131,7 @@ int main (int argc, char *const *argv) {
     LOGINFO << "Repository version " << g_GIT_SHA1 << " " << VERSION << " " << g_GIT_DATE;
     LOGINFO << "Is local changes " << g_GIT_IS_LOCAL_CHANGES;
     LOGINFO << "Branch " << g_GIT_REFSPEC;
+    LOGINFO << "Torrent type: " << SERVER_TYPE;
    
     const std::string path_to_config(argv[1]);
     libconfig::Config config;

@@ -85,13 +85,14 @@ std::string genStatisticResponse(size_t statistic) {
     return jsonToString(jsonDoc, false);
 }
 
-std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &privkey) {
+std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &type, const std::string &privkey) {
     rapidjson::Document jsonDoc(rapidjson::kObjectType);
     auto &allocator = jsonDoc.GetAllocator();
     addIdToResponse(requestId, jsonDoc, allocator);
     
     rapidjson::Document resultJson(rapidjson::kObjectType);
     resultJson.AddMember("version", strToJson(version, allocator), allocator);
+    resultJson.AddMember("type", strToJson(type, allocator), allocator);
     resultJson.AddMember("mh_addr", strToJson(privkey, allocator), allocator);
     
     jsonDoc.AddMember("result", resultJson, allocator);

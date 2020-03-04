@@ -1,5 +1,8 @@
 include_directories(/usr/local/include)
 
+add_definitions(-DVERSION="0.133")
+add_definitions(-DSERVER_TYPE="Torrent")
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 if (DEFINED UBUNTU14)
 add_definitions(-DUBUNTU14="")
@@ -29,8 +32,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../common_utils/")
 include(common_utils)
 
 add_definitions(-DSNIPER_LOG_TRACE -DSNIPER_LOG_DEBUG)
-
-add_definitions(-DVERSION="0.133")
 
 set(COMMON_SOURCES
     ${COMMON_UTILS_SOURCES_WITHOUT_GITSHA}

@@ -63,7 +63,11 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
         //const bool blockHeightPass = get<std::string>(paramsJson, "blockHeightCheck") == "pass";
         //const std::string requestsPerMinuteStr = get<std::string>(paramsJson, "requestsPerMinute");
         //const std::optional<size_t> requestsPerMinute = requestsPerMinuteStr == "unavailable" ? std::nullopt : std::optional<size_t>(std::stoull(requestsPerMinuteStr));
-        
+
+        /*if (serverAddress == "0x00918d061cc200feb7752921419ad46cc410d05abaf2ba9f6d") {
+            LOGINFO << "Node test result " << serverAddress << " " << tx.hash << " " << std::string(tx.data.begin(), tx.data.end()) << " " << tx.blockNumber;
+        }*/
+
         const std::optional<std::string> latencyStr = getOpt<std::string>(paramsJson, "latency");
         const std::optional<std::string> rpsStr = getOpt<std::string>(paramsJson, "rps");
         size_t rps = rpsStr.has_value() ? std::stoull(rpsStr.value()) : (latencyStr.has_value() ? std::stoull(latencyStr.value()) : 0);
@@ -71,7 +75,11 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
         const std::string geo = get<std::string>(paramsJson, "geo");
         const bool success = get<std::string>(paramsJson, "success") == "true";
         if (!success) {
-            rps = 0;
+            if (rpsStr.has_value()) {
+                rps = 0;
+            } else {
+                rps = std::numeric_limits<size_t>::max() - 1000000;
+            }
         }
         
         //LOGINFO << "Node test found " << serverAddress;
@@ -107,12 +115,8 @@ static void processTestTransaction(const TransactionInfo &tx, std::unordered_map
             
             //LOGDEBUG << "Ya tuta test2: " << serverAddress << " " << currDay << " " << found->second.getMax(currDay).rps << " " << found->second.getMax(currDay).geo << " " << success << ". " << dataStr;
             
-            if (nodeTestResult->success) {
-                nodesRps[nodeTestResult->serverAddress].rps.push_back(nodeTestResult->rps);
-            } else {
-                nodesRps[nodeTestResult->serverAddress].rps.push_back(0);
-            }
-            
+            nodesRps[nodeTestResult->serverAddress].rps.push_back(nodeTestResult->rps);
+
             allTests.countAll++;
             if (!nodeTestResult->success) {
                 allTests.countFailure++;

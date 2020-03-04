@@ -469,7 +469,7 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
         if (func == "status") {
             response = genStatusResponse(requestId, VERSION, g_GIT_SHA1);
         } else if (func == "getinfo") {
-            response = genInfoResponse(requestId, VERSION, serverPrivKey);
+            response = genInfoResponse(requestId, VERSION, SERVER_TYPE, serverPrivKey);
         } else if (func == "get-statistic") {
             const SmallStatisticElement smallStat = smallRequestStatistics.getStatistic();
             response = genStatisticResponse(smallStat.stat);
