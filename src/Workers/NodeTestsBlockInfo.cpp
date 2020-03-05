@@ -42,8 +42,10 @@ BestNodeElement BestNodeTest::getMax(size_t currDay) const {
     
     std::map<std::string, std::pair<size_t, size_t>> geos;
     for (const BestNodeElement &res: tests) {
-        geos[res.geo].first += res.rps;
-        geos[res.geo].second++;
+        if (res.rps != 0) {
+            geos[res.geo].first += res.rps;
+            geos[res.geo].second++;
+        }
     }
 
     std::map<std::string, std::pair<size_t, size_t>>::const_iterator bestElement;

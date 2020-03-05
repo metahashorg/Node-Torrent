@@ -78,7 +78,7 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
             if (rpsStr.has_value()) {
                 rps = 0;
             } else {
-                rps = std::numeric_limits<size_t>::max() - 1000000;
+                rps = 0;
             }
         }
         
