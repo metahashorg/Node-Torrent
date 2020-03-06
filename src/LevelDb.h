@@ -76,10 +76,6 @@ public:
     
     void addNodeTestTrust(const std::string &address, const NodeTestTrust &result);
     
-    void addNodeTestCountForDay(const std::string &address, const NodeTestCount &result, size_t dayNumber);
-    
-    void addNodeTestCounstForDay(const NodeTestCount &result, size_t dayNumber);
-    
     void addNodeTestDayNumber(const NodeTestDayNumber &result);
     
     void addAllTestedNodesForDay(const AllTestedNodes &result, size_t dayNumber);
@@ -192,11 +188,7 @@ public:
     std::string findVersionDb() const;
     
     NodeStatBlockInfo findNodeStatBlock() const;
-    
-    NodeTestCount findNodeStatCount(const std::string &address, size_t dayNumber) const;
-    
-    NodeTestCount findNodeStatsCount(size_t dayNumber) const;
-    
+
     BestNodeTest findNodeStatLastResults(const std::string &address) const;
     
     NodeTestTrust findNodeStatLastTrust(const std::string &address) const;
@@ -204,10 +196,6 @@ public:
     NodeRps findNodeStatRps(const std::string &address, size_t dayNumber) const;
     
     NodeTestDayNumber findNodeStatDayNumber() const;
-    
-    NodeTestCount findNodeStatCountLast(const std::string &address) const;
-    
-    NodeTestCount findNodeStatsCountLast() const;
     
     AllTestedNodes findAllTestedNodesForDay(size_t day) const;
     

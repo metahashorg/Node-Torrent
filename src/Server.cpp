@@ -55,7 +55,6 @@ const static std::string GET_FORGING_SUM_ALL = "get-forging-sum-all";
 const static std::string GET_LAST_NODE_STAT_RESULT = "get-last-node-stat-result";
 const static std::string GET_LAST_NODE_STAT_TRUST = "get-last-node-stat-trust";
 const static std::string GET_LAST_NODE_STAT_COUNT = "get-last-node-stat-count";
-const static std::string GET_LAST_NODES_STATS_RESULT = "get-last-nodes-stats-count";
 const static std::string GET_ALL_LAST_NODES_RESULT = "get-all-last-nodes-count";
 const static std::string GET_NODE_RAITING = "get-nodes-raiting";
 const static std::string GET_RANDOM_ADDRESSES = "get-random-addresses";
@@ -738,11 +737,6 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             
             const size_t lastBlockDay = sync.getLastBlockDay();
             response = genAllNodesStatsCountJson(requestId, lastBlockDay, result, isFormatJson, jsonVersion);
-        } else if (func == GET_LAST_NODES_STATS_RESULT) {
-            const auto result = sync.getLastDayNodesTestsCount();
-            
-            const size_t lastBlockDay = sync.getLastBlockDay();
-            response = genNodesStatsCountJson(requestId, lastBlockDay, result, isFormatJson, jsonVersion);
         } else if (func == GET_NODE_RAITING) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             

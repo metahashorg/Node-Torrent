@@ -108,12 +108,8 @@ std::pair<size_t, NodeTestTrust> Sync::getLastNodeTestTrust(const std::string &a
     return impl->getLastNodeTestTrust(address);
 }
 
-NodeTestCount Sync::getLastDayNodeTestCount(const std::string &address) const {
+NodeTestCount2 Sync::getLastDayNodeTestCount(const std::string &address) const {
     return impl->getLastDayNodeTestCount(address);
-}
-
-NodeTestCount Sync::getLastDayNodesTestsCount() const {
-    return impl->getLastDayNodesTestsCount();
 }
 
 std::vector<std::pair<std::string, NodeTestExtendedStat>> Sync::filterLastNodes(size_t countTests) const {

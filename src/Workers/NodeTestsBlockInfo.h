@@ -71,6 +71,15 @@ struct BestNodeElement {
     
 };
 
+struct NodeTestCount2 {
+    size_t countAll = 0;
+    size_t countFailure = 0;
+
+    size_t day = 0;
+
+    size_t countSuccess() const;
+};
+
 struct BestNodeTest {
     std::vector<BestNodeElement> tests;
     size_t day = 0;
@@ -84,7 +93,9 @@ struct BestNodeTest {
     {}
     
     BestNodeElement getMax(size_t currDay) const;
-    
+
+    NodeTestCount2 countTests(size_t currDay) const;
+
     void addElement(const BestNodeElement &element, size_t currDay);
     
     void serialize(std::vector<char> &buffer) const;
@@ -114,34 +125,6 @@ struct NodeTestTrust {
     
 };
 
-struct NodeTestCount {
-    
-    size_t countAll = 0;
-    
-    size_t countFailure = 0;
-    
-    size_t day = 0;
-    
-    std::set<Address> testers;
-    
-    NodeTestCount() = default;
-    
-    NodeTestCount(size_t day)
-        : day(day)
-    {}
-    
-    size_t countSuccess() const;
-    
-    void serialize(std::vector<char> &buffer) const;
-    
-    static NodeTestCount deserialize(const std::string &raw);
-    
-    NodeTestCount& operator+=(const NodeTestCount &second);
-    
-};
-
-NodeTestCount operator+(const NodeTestCount &first, const NodeTestCount &second);
-
 struct NodeStatBlockInfo {
     size_t blockNumber = 0;
     std::vector<unsigned char> blockHash;
@@ -162,8 +145,8 @@ struct NodeStatBlockInfo {
 };
 
 struct NodeTestExtendedStat {
-    
-    NodeTestCount count;
+
+    NodeTestCount2 count;
     
     std::string type;
     
@@ -171,7 +154,7 @@ struct NodeTestExtendedStat {
     
     NodeTestExtendedStat() = default;
     
-    NodeTestExtendedStat(const NodeTestCount &count, const std::string &type, const std::string &ip)
+    NodeTestExtendedStat(const NodeTestCount2 &count, const std::string &type, const std::string &ip)
         : count(count)
         , type(type)
         , ip(ip)
