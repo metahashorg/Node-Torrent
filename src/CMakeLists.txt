@@ -1,6 +1,6 @@
 include_directories(/usr/local/include)
 
-add_definitions(-DVERSION="0.135")
+add_definitions(-DVERSION="0.136")
 add_definitions(-DSERVER_TYPE="Torrent")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})

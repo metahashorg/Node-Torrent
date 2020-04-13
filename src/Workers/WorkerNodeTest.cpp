@@ -71,18 +71,15 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
         const std::optional<std::string> latencyStr = getOpt<std::string>(paramsJson, "latency");
         const std::optional<std::string> rpsStr = getOpt<std::string>(paramsJson, "rps");
         size_t rps = rpsStr.has_value() ? std::stoull(rpsStr.value()) : (latencyStr.has_value() ? std::stoull(latencyStr.value()) : 0);
+        rps += 1;
         
         const std::string geo = get<std::string>(paramsJson, "geo");
         const bool success = get<std::string>(paramsJson, "success") == "true";
         if (!success) {
-            if (rpsStr.has_value()) {
-                rps = 0;
-            } else {
-                rps = 0;
-            }
+            rps = 0;
         }
         
-        //LOGINFO << "Node test found " << serverAddress;
+        //LOGINFO << "Node test found " << serverAddress << " "<< rps << " " << success << " " << tx.fromAddress.calcHexString();
         
         return NodeTestResult(serverAddress, testerAddress, type, tx.data, ip, geo, rps, success, rpsStr.has_value());
     }
