@@ -72,7 +72,8 @@ sudo make install
 cd /tmp
 git clone https://github.com/metahashorg/Node-InfrastructureTorrent torrent_node
 cd torrent_node/build
-git checkout ubuntu18
+git checkout master
+git submodule update --init
 cmake .. && make
 ```
 
