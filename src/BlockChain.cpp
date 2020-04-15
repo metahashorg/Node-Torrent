@@ -68,7 +68,7 @@ size_t BlockChain::calcBlockchain(const std::vector<unsigned char>& lastHash) {
                 lastStateBlock = std::max(bh.blockNumber.value(), lastStateBlock);
             }
             
-            CHECK(bh.blockNumber.value() == hashes.size(), "Ups " + std::to_string(bh.blockNumber.value()) + " " + toHex(bh.hash));
+            CHECK(bh.blockNumber.value() == hashes.size(), "Ups " + std::to_string(bh.blockNumber.value()) + " " + toHex(bh.hash) + " " + toHex(bh.prevHash));
             hashes.emplace_back(iter->get());
         }
         return allNum;
