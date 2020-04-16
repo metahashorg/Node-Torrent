@@ -260,8 +260,13 @@ int main (int argc, char *const *argv) {
         } else {
             const std::string &fileName = allSettings["servers"];
             if (beginWith(fileName, "http")) {
-                const NsResult bestIp = getBestIp(fileName);
-                std::vector<std::string> serversStr{bestIp.server};
+                const std::vector<NsResult> bestIps = getBestIps(fileName, 3);
+                CHECK(!bestIps.empty(), "Not found servers");
+                for (const NsResult &r: bestIps) {
+                    LOGINFO << "Node server found " << r.server << " " << r.timeout;
+                }
+                std::vector<std::string> serversStr;
+                std::transform(bestIps.begin(), bestIps.end(), std::back_inserter(serversStr), std::mem_fn(&NsResult::server));
                 p2p = std::make_unique<P2P_Ips>(serversStr, countConnections);
             } else {
                 const std::vector<std::pair<std::string, std::string>> serversGraph = readServers(fileName, otherPortTorrent);
