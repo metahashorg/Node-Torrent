@@ -37,9 +37,9 @@ struct V8Details;
 struct V8Code;
 struct NodeTestResult;
 struct NodeTestTrust;
-struct NodeTestCount;
 struct NodeTestExtendedStat;
 struct RejectedBlockResult;
+struct NodeTestCount2;
 
 struct TransactionsFilters;
 struct Token;

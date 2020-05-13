@@ -18,10 +18,10 @@ struct BlockInfo;
 struct AllCaches;
 
 struct NodeTestResult;
-struct NodeTestCount;
 struct NodeTestTrust;
 struct NodeTestExtendedStat;
 struct AllNodesNode;
+struct NodeTestCount2;
 
 class BlockChain;
 
