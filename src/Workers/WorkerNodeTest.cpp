@@ -64,10 +64,15 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
         //const bool blockHeightPass = get<std::string>(paramsJson, "blockHeightCheck") == "pass";
         //const std::string requestsPerMinuteStr = get<std::string>(paramsJson, "requestsPerMinute");
         //const std::optional<size_t> requestsPerMinute = requestsPerMinuteStr == "unavailable" ? std::nullopt : std::optional<size_t>(std::stoull(requestsPerMinuteStr));
-        
+
+        /*if (serverAddress == "0x00918d061cc200feb7752921419ad46cc410d05abaf2ba9f6d") {
+            LOGINFO << "Node test result " << serverAddress << " " << tx.hash << " " << std::string(tx.data.begin(), tx.data.end()) << " " << tx.blockNumber;
+        }*/
+
         const std::optional<std::string> latencyStr = getOpt<std::string>(paramsJson, "latency");
         const std::optional<std::string> rpsStr = getOpt<std::string>(paramsJson, "rps");
         size_t rps = rpsStr.has_value() ? std::stoull(rpsStr.value()) : (latencyStr.has_value() ? std::stoull(latencyStr.value()) : 0);
+        rps += 1;
         
         const std::string geo = get<std::string>(paramsJson, "geo");
         const bool success = get<std::string>(paramsJson, "success") == "true";
@@ -75,14 +80,14 @@ std::optional<NodeTestResult> parseTestNodeTransaction(const TransactionInfo &tx
             rps = 0;
         }
         
-        //LOGINFO << "Node test found " << serverAddress;
+        //LOGINFO << "Node test found " << serverAddress << " "<< rps << " " << success << " " << tx.fromAddress.calcHexString();
         
         return NodeTestResult(serverAddress, testerAddress, type, tx.data, ip, geo, rps, success, rpsStr.has_value());
     }
     return std::nullopt;
 }
 
-static void processTestTransaction(const TransactionInfo &tx, std::unordered_map<std::string, BestNodeTest> &lastNodesTests, LevelDb &leveldbNodeTest, size_t currDay, const BlockInfo &bi, std::unordered_map<std::string, NodeTestCount> &countTests, std::unordered_map<std::string, NodeRps> &nodesRps, NodeTestCount &allTests, AllTestedNodes &allNodesForDay) {
+static void processTestTransaction(const TransactionInfo &tx, std::unordered_map<std::string, BestNodeTest> &lastNodesTests, LevelDb &leveldbNodeTest, size_t currDay, const BlockInfo &bi, std::unordered_map<std::string, NodeRps> &nodesRps, AllTestedNodes &allNodesForDay) {
     try {
         const std::optional<NodeTestResult> nodeTestResult = parseTestNodeTransaction(tx);
         
@@ -98,28 +103,11 @@ static void processTestTransaction(const TransactionInfo &tx, std::unordered_map
             }
             found->second.addElement(BestNodeElement(bi.header.timestamp, nodeTestResult->geo, nodeTestResult->rps, tx.filePos), currDay);
             found->second.isMaxElement = nodeTestResult->isForwardSort;
-            
-            NodeTestCount &countTest = countTests.try_emplace(nodeTestResult->serverAddress, NodeTestCount(currDay)).first->second;
-            countTest.countAll++;
-            if (!nodeTestResult->success) {
-                countTest.countFailure++;
-            }
-            countTest.testers.insert(nodeTestResult->testerAddress);
-            
+
             //LOGDEBUG << "Ya tuta test2: " << serverAddress << " " << currDay << " " << found->second.getMax(currDay).rps << " " << found->second.getMax(currDay).geo << " " << success << ". " << dataStr;
             
-            if (nodeTestResult->success) {
-                nodesRps[nodeTestResult->serverAddress].rps.push_back(nodeTestResult->rps);
-            } else {
-                nodesRps[nodeTestResult->serverAddress].rps.push_back(0);
-            }
-            
-            allTests.countAll++;
-            if (!nodeTestResult->success) {
-                allTests.countFailure++;
-            }
-            allTests.testers.insert(nodeTestResult->testerAddress);
-            
+            nodesRps[nodeTestResult->serverAddress].rps.push_back(nodeTestResult->rps);
+
             allNodesForDay.nodes.insert(nodeTestResult->serverAddress);
         }
     } catch (const exception &e) {
@@ -215,13 +203,11 @@ void WorkerNodeTest::work() {
             
             AllTestedNodes allNodesForDay;
             AllNodes allNodes;
-            std::unordered_map<std::string, NodeTestCount> countTests;
             std::unordered_map<std::string, NodeRps> nodesRps;
-            NodeTestCount allTests(currDay);
             std::unordered_map<std::string, BestNodeTest> lastNodesTests;
             for (const TransactionInfo &tx: bi.txs) {
                 if (tx.isIntStatusNodeTest()) {
-                    processTestTransaction(tx, lastNodesTests, leveldbNodeTest, currDay, bi, countTests, nodesRps, allTests, allNodesForDay);
+                    processTestTransaction(tx, lastNodesTests, leveldbNodeTest, currDay, bi, nodesRps, allNodesForDay);
                 } else if (bi.header.isStateBlock()) {
                     processStateBlock(tx, bi, batchStates);
                 } else {
@@ -235,21 +221,11 @@ void WorkerNodeTest::work() {
                 batchStates.addNodeTestDayNumber(dayNumber);
             }
             
-            for (const auto &[address, count]: countTests) {
-                const NodeTestCount oldNodeStat = leveldbNodeTest.findNodeStatCount(address, currDay);
-                const NodeTestCount currNodeStat = count + oldNodeStat;
-                batchStates.addNodeTestCountForDay(address, currNodeStat, currDay);
-            }
             for (const auto &[address, rps]: nodesRps) {
                 const NodeRps oldNodeRps = leveldbNodeTest.findNodeStatRps(address, currDay);
                 NodeRps currNodeRps = oldNodeRps;
                 currNodeRps.rps.insert(currNodeRps.rps.end(), rps.rps.begin(), rps.rps.end());
                 batchStates.addNodeTestRpsForDay(address, currNodeRps, currDay);
-            }
-            if (allTests.countAll != 0) {
-                const NodeTestCount oldNodeStats = leveldbNodeTest.findNodeStatsCount(currDay);
-                const NodeTestCount currNodesStats = oldNodeStats + allTests;
-                batchStates.addNodeTestCounstForDay(currNodesStats, currDay);
             }
             for (const auto &[serverAddress, res]: lastNodesTests) {
                 batchStates.addNodeTestLastResults(serverAddress, res);
@@ -346,12 +322,10 @@ std::pair<size_t, NodeTestTrust> WorkerNodeTest::getLastNodeTestTrust(const std:
     return std::make_pair(lastTimestamp, result);
 }
 
-NodeTestCount WorkerNodeTest::getLastDayNodeTestCount(const std::string &address) const {
-    return leveldbNodeTest.findNodeStatCountLast(address);
-}
+NodeTestCount2 WorkerNodeTest::getLastDayNodeTestCount(const std::string &address) const {
+    const BestNodeTest lastNodeTests = leveldbNodeTest.findNodeStatLastResults(address);
 
-NodeTestCount WorkerNodeTest::getLastDayNodesTestsCount() const {
-    return leveldbNodeTest.findNodeStatsCountLast();
+    return lastNodeTests.countTests(getLastBlockDay());
 }
 
 std::vector<std::pair<std::string, NodeTestExtendedStat>> WorkerNodeTest::filterLastNodes(size_t countTests) const {
@@ -359,9 +333,9 @@ std::vector<std::pair<std::string, NodeTestExtendedStat>> WorkerNodeTest::filter
     const size_t lastBlockDay = getLastBlockDay();
     std::vector<std::pair<std::string, NodeTestExtendedStat>> result;
     for (const std::string &node: allNodesForDay.nodes) {
-        const NodeTestCount nodeTestCount = leveldbNodeTest.findNodeStatCount(node, allNodesForDay.day);
-        
         const BestNodeTest lastNodeTests = leveldbNodeTest.findNodeStatLastResults(node);
+        const NodeTestCount2 nodeTestCount = lastNodeTests.countTests(lastBlockDay);
+        
         const BestNodeElement nodeTestElement = lastNodeTests.getMax(lastBlockDay);
         const NodeTestResult nodeTestResult = readNodeTestTransaction(nodeTestElement, lastNodeTests.day, folderBlocks);
         

@@ -1,5 +1,8 @@
 include_directories(/usr/local/include)
 
+add_definitions(-DVERSION="0.137")
+add_definitions(-DSERVER_TYPE="Torrent")
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 if (DEFINED UBUNTU14)
 add_definitions(-DUBUNTU14="")
@@ -12,6 +15,7 @@ if (NOT DEFINED UBUNTU14)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/rapidjson/)
     include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/libconfig/include/)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/lz4/include/)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/microhttpd/include/)
     include_directories(${SNIPER_INCLUDE_DIRS})
 endif()
 if (DEFINED UBUNTU14)
@@ -28,8 +32,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../common_utils/")
 include(common_utils)
 
 add_definitions(-DSNIPER_LOG_TRACE -DSNIPER_LOG_DEBUG)
-
-add_definitions(-DVERSION="0.133")
 
 set(COMMON_SOURCES
     ${COMMON_UTILS_SOURCES_WITHOUT_GITSHA}
@@ -167,6 +169,8 @@ if (NOT DEFINED UBUNTU14)
 
     find_library(CONFIG1_LIB NAMES libconfig++.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/libconfig/lib/)
     find_library(CONFIG2_LIB NAMES libconfig.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/libconfig/lib/)
+
+    find_library(MICROHTTPD_LIB NAMES libmicrohttpd.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu18/microhttpd/lib/)
 endif()
 if (DEFINED UBUNTU14)
     find_library(LEVELDB NAMES libleveldb.a HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty/ubuntu14/leveldb/lib)
@@ -219,9 +223,11 @@ set(PROJECT_LIBS
     dl
 
     event.a
-    microhttpd.a
-    gcrypt
+    ${MICROHTTPD_LIB}
+    gcrypt.a
+    gpg-error.a
     gnutls
+
     tcmalloc
 
     curl

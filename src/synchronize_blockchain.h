@@ -28,7 +28,7 @@ struct V8Code;
 struct ForgingSums;
 struct NodeTestResult;
 struct NodeTestTrust;
-struct NodeTestCount;
+struct NodeTestCount2;
 struct NodeTestExtendedStat;
 struct Token;
 struct SignBlockInfo;
@@ -101,10 +101,8 @@ public:
     
     std::pair<size_t, NodeTestTrust> getLastNodeTestTrust(const std::string &address) const;
     
-    NodeTestCount getLastDayNodeTestCount(const std::string &address) const;
-    
-    NodeTestCount getLastDayNodesTestsCount() const;
-        
+    NodeTestCount2 getLastDayNodeTestCount(const std::string &address) const;
+
     std::vector<std::pair<std::string, NodeTestExtendedStat>> filterLastNodes(size_t countTests) const;
     
     std::pair<int, size_t> calcNodeRaiting(const std::string &address, size_t countTests) const;

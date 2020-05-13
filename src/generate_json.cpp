@@ -94,13 +94,14 @@ std::string genStatisticResponse(size_t statistic) {
     return jsonToString(jsonDoc, false);
 }
 
-std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &privkey) {
+std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &type, const std::string &privkey) {
     rapidjson::Document jsonDoc(rapidjson::kObjectType);
     auto &allocator = jsonDoc.GetAllocator();
     addIdToResponse(requestId, jsonDoc, allocator);
     
     rapidjson::Document resultJson(rapidjson::kObjectType);
     resultJson.AddMember("version", strToJson(version, allocator), allocator);
+    resultJson.AddMember("type", strToJson(type, allocator), allocator);
     resultJson.AddMember("mh_addr", strToJson(privkey, allocator), allocator);
     
     jsonDoc.AddMember("result", resultJson, allocator);
@@ -758,7 +759,7 @@ std::string genNodeStatResultJson(const RequestId &requestId, const std::string 
     rapidjson::Value resultJson(rapidjson::kObjectType);
     resultJson.AddMember("address", strToJson(address, allocator), allocator);
     resultJson.AddMember("type", strToJson(result.typeNode, allocator), allocator);
-    resultJson.AddMember("avgRps", strToJson(std::to_string(result.avgRps), allocator), allocator);
+    resultJson.AddMember("avgRps", strToJson(std::to_string(result.avgRps != 0 ? result.avgRps - 1 : 0), allocator), allocator);
     resultJson.AddMember("isLatency", !result.isForwardSort, allocator);
     resultJson.AddMember("ip", strToJson(result.ip, allocator), allocator);
     resultJson.AddMember("geo", strToJson(result.geo, allocator), allocator);
@@ -785,7 +786,7 @@ std::string genNodeStatTrustJson(const RequestId &requestId, const std::string &
     return jsonToString(doc, isFormat);
 }
 
-std::string genNodeStatCountJson(const RequestId &requestId, const std::string &address, size_t lastBlockDay, const torrent_node_lib::NodeTestCount &result, bool isFormat, const JsonVersion &version) {
+std::string genNodeStatCountJson(const RequestId &requestId, const std::string &address, size_t lastBlockDay, const torrent_node_lib::NodeTestCount2 &result, bool isFormat, const JsonVersion &version) {
     const bool isStringValue = version == JsonVersion::V2;
     rapidjson::Document doc(rapidjson::kObjectType);
     auto &allocator = doc.GetAllocator();
@@ -795,22 +796,7 @@ std::string genNodeStatCountJson(const RequestId &requestId, const std::string &
     resultJson.AddMember("day", intOrString(result.day, isStringValue, allocator), allocator);
     resultJson.AddMember("count", intOrString(result.countSuccess(), isStringValue, allocator), allocator);
     resultJson.AddMember("countAll", intOrString(result.countAll, isStringValue, allocator), allocator);
-    resultJson.AddMember("testers", intOrString(result.testers.size(), isStringValue, allocator), allocator);
-    resultJson.AddMember("lastBlockDay", intOrString(lastBlockDay, isStringValue, allocator), allocator);
-    doc.AddMember("result", resultJson, allocator);
-    return jsonToString(doc, isFormat);
-}
-
-std::string genNodesStatsCountJson(const RequestId &requestId, size_t lastBlockDay, const torrent_node_lib::NodeTestCount &result, bool isFormat, const JsonVersion &version) {
-    const bool isStringValue = version == JsonVersion::V2;
-    rapidjson::Document doc(rapidjson::kObjectType);
-    auto &allocator = doc.GetAllocator();
-    addIdToResponse(requestId, doc, allocator);
-    rapidjson::Value resultJson(rapidjson::kObjectType);
-    resultJson.AddMember("day", intOrString(result.day, isStringValue, allocator), allocator);
-    resultJson.AddMember("count", intOrString(result.countSuccess(), isStringValue, allocator), allocator);
-    resultJson.AddMember("countAll", intOrString(result.countAll, isStringValue, allocator), allocator);
-    resultJson.AddMember("testers", intOrString(result.testers.size(), isStringValue, allocator), allocator);
+    resultJson.AddMember("testers", intOrString(1, isStringValue, allocator), allocator);
     resultJson.AddMember("lastBlockDay", intOrString(lastBlockDay, isStringValue, allocator), allocator);
     doc.AddMember("result", resultJson, allocator);
     return jsonToString(doc, isFormat);

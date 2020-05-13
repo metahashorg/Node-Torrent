@@ -23,7 +23,9 @@ public:
     void read(char *data, size_t size);
     
 private:
-    
+
+    std::string fileName;
+
     std::unique_ptr<FILE, std::function<void(FILE*)>> fd;
 };
 

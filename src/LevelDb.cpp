@@ -438,16 +438,6 @@ void Batch::addNodeTestTrust(const std::string &address, const NodeTestTrust &re
     addKey(bufferKey, result);
 }
 
-void Batch::addNodeTestCountForDay(const std::string &address, const NodeTestCount &result, size_t dayNumber) {
-    makeKey(bufferKey, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    addKey(bufferKey, result);
-}
-
-void Batch::addNodeTestCounstForDay(const NodeTestCount &result, size_t dayNumber) {
-    makeKey(bufferKey, NODE_STATS_COUNT_PREFIX, NODE_STATS_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    addKey(bufferKey, result);
-}
-
 void Batch::addNodeTestDayNumber(const NodeTestDayNumber &result) {
     addKey(NODE_STAT_DAY_NUMBER, result);
 }
@@ -658,16 +648,6 @@ NodeStatBlockInfo LevelDb::findNodeStatBlock() const {
     return findOneValueWithoutCheckValue<NodeStatBlockInfo>(NODE_STAT_BLOCK_NUMBER_PREFIX);
 }
 
-NodeTestCount LevelDb::findNodeStatCount(const std::string &address, size_t dayNumber) const {
-    makeKey(bufferKey, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    return findOneValueWithoutCheckValue<NodeTestCount>(bufferKey);
-}
-
-NodeTestCount LevelDb::findNodeStatsCount(size_t dayNumber) const {
-    makeKey(bufferKey, NODE_STATS_COUNT_PREFIX, NODE_STATS_COUNT_POSTFIX, SerializerInt(-dayNumber));
-    return findOneValueWithoutCheckValue<NodeTestCount>(bufferKey);
-}
-
 BestNodeTest LevelDb::findNodeStatLastResults(const std::string &address) const {
     makeKey(bufferKey, NODE_STAT_RESULT_PREFIX, address);
     return findOneValueWithoutCheckValue<BestNodeTest>(bufferKey);
@@ -685,18 +665,6 @@ NodeRps LevelDb::findNodeStatRps(const std::string &address, size_t dayNumber) c
 
 NodeTestDayNumber LevelDb::findNodeStatDayNumber() const {
     return findOneValueWithoutCheckValue<NodeTestDayNumber>(NODE_STAT_DAY_NUMBER);
-}
-
-NodeTestCount LevelDb::findNodeStatCountLast(const std::string &address) const {
-    makeKey(bufferKey, NODE_STAT_COUNT_PREFIX, address, NODE_STAT_COUNT_POSTFIX);
-    const auto &[key, value] = findFirstOf(bufferKey, {});
-    return NodeTestCount::deserialize(value);
-}
-
-NodeTestCount LevelDb::findNodeStatsCountLast() const {
-    makeKey(bufferKey, NODE_STATS_COUNT_PREFIX, NODE_STAT_COUNT_POSTFIX);
-    const auto &[key, value] = findFirstOf(bufferKey, {});
-    return NodeTestCount::deserialize(value);
 }
 
 AllTestedNodes LevelDb::findAllTestedNodesForDay(size_t day) const {

@@ -119,11 +119,11 @@ std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const s
     Iterator iterFirst = timeline.cbegin();
     if (firstBlock.has_value()) {
         const auto found = hashes.find(firstBlock.value());
-        CHECK(found != hashes.end(), "Block not found in timeline");
+        CHECK(found != hashes.end(), "Block not found in timeline " + toHex(firstBlock.value()) + " " + std::to_string(hashes.size()));
         iterFirst = std::next(found->second);
     } else {
         const auto found = hashes.find(secondBlock.value());
-        CHECK(found != hashes.end(), "Block not found in timeline");
+        CHECK(found != hashes.end(), "Block not found in timeline " + toHex(secondBlock.value()) + " " + std::to_string(hashes.size()));
         Iterator iter = found->second;
         if (iter == timeline.cbegin()) {
             iterFirst = iter;
@@ -141,17 +141,15 @@ std::vector<MinimumSignBlockHeader> BlocksTimeline::getSignaturesBetween(const s
     Iterator iterSecond = timeline.cend();
     if (secondBlock.has_value()) {
         const auto found = hashes.find(secondBlock.value());
-        CHECK(found != hashes.end(), "Block not found in timeline");
+        CHECK(found != hashes.end(), "Block not found in timeline " + toHex(secondBlock.value()) + " " + std::to_string(hashes.size()));
         iterSecond = found->second;
     } else {
-        const auto found = hashes.find(firstBlock.value());
-        CHECK(found != hashes.end(), "Block not found in timeline");
-        Iterator iter = found->second;
+        Iterator iter = iterFirst;
         while (iter != timeline.cend()) {
-            iter++;
             if (std::holds_alternative<SimpleBlockElement>(*iter)) {
                 break;
             }
+            iter++;
         }
         iterSecond = iter; // dont prev;
     }

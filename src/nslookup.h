@@ -2,6 +2,7 @@
 #define NS_LOOKUP_H_
 
 #include <string>
+#include <vector>
 
 struct NsResult {
     std::string server;
@@ -16,7 +17,7 @@ struct NsResult {
     {}
 };
 
-NsResult getBestIp(const std::string &address, const char* print = nullptr);
+std::vector<NsResult> getBestIps(const std::string &address, size_t count);
 
 void lookup_best_ip();
 

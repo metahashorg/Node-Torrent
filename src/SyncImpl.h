@@ -107,10 +107,8 @@ public:
     
     std::pair<size_t, NodeTestTrust> getLastNodeTestTrust(const std::string &address) const;
     
-    NodeTestCount getLastDayNodeTestCount(const std::string &address) const;
+    NodeTestCount2 getLastDayNodeTestCount(const std::string &address) const;
     
-    NodeTestCount getLastDayNodesTestsCount() const;
-        
     std::vector<std::pair<std::string, NodeTestExtendedStat>> filterLastNodes(size_t countTests) const;
     
     std::pair<int, size_t> calcNodeRaiting(const std::string &address, size_t countTests) const;

@@ -19,7 +19,7 @@ struct V8Code;
 struct ForgingSums;
 struct NodeTestResult;
 struct NodeTestTrust;
-struct NodeTestCount;
+struct NodeTestCount2;
 struct NodeTestExtendedStat;
 struct Token;
 struct SignTransactionInfo;
@@ -48,7 +48,7 @@ std::string genStatisticResponse(const RequestId &requestId, size_t statistic, d
 
 std::string genStatisticResponse(size_t statistic);
 
-std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &privkey);
+std::string genInfoResponse(const RequestId &requestId, const std::string &version, const std::string &type, const std::string &privkey);
 
 std::string genTransactionNotFoundResponse(const RequestId &requestId, const std::string &transaction);
 
@@ -98,9 +98,7 @@ std::string genNodeStatResultJson(const RequestId &requestId, const std::string 
 
 std::string genNodeStatTrustJson(const RequestId &requestId, const std::string &address, size_t lastBlockTimestamp, const torrent_node_lib::NodeTestTrust &result, bool isFormat, const JsonVersion &version);
 
-std::string genNodeStatCountJson(const RequestId &requestId, const std::string &address, size_t lastBlockDay, const torrent_node_lib::NodeTestCount &result, bool isFormat, const JsonVersion &version);
-
-std::string genNodesStatsCountJson(const RequestId &requestId, size_t lastBlockDay, const torrent_node_lib::NodeTestCount &result, bool isFormat, const JsonVersion &version);
+std::string genNodeStatCountJson(const RequestId &requestId, const std::string &address, size_t lastBlockDay, const torrent_node_lib::NodeTestCount2 &result, bool isFormat, const JsonVersion &version);
 
 std::string genAllNodesStatsCountJson(const RequestId &requestId, size_t lastBlockDay, const std::vector<std::pair<std::string, torrent_node_lib::NodeTestExtendedStat>> &result, bool isFormat, const JsonVersion &version);
 

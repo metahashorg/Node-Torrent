@@ -144,7 +144,7 @@ static bool validateIpAddress(const std::string &ipAddress) {
     return result != 0;
 }
 
-NsResult getBestIp(const std::string &address, const char* print) {
+std::vector<NsResult> getBestIps(const std::string &address, size_t count) {
     std::string server = address;
     const auto foundScheme = server.find("://");
     std::string scheme;
@@ -163,7 +163,7 @@ NsResult getBestIp(const std::string &address, const char* print) {
     }
     
     if (validateIpAddress(server)) {
-        return NsResult(scheme + server + ((port != 0) ? (":" + std::to_string(port)) : ""), 0);
+        return {NsResult(scheme + server + ((port != 0) ? (":" + std::to_string(port)) : ""), 0)};
     }
     
     const std::vector<std::string> result = nsLookup(server);
@@ -189,17 +189,5 @@ NsResult getBestIp(const std::string &address, const char* print) {
         return first.timeout < second.timeout;
     });
 
-    if (print) {
-        std::cout << print << std::endl;
-        LOGINFO << print;
-        for (const auto& i: pr) {
-            std::cout << std::left << std::setfill(' ') << std::setw(25) << i.server << i.timeout << " ms" << std::endl;
-            LOGINFO << i.server << " " << i.timeout << " ms";
-        }
-    }
-    
-    const auto found = pr.begin();
-
-    CHECK(found != pr.end(), "Servers empty");
-    return *pr.begin();
+    return std::vector<NsResult>(pr.begin(), pr.begin() + std::min(pr.size(), count));
 }

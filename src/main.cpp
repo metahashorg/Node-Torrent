@@ -131,6 +131,7 @@ int main (int argc, char *const *argv) {
     LOGINFO << "Repository version " << g_GIT_SHA1 << " " << VERSION << " " << g_GIT_DATE;
     LOGINFO << "Is local changes " << g_GIT_IS_LOCAL_CHANGES;
     LOGINFO << "Branch " << g_GIT_REFSPEC;
+    LOGINFO << "Torrent type: " << SERVER_TYPE;
    
     const std::string path_to_config(argv[1]);
     libconfig::Config config;
@@ -261,8 +262,13 @@ int main (int argc, char *const *argv) {
         } else {
             const std::string &fileName = allSettings["servers"];
             if (beginWith(fileName, "http")) {
-                const NsResult bestIp = getBestIp(fileName);
-                std::vector<std::string> serversStr{bestIp.server};
+                const std::vector<NsResult> bestIps = getBestIps(fileName, 3);
+                CHECK(!bestIps.empty(), "Not found servers");
+                for (const NsResult &r: bestIps) {
+                    LOGINFO << "Node server found " << r.server << " " << r.timeout;
+                }
+                std::vector<std::string> serversStr;
+                std::transform(bestIps.begin(), bestIps.end(), std::back_inserter(serversStr), std::mem_fn(&NsResult::server));
                 p2p = std::make_unique<P2P_Ips>(serversStr, countConnections);
                 p2p2 = std::make_unique<P2P_Ips>(serversStr, countConnections);
             } else {

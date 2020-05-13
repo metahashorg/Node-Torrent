@@ -36,6 +36,10 @@ bool BestNodeElement::operator<(const BestNodeElement &second) const {
     return this->rps < second.rps;
 }
 
+size_t NodeTestCount2::countSuccess() const {
+    return countAll - countFailure;
+}
+
 BestNodeElement BestNodeTest::getMax(size_t currDay) const {
     if (currDay != day) {
         return BestNodeElement();
@@ -43,8 +47,10 @@ BestNodeElement BestNodeTest::getMax(size_t currDay) const {
     
     std::map<std::string, std::pair<size_t, size_t>> geos;
     for (const BestNodeElement &res: tests) {
-        geos[res.geo].first += res.rps;
-        geos[res.geo].second++;
+        if (res.rps != 0) {
+            geos[res.geo].first += res.rps;
+            geos[res.geo].second++;
+        }
     }
 
     std::map<std::string, std::pair<size_t, size_t>>::const_iterator bestElement;
@@ -73,6 +79,25 @@ BestNodeElement BestNodeTest::getMax(size_t currDay) const {
     } else {
         return *found;
     }
+}
+
+NodeTestCount2 BestNodeTest::countTests(size_t currDay) const {
+    const BestNodeElement bestNode = getMax(currDay);
+
+    NodeTestCount2 result;
+    result.day = currDay;
+
+    for (const BestNodeElement &res: tests) {
+        if (res.geo != bestNode.geo) {
+            continue;
+        }
+        result.countAll++;
+        if (res.rps == 0) {
+            result.countFailure++;
+        }
+    }
+
+    return result;
 }
 
 void BestNodeTest::addElement(const BestNodeElement &element, size_t currDay) {
@@ -130,56 +155,6 @@ torrent_node_lib::NodeTestTrust NodeTestTrust::deserialize(const std::string& ra
     result.timestamp = deserializeInt<size_t>(raw, from);
     result.trust = deserializeInt<size_t>(raw, from);
     
-    return result;
-}
-
-size_t NodeTestCount::countSuccess() const {
-    return countAll - countFailure;
-}
-
-void NodeTestCount::serialize(std::vector<char> &buffer) const {
-    serializeInt(countAll, buffer);
-    serializeInt(countFailure, buffer);
-    serializeInt(day, buffer);
-    
-    serializeInt(testers.size(), buffer);
-    for (const Address &tester: testers) {
-        serializeString(tester.toBdString(), buffer);
-    }
-}
-
-torrent_node_lib::NodeTestCount NodeTestCount::deserialize(const std::string& raw) {
-    if (raw.empty()) {
-        return NodeTestCount(0);
-    }
-    NodeTestCount result;
-    
-    size_t pos = 0;
-    
-    result.countAll = deserializeInt<size_t>(raw, pos);
-    result.countFailure = deserializeInt<size_t>(raw, pos);
-    result.day = deserializeInt<size_t>(raw, pos);
-    
-    const size_t countTesters = deserializeInt<size_t>(raw, pos);
-    for (size_t i = 0; i < countTesters; i++) {
-        const std::string addr = deserializeString(raw, pos);
-        const std::vector<unsigned char> address(addr.begin(), addr.end());
-        result.testers.insert(Address(address));
-    }
-    return result;
-}
-
-NodeTestCount& NodeTestCount::operator+=(const NodeTestCount &second) {
-    countAll += second.countAll;
-    countFailure += second.countFailure;
-    testers.insert(second.testers.begin(), second.testers.end());
-    day = std::max(day, second.day);
-    return *this;
-}
-
-NodeTestCount operator+(const NodeTestCount &first, const NodeTestCount &second) {
-    NodeTestCount result = first;
-    result += second;
     return result;
 }
 

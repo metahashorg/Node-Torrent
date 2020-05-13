@@ -61,6 +61,7 @@ static size_t fileSize(IfStream &ifile) {
 static size_t fileSize(std::ofstream &ifile) {
     ifile.clear();
     ifile.seekp(0, std::ios_base::end);
+    CHECK(ifile.good(), "Incorrect get size file");
     return ifile.tellp();
 }
 
@@ -71,6 +72,7 @@ size_t saveBlockToFileBinary(const std::string& fileName, const std::string& dat
     const std::string blockSizeStr(reinterpret_cast<const char*>(&blockSize), sizeof(blockSize));
     file << blockSizeStr;
     file << data;
+    CHECK(fileSize(file) == oldSize + blockSizeStr.size() + data.size(), "Incorrect write block operation");
     return oldSize;
 }
 

@@ -554,16 +554,10 @@ std::pair<size_t, NodeTestTrust> SyncImpl::getLastNodeTestTrust(const std::strin
     return nodeTestWorker->getLastNodeTestTrust(address);
 }
 
-NodeTestCount SyncImpl::getLastDayNodeTestCount(const std::string &address) const {
+NodeTestCount2 SyncImpl::getLastDayNodeTestCount(const std::string &address) const {
     CHECK(modules[MODULE_NODE_TEST], "Module " + MODULE_NODE_TEST_STR + " not set");
     CHECK(nodeTestWorker != nullptr, "node test worker not init");
     return nodeTestWorker->getLastDayNodeTestCount(address);    
-}
-
-NodeTestCount SyncImpl::getLastDayNodesTestsCount() const {
-    CHECK(modules[MODULE_NODE_TEST], "Module " + MODULE_NODE_TEST_STR + " not set");
-    CHECK(nodeTestWorker != nullptr, "node test worker not init");
-    return nodeTestWorker->getLastDayNodesTestsCount();
 }
 
 std::vector<std::pair<std::string, NodeTestExtendedStat>> SyncImpl::filterLastNodes(size_t countTests) const {

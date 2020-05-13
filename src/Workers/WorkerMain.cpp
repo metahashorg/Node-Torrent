@@ -626,7 +626,7 @@ static void filterTxs(std::vector<TransactionInfo> &txs, const TransactionsFilte
 }
 
 std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const Address& address, size_t &from, size_t count, size_t limitTxs, const TransactionsFilters &filters) const {
-    const size_t countLimited = std::min((count == 0 ? limitTxs + 10 : count), limitTxs + 10);
+    const size_t countLimited = limitTxs + 10;
     std::vector<TransactionInfo> result;
     while (true) {
         const std::vector<AddressInfo> foundResults = leveldb.findAddress(address.toBdString(), from, countLimited - result.size());
@@ -635,16 +635,17 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const A
         }
         CHECK(foundResults.size() < limitTxs, "Too many transactions in history. Please, request a history with chunks");
         std::vector<TransactionInfo> txs = readTxs(foundResults);
-        
+
         filterTxs(txs, filters, address);
         result.insert(result.end(), txs.begin(), txs.end());
-        
+
         from += foundResults.size();
         
         if (result.size() >= count) {
             break;
         }
     }
+    result.resize(count);
     
     std::sort(result.begin(), result.end(), [](const TransactionInfo &first, const TransactionInfo &second) {
         return first.blockNumber > second.blockNumber;

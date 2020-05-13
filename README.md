@@ -70,9 +70,10 @@ sudo make install
 6. Build Torrent Node
 ```shell
 cd /tmp
-git clone https://github.com/metahashorg/Node-InfrastructureTorrent torrent_node
+git clone https://github.com/metahashorg/Node-Torrent.git torrent_node
 cd torrent_node/build
-git checkout ubuntu18
+git checkout master
+git submodule update --init
 cmake .. && make
 ```
 
