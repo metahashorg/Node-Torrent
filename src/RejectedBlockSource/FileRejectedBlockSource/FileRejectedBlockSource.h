@@ -76,12 +76,13 @@ private:
 
     };
 
+    // TODO Поменять ordered_non_unique на hashed_non_unique
     using BlocksContainer = boost::multi_index::multi_index_container<
         BlockHolder,
         boost::multi_index::indexed_by<
             boost::multi_index::random_access<boost::multi_index::tag<BlockHolder::SequenceTag>>,
             boost::multi_index::hashed_unique<boost::multi_index::tag<BlockHolder::IndexTag>, boost::multi_index::member<BlockHolder, size_t, &BlockHolder::index>>,
-            boost::multi_index::hashed_non_unique<boost::multi_index::tag<BlockHolder::HashTag>, boost::multi_index::const_mem_fun<BlockHolder, std::optional<std::vector<unsigned char>>, &BlockHolder::hash>>
+            boost::multi_index::ordered_non_unique<boost::multi_index::tag<BlockHolder::HashTag>, boost::multi_index::const_mem_fun<BlockHolder, std::optional<std::vector<unsigned char>>, &BlockHolder::hash>>
         >
     >;
 
