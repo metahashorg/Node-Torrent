@@ -48,11 +48,11 @@ public:
             }
 
             size_t delegate() const {
-                return balance.balance();
+                return balance.spent();
             }
 
             size_t undelegate() const {
-                return balance.balance();
+                return balance.received();
             }
 
             void fill(size_t delegate, size_t undelegate) {
@@ -76,11 +76,11 @@ public:
             }
 
             size_t delegated() const {
-                return balance.balance();
+                return balance.received();
             }
 
             size_t undelegated() const {
-                return balance.balance();
+                return balance.spent();
             }
 
             void fill(size_t delegated, size_t undelegated) {
