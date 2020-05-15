@@ -46,6 +46,10 @@ public:
 
     std::optional<RejectedTransactionHistory> findTx(const std::vector<unsigned char> &txHash) const;
 
+    std::vector<std::string> getDumps(const std::vector<std::vector<unsigned char>> &hashes) const;
+
+    std::vector<RejectedBlockResult> calcLastBlocks(size_t count);
+
 private:
 
     void worker();
@@ -57,6 +61,8 @@ private:
     void processBlocks(const std::vector<RejectedBlock> &blocks, const std::vector<std::vector<unsigned char>> &allHashes);
 
     void clearOldHistory();
+
+    void addLastBlocks(const std::vector<RejectedBlockResult> &newBlocks);
 
 private:
 
@@ -75,6 +81,8 @@ private:
     std::set<std::vector<unsigned char>> currentRejectedBlocks;
 
     std::map<std::vector<unsigned char>, HistoryElement> history;
+
+    std::vector<RejectedBlockResult> lastRejectedBlocks;
 };
 
 } // namespace torrent_node_lib

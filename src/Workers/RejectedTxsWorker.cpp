@@ -85,10 +85,16 @@ void RejectedTxsWorker::addHistory(const torrent_node_lib::RejectedTransactionIn
     }
 }
 
+void RejectedTxsWorker::addLastBlocks(const std::vector<RejectedBlockResult> &newBlocks) {
+    std::lock_guard<std::mutex> lock(mut);
+    lastRejectedBlocks = newBlocks; // TODO подумать над другим алгоритмом
+}
+
 void RejectedTxsWorker::worker() {
     try {
         while (true) {
             const std::vector<RejectedBlockResult> lastBlocks = blockSource.calcLastBlocks(100);
+            addLastBlocks(lastBlocks);
             std::vector<std::vector<unsigned char>> hashes;
             hashes.reserve(lastBlocks.size());
             std::transform(lastBlocks.begin(), lastBlocks.end(), std::back_inserter(hashes), std::mem_fn(&RejectedBlockResult::hash));
@@ -128,6 +134,17 @@ std::optional<RejectedTransactionHistory> RejectedTxsWorker::findTx(const std::v
     } else {
         return found->second.history;
     }
+}
+
+std::vector<std::string> RejectedTxsWorker::getDumps(const std::vector<std::vector<unsigned char> > &hashes) const {
+    return blockSource.getDumps(hashes);
+}
+
+std::vector<RejectedBlockResult> RejectedTxsWorker::calcLastBlocks(size_t count) {
+    std::lock_guard<std::mutex> lock(mut);
+
+    std::vector<RejectedBlockResult> blocks(lastRejectedBlocks.end() - std::min(lastRejectedBlocks.size(), count), lastRejectedBlocks.end());
+    return blocks;
 }
 
 } // namespace torrent_node_lib

@@ -597,13 +597,13 @@ std::optional<RejectedTransactionHistory> SyncImpl::findRejectedTx(const std::ve
 }
 
 std::vector<std::string> SyncImpl::getRejectedDumps(const std::vector<std::vector<unsigned char>> &hashes) const {
-    CHECK(rejectedBlockSource != nullptr, "Rejected worker not set");
-    return rejectedBlockSource->getDumps(hashes);
+    CHECK(rejectedTxsWorker != nullptr, "Rejected worker not set");
+    return rejectedTxsWorker->getDumps(hashes);
 }
 
 std::vector<RejectedBlockResult> SyncImpl::calcLastRejectedBlocks(size_t count) const {
-    CHECK(rejectedBlockSource != nullptr, "Rejected worker not set");
-    return rejectedBlockSource->calcLastBlocks(count);
+    CHECK(rejectedTxsWorker != nullptr, "Rejected worker not set");
+    return rejectedTxsWorker->calcLastBlocks(count);
 }
 
 }
