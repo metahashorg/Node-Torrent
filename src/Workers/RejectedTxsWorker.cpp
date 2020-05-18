@@ -34,12 +34,12 @@ void RejectedTxsWorker::start() {
     workerThread = Thread(&RejectedTxsWorker::worker, this);
 }
 
-std::vector<std::vector<unsigned char>> RejectedTxsWorker::filterNewBlocks(const std::vector<std::vector<unsigned char>> &blocks) const {
+std::vector<RejectedBlockResult> RejectedTxsWorker::filterNewBlocks(const std::vector<RejectedBlockResult> &blocks) const {
     std::lock_guard<std::mutex> lock(mut);
 
-    std::vector<std::vector<unsigned char>> result;
-    std::copy_if(blocks.begin(), blocks.end(), std::back_inserter(result), [this](const std::vector<unsigned char> &hash) {
-        return currentRejectedBlocks.find(hash) == currentRejectedBlocks.end();
+    std::vector<RejectedBlockResult> result;
+    std::copy_if(blocks.begin(), blocks.end(), std::back_inserter(result), [this](const RejectedBlockResult &block) {
+        return currentRejectedBlocks.find(block.hash) == currentRejectedBlocks.end();
     });
 
     return result;
@@ -87,21 +87,30 @@ void RejectedTxsWorker::addHistory(const torrent_node_lib::RejectedTransactionIn
 
 void RejectedTxsWorker::addLastBlocks(const std::vector<RejectedBlockResult> &newBlocks) {
     std::lock_guard<std::mutex> lock(mut);
-    lastRejectedBlocks = newBlocks; // TODO подумать над другим алгоритмом
+    std::transform(newBlocks.begin(), newBlocks.end(), std::inserter(lastRejectedBlocks, lastRejectedBlocks.begin()), [](const RejectedBlockResult &block) {
+        return std::make_pair(block.blockNumber, block);
+    });
+    const size_t maxCountElems = 500;
+    const size_t eraseElements = lastRejectedBlocks.size() > maxCountElems ? lastRejectedBlocks.size() - maxCountElems : 0;
+    lastRejectedBlocks.erase(lastRejectedBlocks.begin(), std::next(lastRejectedBlocks.begin(), eraseElements));
 }
 
 void RejectedTxsWorker::worker() {
     try {
         while (true) {
             const std::vector<RejectedBlockResult> lastBlocks = blockSource.calcLastBlocks(100);
-            addLastBlocks(lastBlocks);
+            const std::vector<RejectedBlockResult> newLastBlocks = filterNewBlocks(lastBlocks);
+
             std::vector<std::vector<unsigned char>> hashes;
             hashes.reserve(lastBlocks.size());
             std::transform(lastBlocks.begin(), lastBlocks.end(), std::back_inserter(hashes), std::mem_fn(&RejectedBlockResult::hash));
 
-            const std::vector<std::vector<unsigned char>> newHashes = filterNewBlocks(hashes);
+            std::vector<std::vector<unsigned char>> newHashes;
+            newHashes.reserve(newLastBlocks.size());
+            std::transform(newLastBlocks.begin(), newLastBlocks.end(), std::back_inserter(newHashes), std::mem_fn(&RejectedBlockResult::hash));
 
             const std::vector<RejectedBlock> blocks = blockSource.getBlocks(newHashes);
+            addLastBlocks(newLastBlocks);
 
             processBlocks(blocks, hashes);
 
@@ -143,7 +152,13 @@ std::vector<std::string> RejectedTxsWorker::getDumps(const std::vector<std::vect
 std::vector<RejectedBlockResult> RejectedTxsWorker::calcLastBlocks(size_t count) {
     std::lock_guard<std::mutex> lock(mut);
 
-    std::vector<RejectedBlockResult> blocks(lastRejectedBlocks.end() - std::min(lastRejectedBlocks.size(), count), lastRejectedBlocks.end());
+    const size_t countElements = std::min(lastRejectedBlocks.size(), count);
+    std::vector<RejectedBlockResult> blocks;
+    blocks.reserve(countElements);
+    std::transform(lastRejectedBlocks.rbegin(), std::next(lastRejectedBlocks.rbegin(), countElements), std::back_inserter(blocks), [](const auto &pair) {
+        return pair.second;
+    });
+
     return blocks;
 }
 

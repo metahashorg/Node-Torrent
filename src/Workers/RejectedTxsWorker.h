@@ -56,7 +56,7 @@ private:
 
 private:
 
-    std::vector<std::vector<unsigned char>> filterNewBlocks(const std::vector<std::vector<unsigned char>> &blocks) const;
+    std::vector<RejectedBlockResult> filterNewBlocks(const std::vector<RejectedBlockResult> &blocks) const;
 
     void processBlocks(const std::vector<RejectedBlock> &blocks, const std::vector<std::vector<unsigned char>> &allHashes);
 
@@ -82,7 +82,7 @@ private:
 
     std::map<std::vector<unsigned char>, HistoryElement> history;
 
-    std::vector<RejectedBlockResult> lastRejectedBlocks;
+    std::multimap<size_t, RejectedBlockResult> lastRejectedBlocks;
 };
 
 } // namespace torrent_node_lib
