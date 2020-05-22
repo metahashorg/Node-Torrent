@@ -121,12 +121,17 @@ int main (int argc, char *const *argv) {
     
     Curl::initialize();
     
-    if (argc != 2) {
-        std::cout << "path_to_config" << std::endl;
+    if (argc < 2) {
+        std::cout << "path_to_config isConsoleLog" << std::endl;
         return -1;
     }
     
-    configureLog("./", true, true, false, true);
+    bool isConsoleLog = false;
+    if (argc == 3 && argv[2] == std::string("true")) {
+        isConsoleLog = true;
+    }
+
+    configureLog("./", true, isConsoleLog, false, true);
     
     LOGINFO << "Repository version " << g_GIT_SHA1 << " " << VERSION << " " << g_GIT_DATE;
     LOGINFO << "Is local changes " << g_GIT_IS_LOCAL_CHANGES;
