@@ -26,7 +26,7 @@ namespace torrent_node_lib {
 
 class P2P;
 
-class NetworkRejectedBlockSource: public RejectedBlockSource {
+class NetworkRejectedBlockSource final: public RejectedBlockSource {
 private:
 
     struct BlockHolder {

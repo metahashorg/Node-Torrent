@@ -23,7 +23,7 @@ namespace torrent_node_lib {
 
 class BlockChain;
 
-class FileRejectedBlockSource: public RejectedBlockSource {
+class FileRejectedBlockSource final: public RejectedBlockSource {
 private:
 
     struct BlockHolder {
