@@ -126,7 +126,7 @@ int main (int argc, char *const *argv) {
         return -1;
     }
     
-    bool isConsoleLog = false;
+    bool isConsoleLog = true;
     if (argc == 3 && argv[2] == std::string("true")) {
         isConsoleLog = true;
     }
