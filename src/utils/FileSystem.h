@@ -45,6 +45,10 @@ std::string loadFile(const std::string &folder, const std::string &fileName);
 
 bool isFileExist(const std::string &file);
 
+void resizeFile(const std::string &file, size_t newSize);
+
+void removeDirectory(const std::string &path);
+
 }
 
 namespace std {

@@ -11,6 +11,8 @@
 
 #include "ConfigOptions.h"
 
+#include "P2P/P2P.h"
+
 #include "TestP2PNodes.h"
 #include "blockchain_structs/Token.h"
 #include "blockchain_structs/TransactionInfo.h"
@@ -46,6 +48,8 @@ struct Token;
 
 class RejectedBlockSource;
 
+struct ConflictBlocksInfo;
+
 class SyncImpl {  
 public:
     
@@ -67,11 +71,11 @@ private:
     
     std::vector<Worker*> makeWorkers();
     
-    void process(const std::vector<Worker*> &workers);
+    [[nodiscard]] std::optional<ConflictBlocksInfo> process(const std::vector<Worker*> &workers);
     
 public:
     
-    void synchronize(int countThreads);
+    [[nodiscard]] std::optional<ConflictBlocksInfo> synchronize(int countThreads);
        
     std::vector<TransactionInfo> getTxsForAddress(const Address &address, size_t from, size_t count, size_t limitTxs) const;
     
@@ -143,6 +147,8 @@ private:
 
     SignBlockInfo readSignBlockInfo(const MinimumSignBlockHeader &header) const;
     
+    std::optional<ConflictBlocksInfo> findCommonAncestor();
+    
 private:
     
     LevelDb leveldb;
@@ -189,6 +195,7 @@ private:
 
     std::unique_ptr<RejectedBlockSource> rejectedBlockSource;
 
+    P2P* p2pAll;
 };
 
 }

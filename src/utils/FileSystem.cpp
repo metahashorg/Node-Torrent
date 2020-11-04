@@ -133,4 +133,12 @@ bool isFileExist(const std::string &file) {
     return fs::exists(file);
 }
 
+void resizeFile(const std::string &file, size_t newSize) {
+    fs::resize_file(file, newSize);
+}
+
+void removeDirectory(const std::string &path) {
+    fs::remove_all(path);
+}
+
 }

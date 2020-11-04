@@ -46,17 +46,19 @@ struct GetterBlockOptions {
     const size_t countBlocksInBatch;
     P2P* const p2p;
     P2P* const p2p2;
+    P2P* const p2pAll;
     const bool getBlocksFromFile;
     const bool isValidate;
     const bool isValidateSign;
     const bool isCompress;
     const bool isPreLoad;
     
-    GetterBlockOptions(size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, P2P* p2p, P2P* p2p2, bool getBlocksFromFile, bool isValidate, bool isValidateSign, bool isCompress, bool isPreLoad)
+    GetterBlockOptions(size_t maxAdvancedLoadBlocks, size_t countBlocksInBatch, P2P* p2p, P2P* p2p2, P2P* p2pAll, bool getBlocksFromFile, bool isValidate, bool isValidateSign, bool isCompress, bool isPreLoad)
         : maxAdvancedLoadBlocks(maxAdvancedLoadBlocks)
         , countBlocksInBatch(countBlocksInBatch)
         , p2p(p2p)
         , p2p2(p2p2)
+        , p2pAll(p2pAll)
         , getBlocksFromFile(getBlocksFromFile)
         , isValidate(isValidate)
         , isValidateSign(isValidateSign)

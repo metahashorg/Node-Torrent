@@ -112,6 +112,20 @@ static SettingsDb parseSettingsDb(const libconfig::Setting &allSettings, const s
     return settings;
 }
 
+static void removeFiles(const std::string &relativeFileName, size_t pos, const std::string &pathToFolder, const std::string &pathToBd) {
+    const std::string file = getFullPath(relativeFileName, pathToFolder);
+    resizeFile(file, pos);
+    
+    std::vector<std::string> filesInFolder = getAllFilesRelativeInDir(pathToFolder);
+    std::sort(filesInFolder.begin(), filesInFolder.end());
+    const auto found = std::upper_bound(filesInFolder.begin(), filesInFolder.end(), relativeFileName);
+    for (auto it = found; it != filesInFolder.end(); it++) {
+        removeFile(pathToFolder, *it);
+    }
+    
+    removeDirectory(pathToBd);
+}
+
 int main (int argc, char *const *argv) {
     //signal(SIGSEGV, crash_handler);
     //signal(SIGABRT, crash_handler);
@@ -249,6 +263,7 @@ int main (int argc, char *const *argv) {
 
         std::unique_ptr<P2P> p2p = nullptr;
         std::unique_ptr<P2P> p2p2 = nullptr;
+        std::unique_ptr<P2P> p2pAll = nullptr;
         
         size_t otherPortTorrent = port;
         if (allSettings.exists("other_torrent_port")) {
@@ -264,6 +279,7 @@ int main (int argc, char *const *argv) {
             }
             p2p = std::make_unique<P2P_Ips>(serversStr, countConnections);
             p2p2 = std::make_unique<P2P_Ips>(serversStr, countConnections);
+            p2pAll = std::make_unique<P2P_Ips>(serversStr, countConnections);
         } else {
             const std::string &fileName = allSettings["servers"];
             if (beginWith(fileName, "http")) {
@@ -276,10 +292,17 @@ int main (int argc, char *const *argv) {
                 std::transform(bestIps.begin(), bestIps.end(), std::back_inserter(serversStr), std::mem_fn(&NsResult::server));
                 p2p = std::make_unique<P2P_Ips>(serversStr, countConnections);
                 p2p2 = std::make_unique<P2P_Ips>(serversStr, countConnections);
+                
+                const std::vector<NsResult> bestIps2 = getBestIps(fileName, 100);
+                CHECK(!bestIps2.empty(), "Not found servers");
+                std::vector<std::string> serversStr2;
+                std::transform(bestIps2.begin(), bestIps2.end(), std::back_inserter(serversStr2), std::mem_fn(&NsResult::server));
+                p2pAll = std::make_unique<P2P_Ips>(serversStr2, countConnections);                
             } else {
                 const std::vector<std::pair<std::string, std::string>> serversGraph = readServers(fileName, otherPortTorrent);
                 p2p = std::make_unique<P2P_Graph>(serversGraph, myIp, countConnections);
                 p2p2 = std::make_unique<P2P_Graph>(serversGraph, myIp, countConnections);
+                p2pAll = std::make_unique<P2P_Graph>(serversGraph, myIp, countConnections);
             }
         }
        
@@ -288,7 +311,7 @@ int main (int argc, char *const *argv) {
             technicalAddress,
             LevelDbOptions(settingsDb.writeBufSizeMb, settingsDb.isBloomFilter, settingsDb.isChecks, getFullPath("simple", pathToBd), settingsDb.lruCacheMb),
             CachesOptions(maxCountElementsBlockCache, maxCountElementsTxsCache, maxLocalCacheElements),
-            GetterBlockOptions(maxAdvancedLoadBlocks, countBlocksInBatch, p2p.get(), p2p2.get(), getBlocksFromFile, isValidate, isValidateSign, isCompress, isPreLoad),
+            GetterBlockOptions(maxAdvancedLoadBlocks, countBlocksInBatch, p2p.get(), p2p2.get(), p2pAll.get(), getBlocksFromFile, isValidate, isValidateSign, isCompress, isPreLoad),
             signKey,
             TestNodesOptions(otherPortTorrent, myIp, testNodesServer),
             isValidateState
@@ -307,7 +330,17 @@ int main (int argc, char *const *argv) {
         
         //sync.addUsers({Address("0x0049704639387c1ae22283184e7bc52d38362ade0f977030e6"), Address("0x0034d209107371745c6f5634d6ed87199bac872c310091ca56")});
         
-        sync.synchronize(countWorkers);
+        const std::optional<ConflictBlocksInfo> result = sync.synchronize(countWorkers);
+        if (result.has_value()) {
+            if (!getBlocksFromFile) {
+                LOGINFO << "Remove conflicted blocks from pos " << result->ourConflictedBlock.filePos.fileNameRelative << " " << result->ourConflictedBlock.filePos.pos;
+                removeFiles(result->ourConflictedBlock.filePos.fileNameRelative, result->ourConflictedBlock.filePos.pos, pathToFolder, pathToBd);
+                std::string loadedFile = loadFile(pathToFolder, result->ourConflictedBlock.filePos.fileNameRelative);
+                loadedFile += result->blockDump;
+                saveToFile(pathToFolder, result->ourConflictedBlock.filePos.fileNameRelative, loadedFile);
+            }
+            stopProgram();
+        }
         
         while(countRunningServerThreads.load() != 0);
         LOGINFO << "Stop server thread";       

@@ -33,7 +33,10 @@
 #include "RejectedBlockSource/FileRejectedBlockSource/FileRejectedBlockSource.h"
 #include "RejectedBlockSource/NetworkRejectedBlockSource/NetworkRejectedBlockSource.h"
 
+#include "BlockSource/get_new_blocks_messages.h"
+
 #include "Workers/RejectedTxsWorker.h"
+#include "synchronize_blockchain.h"
 
 using namespace common;
 
@@ -51,6 +54,7 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
     , isValidate(getterBlocksOpt.isValidate)
     , validateStates(validateStates)
     , testNodes(getterBlocksOpt.p2p, testNodesOpt.myIp, testNodesOpt.testNodesServer, testNodesOpt.defaultPortTorrent)
+    , p2pAll(getterBlocksOpt.p2pAll)
 {
     if (getterBlocksOpt.isValidate) {
         CHECK(!getterBlocksOpt.getBlocksFromFile, "validate and get_blocks_from_file options not compatible");
@@ -206,7 +210,7 @@ void SyncImpl::initialize() {
     }
     
     if (!metadata.blockHash.empty()) {
-        const size_t countBlocks = blockchain.calcBlockchain(metadata.blockHash);
+        const size_t countBlocks = blockchain.calcBlockchain(metadata.blockHash).value();
         LOGINFO << "Last block " << countBlocks << " " << toHex(metadata.blockHash);
     }
     
@@ -279,7 +283,71 @@ std::vector<Worker*> SyncImpl::makeWorkers() {
     return workers;
 }
 
-void SyncImpl::process(const std::vector<Worker*> &workers) {
+std::optional<ConflictBlocksInfo> SyncImpl::findCommonAncestor() {
+    size_t currentBlockNum = blockchain.countBlocks();
+    
+    BlockInfo bi;
+    std::string blockDump;
+    
+    while (true) {
+        const BlockHeader bh = blockchain.getBlock(currentBlockNum);
+        
+        getBlockAlgorithm->getExistingBlock(bh, bi, blockDump);
+        
+        if (blockchain.getBlock(bi.header.hash).blockNumber.has_value()) {
+            continue;
+        }
+        
+        if (blockchain.getBlock(bi.header.prevHash).blockNumber.has_value()) {
+            break;
+        }
+        
+        currentBlockNum--;
+    }
+    
+    LOGINFO << "Found ancestor " << currentBlockNum << " " << toHex(bi.header.hash) << " " << toHex(bi.header.prevHash);
+    
+    const size_t commonAncestorBlockNum = currentBlockNum - 1;
+    
+    const BlockHeader bh = blockchain.getBlock(currentBlockNum);
+    
+    std::mutex mut;
+    size_t countServers = 0;
+    size_t countHashServers = 0;
+    size_t countHashOur = 0;
+    p2pAll->broadcast("", makeGetBlockByNumberMessage(currentBlockNum), "", [hashServer=bi.header.hash, hashCurr=bh.hash, &countServers, &mut, &countHashServers, &countHashOur](const std::string &server, const std::string &result, const std::optional<CurlException> &exception){
+        if (exception.has_value()) {
+            return;
+        }
+        
+        const MinimumBlockHeader blockHeader = parseBlockHeader(result);
+        if (fromHex(blockHeader.hash) == hashServer) {
+            std::lock_guard lock(mut);
+            countServers++;
+            countHashServers++;
+        } else if (fromHex(blockHeader.hash) == hashCurr) {
+            std::lock_guard lock(mut);
+            countServers++;
+            countHashOur++;
+        } else {
+            std::lock_guard lock(mut);
+            countServers++;
+        }
+    });
+    
+    LOGINFO << "Results " << countServers << " " << countHashOur << " " << countHashServers;
+    if (countHashServers > countHashOur) {
+        ConflictBlocksInfo info;
+        info.blockDump = blockDump;
+        info.ourConflictedBlock = bh;
+        info.serverConflictedBlock = bi.header;
+        return info;
+    } else {
+        return std::nullopt;
+    }
+}
+
+std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &workers) {
     while (true) {
         const time_point beginWhileTime = ::now();
         try {
@@ -302,9 +370,18 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     
                     saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles);
                     
-                    const size_t currentBlockNum = blockchain.addBlock(blockInfo.header);
-                    CHECK(currentBlockNum != 0, "Incorrect block number");
-                    blockInfo.header.blockNumber = currentBlockNum;
+                    const std::optional<size_t> currentBlockNum = blockchain.addBlock(blockInfo.header);
+                    if (!currentBlockNum.has_value()) {
+                        LOGINFO << "Ya tuta " << toHex(blockInfo.header.hash) << " " << toHex(blockInfo.header.prevHash);
+                        const std::optional<ConflictBlocksInfo> conflictBlock = findCommonAncestor();
+                        if (!conflictBlock.has_value()) {
+                            throw exception("False alarm");
+                        } else {
+                            return conflictBlock;
+                        }
+                    }
+                    CHECK(currentBlockNum.value() != 0, "Incorrect block number");
+                    blockInfo.header.blockNumber = currentBlockNum.value();
                     
                     for (TransactionInfo &tx: blockInfo.txs) {
                         tx.blockNumber = blockInfo.header.blockNumber.value();
@@ -315,7 +392,7 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
                     tt.stop();
                     tt2.stop();
                     
-                    LOGINFO << "Block " << currentBlockNum << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(blockInfo.header.hash) << ". Parent hash " << toHex(blockInfo.header.prevHash);
+                    LOGINFO << "Block " << currentBlockNum.value() << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << " current block " << toHex(blockInfo.header.hash) << ". Parent hash " << toHex(blockInfo.header.prevHash);
                     
                     std::shared_ptr<BlockInfo> blockInfoPtr(nextBi, &blockInfo);
                     
@@ -362,9 +439,10 @@ void SyncImpl::process(const std::vector<Worker*> &workers) {
         
         sleepMs(pending);
     }
+    return std::nullopt;
 }
 
-void SyncImpl::synchronize(int countThreads) {
+std::optional<ConflictBlocksInfo> SyncImpl::synchronize(int countThreads) {
     this->countThreads = countThreads;
     
     CHECK(isInitialized, "Not initialized");
@@ -373,7 +451,8 @@ void SyncImpl::synchronize(int countThreads) {
     try {
         initialize();
         const std::vector<Worker*> workers = makeWorkers();
-        process(workers);
+        const auto result = process(workers);
+        return result;
     } catch (const StopException &e) {
         LOGINFO << "Stop synchronize thread";
     } catch (const exception &e) {
@@ -383,6 +462,7 @@ void SyncImpl::synchronize(int countThreads) {
     } catch (...) {
         LOGERR << "Unknown error";
     }
+    return std::nullopt;
 }
 
 std::vector<TransactionInfo> SyncImpl::getTxsForAddress(const Address &address, size_t from, size_t count, size_t limitTxs) const {

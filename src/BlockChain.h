@@ -27,9 +27,9 @@ public:
     
     bool addWithoutCalc(const BlockHeader &block);
     
-    size_t calcBlockchain(const std::vector<unsigned char> &lastHash);
+    std::optional<size_t> calcBlockchain(const std::vector<unsigned char> &lastHash);
     
-    size_t addBlock(const BlockHeader &block);
+    std::optional<size_t> addBlock(const BlockHeader &block);
     
     BlockHeader getBlock(const std::vector<unsigned char> &hash) const override;
     

@@ -71,8 +71,8 @@ std::vector<TransactionInfo> Sync::getTxsForAddress(const Address& address, size
     return impl->getTxsForAddress(address, from, count, limitTxs, filters);
 }
 
-void Sync::synchronize(int countThreads) {
-    impl->synchronize(countThreads);
+std::optional<ConflictBlocksInfo> Sync::synchronize(int countThreads) {
+    return impl->synchronize(countThreads);
 }
 
 const BlockChainReadInterface & Sync::getBlockchain() const {

@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <variant>
 
+#include "blockchain_structs/BlockInfo.h"
+
 #include "ConfigOptions.h"
 
 namespace torrent_node_lib {
@@ -46,6 +48,12 @@ class P2P;
 
 class SyncImpl;
 
+struct ConflictBlocksInfo {
+    BlockHeader ourConflictedBlock;
+    BlockHeader serverConflictedBlock;
+    std::string blockDump;
+};
+
 class Sync: public common::no_copyable, common::no_moveable {    
 public:
     
@@ -65,7 +73,7 @@ public:
     
 public:
     
-    void synchronize(int countThreads);
+    [[nodiscard]] std::optional<ConflictBlocksInfo> synchronize(int countThreads);
     
     std::vector<TransactionInfo> getTxsForAddress(const Address &address, size_t from, size_t count, size_t limitTxs) const;
 

@@ -37,7 +37,7 @@ void BlockChain::removeBlock(const BlockHeader& block) {
     blocks.erase(block.hash);
 }
 
-size_t BlockChain::calcBlockchain(const std::vector<unsigned char>& lastHash) {
+std::optional<size_t> BlockChain::calcBlockchain(const std::vector<unsigned char>& lastHash) {
     CHECK(!lastHash.empty(), "Empty block hash");
     std::lock_guard<std::shared_mutex> lock(mut);
     
@@ -68,7 +68,9 @@ size_t BlockChain::calcBlockchain(const std::vector<unsigned char>& lastHash) {
                 lastStateBlock = std::max(bh.blockNumber.value(), lastStateBlock);
             }
             
-            CHECK(bh.blockNumber.value() == hashes.size(), "Ups " + std::to_string(bh.blockNumber.value()) + " " + toHex(bh.hash) + " " + toHex(bh.prevHash));
+            if (bh.blockNumber.value() != hashes.size()) {
+                return std::nullopt;
+            }
             hashes.emplace_back(iter->get());
         }
         return allNum;
@@ -80,12 +82,18 @@ size_t BlockChain::calcBlockchain(const std::vector<unsigned char>& lastHash) {
     }
 }
 
-size_t BlockChain::addBlock(const BlockHeader& block) {
+std::optional<size_t> BlockChain::addBlock(const BlockHeader& block) {
     //c Защищено мьютексом в вызываемых процедурах
     const bool found = addWithoutCalc(block);
     CHECK(!found, "Block " + toHex(block.hash) + " already exist");
     try {
-        return calcBlockchain(block.hash);
+        const std::optional<size_t> result = calcBlockchain(block.hash);
+        if (!result.has_value()) {
+            removeBlock(block);
+            return std::nullopt;
+        } else {
+            return result.value();
+        }
     } catch (const exception &e) {
         removeBlock(block);
         throw;
