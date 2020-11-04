@@ -355,24 +355,31 @@ std::optional<ConflictBlocksInfo> SyncImpl::findCommonAncestor() {
 }
 
 std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &workers) {
+    bool isNoDefaultSource = false;
+    BlockSource* gba;
+    
+    const auto selectGba = [&gba, &isNoDefaultSource, this]() {
+        isNoDefaultSource = false;
+        if (blockchain.countBlocks() != 0) {
+            LOGINFO << "Get blocks from default";
+            gba = getBlockAlgorithm.get();
+        } else {
+            if (fileBlockAlgorithm != nullptr) {
+                LOGINFO << "Get blocks from file";
+                gba = fileBlockAlgorithm.get();
+                isNoDefaultSource = true;
+            } else {
+                LOGINFO << "Get blocks from default";
+                gba = getBlockAlgorithm.get();
+            }
+        }
+    };
+    
+    selectGba();
+    
     while (true) {
         const time_point beginWhileTime = ::now();
         try {
-            bool isInFile = false;
-            BlockSource* gba;
-            if (blockchain.countBlocks() != 0) {
-                LOGINFO << "Get blocks from default";
-                gba = getBlockAlgorithm.get();
-            } else {
-                if (fileBlockAlgorithm != nullptr) {
-                    LOGINFO << "Get blocks from file";
-                    gba = fileBlockAlgorithm.get();
-                    isInFile = true;
-                } else {
-                    LOGINFO << "Get blocks from default";
-                    gba = getBlockAlgorithm.get();
-                }
-            }
             knownLastBlock = gba->doProcess(blockchain.countBlocks());
             while (true) {
                 Timer tt;
@@ -382,6 +389,7 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
                 std::shared_ptr<std::string> nextBlockDump = std::make_shared<std::string>();
                 const bool isContinue = gba->process(*nextBi, *nextBlockDump);
                 if (!isContinue) {
+                    selectGba();
                     break;
                 }
                 
@@ -390,7 +398,7 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
                     
                     Timer tt2;
                     
-                    saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles && !isInFile);
+                    saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles && !isNoDefaultSource);
                     
                     const std::optional<size_t> currentBlockNum = blockchain.addBlock(blockInfo.header);
                     if (!currentBlockNum.has_value()) {
@@ -428,7 +436,7 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
                     SignBlockInfo &blockInfo = std::get<SignBlockInfo>(*nextBi);
                     Timer tt2;
                     
-                    saveTransactionsSignBlock(blockInfo, *nextBlockDump, isSaveBlockToFiles && !isInFile);
+                    saveTransactionsSignBlock(blockInfo, *nextBlockDump, isSaveBlockToFiles && !isNoDefaultSource);
                     
                     auto [timelineKey, timelineElement] = timeline.addSignBlock(blockInfo.header);
                     
@@ -459,7 +467,10 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
             pending = 0ms;
         }
         
-        sleepMs(pending);
+        if (!isNoDefaultSource) {
+            LOGINFO << "Sleep";
+            sleepMs(pending);
+        }
     }
     return std::nullopt;
 }
