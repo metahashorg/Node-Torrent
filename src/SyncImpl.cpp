@@ -71,6 +71,9 @@ SyncImpl::SyncImpl(const std::string& folderBlocks, const std::string &technical
         CHECK(getterBlocksOpt.p2p2 != nullptr, "p2p nullptr");
         isSaveBlockToFiles = modules[MODULE_BLOCK_RAW];
         getBlockAlgorithm = std::make_unique<NetworkBlockSource>(timeline, folderBlocks, getterBlocksOpt.maxAdvancedLoadBlocks, getterBlocksOpt.countBlocksInBatch, getterBlocksOpt.isCompress, *getterBlocksOpt.p2p, true, getterBlocksOpt.isValidate, getterBlocksOpt.isValidateSign, getterBlocksOpt.isPreLoad);
+        
+        fileRejectedBlockSource = std::make_unique<FileRejectedBlockSource>(blockchain, folderBlocks);
+        fileBlockAlgorithm = std::make_unique<FileBlockSource>(*fileRejectedBlockSource, leveldb, folderBlocks, isValidate);
 
         rejectedBlockSource = std::make_unique<NetworkRejectedBlockSource>(*getterBlocksOpt.p2p2, getterBlocksOpt.isCompress);
     }
@@ -200,6 +203,10 @@ void SyncImpl::initialize() {
     const BlocksMetadata metadata = leveldb.findBlockMetadata();
     
     getBlockAlgorithm->initialize();
+    
+    if (fileBlockAlgorithm != nullptr) {
+        fileBlockAlgorithm->initialize();
+    }
     
     blockchain.clear();
     
@@ -351,14 +358,29 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
     while (true) {
         const time_point beginWhileTime = ::now();
         try {
-            knownLastBlock = getBlockAlgorithm->doProcess(blockchain.countBlocks());
+            bool isInFile = false;
+            BlockSource* gba;
+            if (blockchain.countBlocks() != 0) {
+                LOGINFO << "Get blocks from default";
+                gba = getBlockAlgorithm.get();
+            } else {
+                if (fileBlockAlgorithm != nullptr) {
+                    LOGINFO << "Get blocks from file";
+                    gba = fileBlockAlgorithm.get();
+                    isInFile = true;
+                } else {
+                    LOGINFO << "Get blocks from default";
+                    gba = getBlockAlgorithm.get();
+                }
+            }
+            knownLastBlock = gba->doProcess(blockchain.countBlocks());
             while (true) {
                 Timer tt;
                 
                 std::shared_ptr<std::variant<std::monostate, BlockInfo, SignBlockInfo>> nextBi = std::make_shared<std::variant<std::monostate, BlockInfo, SignBlockInfo>>();
                                
                 std::shared_ptr<std::string> nextBlockDump = std::make_shared<std::string>();
-                const bool isContinue = getBlockAlgorithm->process(*nextBi, *nextBlockDump);
+                const bool isContinue = gba->process(*nextBi, *nextBlockDump);
                 if (!isContinue) {
                     break;
                 }
@@ -368,7 +390,7 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
                     
                     Timer tt2;
                     
-                    saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles);
+                    saveTransactions(blockInfo, *nextBlockDump, isSaveBlockToFiles && !isInFile);
                     
                     const std::optional<size_t> currentBlockNum = blockchain.addBlock(blockInfo.header);
                     if (!currentBlockNum.has_value()) {
@@ -401,12 +423,12 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
                     }
                     
                     saveBlockToLeveldb(blockInfo, timelineKey, timelineElement);
-                    getBlockAlgorithm->confirmBlock(FileInfo(blockInfo.header.filePos.fileNameRelative, blockInfo.header.endBlockPos()));
+                    gba->confirmBlock(FileInfo(blockInfo.header.filePos.fileNameRelative, blockInfo.header.endBlockPos()));
                 } else if (std::holds_alternative<SignBlockInfo>(*nextBi)) {
                     SignBlockInfo &blockInfo = std::get<SignBlockInfo>(*nextBi);
                     Timer tt2;
                     
-                    saveTransactionsSignBlock(blockInfo, *nextBlockDump, isSaveBlockToFiles);
+                    saveTransactionsSignBlock(blockInfo, *nextBlockDump, isSaveBlockToFiles && !isInFile);
                     
                     auto [timelineKey, timelineElement] = timeline.addSignBlock(blockInfo.header);
                     
@@ -416,7 +438,7 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
                     LOGINFO << "Sign block " << toHex(blockInfo.header.hash) << " getted. Count txs " << blockInfo.txs.size() << ". Time ms " << tt.countMs() << " " << tt2.countMs() << ". Parent hash " << toHex(blockInfo.header.prevHash);
                     
                     saveSignBlockToLeveldb(blockInfo, timelineKey, timelineElement);
-                    getBlockAlgorithm->confirmBlock(FileInfo(blockInfo.header.filePos.fileNameRelative, blockInfo.header.endBlockPos()));
+                    gba->confirmBlock(FileInfo(blockInfo.header.filePos.fileNameRelative, blockInfo.header.endBlockPos()));
                 } else {
                     throwErr("Unknown block type");
                 }

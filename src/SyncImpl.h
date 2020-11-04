@@ -43,6 +43,9 @@ struct NodeTestExtendedStat;
 struct RejectedBlockResult;
 struct NodeTestCount2;
 
+class FileBlockSource;
+class FileRejectedBlockSource;
+
 struct TransactionsFilters;
 struct Token;
 
@@ -170,6 +173,9 @@ private:
     int countThreads;
         
     std::unique_ptr<BlockSource> getBlockAlgorithm;
+    
+    std::unique_ptr<FileRejectedBlockSource> fileRejectedBlockSource;
+    std::unique_ptr<FileBlockSource> fileBlockAlgorithm;
     
     std::set<Address> users;
     mutable std::mutex usersMut;
