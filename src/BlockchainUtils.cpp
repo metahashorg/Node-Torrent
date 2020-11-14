@@ -24,6 +24,7 @@
 #include "log.h"
 #include "check.h"
 #include "stringUtils.h"
+#include "convertStrings.h"
 
 using namespace common;
 
@@ -300,7 +301,7 @@ bool crypto_check_sign_data2(
 }
 
 bool crypto_check_sign_data(
-    const std::vector<char>& sign, 
+    std::vector<char> sign, 
     const std::vector<unsigned char>& public_key, 
     const unsigned char *data,
     size_t data_size)
@@ -309,9 +310,15 @@ bool crypto_check_sign_data(
     if (secp256k1_ec_pubkey_parse(getCtx(), &pubkeySecp, public_key.data() + public_key.size() - 65, 65) != 1) {
         return crypto_check_sign_data2(sign, public_key, data, data_size);
     }
-    
+        
     secp256k1_ecdsa_signature signSecp;
-    CHECK(secp256k1_ecdsa_signature_parse_der(getCtx(), &signSecp, (const unsigned char*)sign.data(), sign.size()) == 1, "Incorrect sign key");
+    
+    while (secp256k1_ecdsa_signature_parse_der(getCtx(), &signSecp, (const unsigned char*)sign.data(), sign.size()) != 1) {
+        if (sign.size() < 70) {
+            throwErr("Incorrect sign key");
+        }
+        sign.resize(sign.size() - 1);
+    }
     secp256k1_ecdsa_signature sig_norm;
     secp256k1_ecdsa_signature_normalize(getCtx(), &sig_norm, &signSecp);
     
