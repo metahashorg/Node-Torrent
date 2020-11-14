@@ -22,7 +22,7 @@ std::vector<unsigned char> get_address_bin(const std::vector<unsigned char> & bp
 std::string makeAddressFromSecpKey(const std::vector<unsigned char> &pubkey);
 
 bool crypto_check_sign_data(
-    const std::vector<char>& sign, 
+    std::vector<char> sign, 
     const std::vector<unsigned char>& public_key, 
     const unsigned char *data,
     size_t data_size);
