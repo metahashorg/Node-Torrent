@@ -389,7 +389,7 @@ std::optional<ConflictBlocksInfo> SyncImpl::process(const std::vector<Worker*> &
                 std::shared_ptr<std::string> nextBlockDump = std::make_shared<std::string>();
                 const bool isContinue = gba->process(*nextBi, *nextBlockDump);
                 if (!isContinue) {
-                    selectGba();
+                    gba = getBlockAlgorithm.get();
                     break;
                 }
                 
