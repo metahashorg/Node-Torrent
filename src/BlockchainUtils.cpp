@@ -272,6 +272,81 @@ static std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> crypto_load_public_ke
     return crypto_load_key(public_key_buf, true);
 }
 
+bool CheckBufferSignature(EVP_PKEY* publicKey, const std::vector<char>& data, ECDSA_SIG* signature) {
+    size_t bufsize = data.size();
+    const char* buff = data.data();
+    
+    EVP_MD_CTX* mdctx;
+    static const EVP_MD* md = EVP_sha256();
+    unsigned char md_value[EVP_MAX_MD_SIZE];
+    unsigned int md_len;
+    
+    md = EVP_sha256();
+    mdctx = EVP_MD_CTX_create();
+    EVP_DigestInit_ex(mdctx, md, nullptr);
+    EVP_DigestUpdate(mdctx, buff, bufsize);
+    EVP_DigestFinal_ex(mdctx, md_value, &md_len);
+    EVP_MD_CTX_destroy(mdctx);
+    
+    EC_KEY* ec_key = EVP_PKEY_get1_EC_KEY(publicKey);
+    if (ECDSA_do_verify(md_value, md_len, signature, ec_key) == 1) {
+        EC_KEY_free(ec_key);
+        return true;
+    }
+    EC_KEY_free(ec_key);
+    return false;
+}
+
+template <typename SignContainer>
+ECDSA_SIG* ReadSignature(const SignContainer& binsign) {
+    const auto* data = reinterpret_cast<const unsigned char*>(binsign.data());
+    
+    ECDSA_SIG* signature = d2i_ECDSA_SIG(nullptr, &data, binsign.size());
+    return signature;
+}
+
+template <typename PubKContainer>
+EVP_PKEY* ReadPublicKey(const PubKContainer& binpubk) {
+    const auto* data = reinterpret_cast<const unsigned char*>(binpubk.data());
+    
+    EVP_PKEY* key = d2i_PUBKEY(nullptr, &data, binpubk.size());
+    return key;
+}
+
+template <typename PrivKContainer>
+EVP_PKEY* ReadPrivateKey(const PrivKContainer& binprivk) {
+    const auto* data = reinterpret_cast<const unsigned char*>(binprivk.data());
+    
+    EVP_PKEY* key = d2i_AutoPrivateKey(nullptr, &data, binprivk.size());
+    return key;
+}
+
+template <typename DataContainer, typename SignContainer, typename PubKContainer>
+bool check_sign(const DataContainer& data, const SignContainer& sign, const PubKContainer& pubk) {
+    EVP_PKEY* pubkey = ReadPublicKey(pubk);
+    if (!pubkey) {
+        return false;
+    }
+    ECDSA_SIG* signature = ReadSignature(sign);
+    if (!signature) {
+        EVP_PKEY_free(pubkey);
+        return false;
+    }
+    
+    std::vector<char> data_as_vector;
+    data_as_vector.insert(data_as_vector.end(), data.begin(), data.end());
+    
+    if (CheckBufferSignature(pubkey, data_as_vector, signature)) {
+        EVP_PKEY_free(pubkey);
+        ECDSA_SIG_free(signature);
+        return true;
+    }
+    
+    EVP_PKEY_free(pubkey);
+    ECDSA_SIG_free(signature);
+    return false;
+}
+
 bool crypto_check_sign_data2(
     const std::vector<char>& sign, 
     const std::vector<unsigned char>& public_key, 
@@ -315,7 +390,7 @@ bool crypto_check_sign_data(
     
     while (secp256k1_ecdsa_signature_parse_der(getCtx(), &signSecp, (const unsigned char*)sign.data(), sign.size()) != 1) {
         if (sign.size() < 70) {
-            throwErr("Incorrect sign key");
+            return check_sign(std::vector(data, data + data_size), sign, public_key);
         }
         sign.resize(sign.size() - 1);
     }
