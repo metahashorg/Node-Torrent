@@ -381,31 +381,7 @@ bool crypto_check_sign_data(
     const unsigned char *data,
     size_t data_size)
 {
-    secp256k1_pubkey pubkeySecp;
-    if (secp256k1_ec_pubkey_parse(getCtx(), &pubkeySecp, public_key.data() + public_key.size() - 65, 65) != 1) {
-        return crypto_check_sign_data2(sign, public_key, data, data_size);
-    }
-        
-    secp256k1_ecdsa_signature signSecp;
-    
-    while (secp256k1_ecdsa_signature_parse_der(getCtx(), &signSecp, (const unsigned char*)sign.data(), sign.size()) != 1) {
-        if (sign.size() < 70) {
-            return check_sign(std::vector(data, data + data_size), sign, public_key);
-        }
-        sign.resize(sign.size() - 1);
-    }
-    secp256k1_ecdsa_signature sig_norm;
-    secp256k1_ecdsa_signature_normalize(getCtx(), &sig_norm, &signSecp);
-    
-    std::array<unsigned char, SHA256_DIGEST_LENGTH> hash;
-    SHA256(data, data_size, hash.data());
-        
-    const int result = secp256k1_ecdsa_verify(getCtx(), &sig_norm, hash.data(), &pubkeySecp);
-    if (result == 1) {
-        return true;
-    } else {
-        return false;
-    }
+    return check_sign(std::vector(data, data + data_size), sign, public_key);
 }
 
 void initBlockchainUtilsImpl() {
