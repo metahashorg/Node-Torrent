@@ -312,7 +312,7 @@ static std::tuple<bool, SizeTransactinType, const char*> readSimpleTransactionIn
             txInfo.scriptInfo.value().type = TransactionInfo::ScriptInfo::ScriptType::pay;
         }
     }
-    
+/*    
     if (txInfo.toAddress.isTokenAddress()) {
         const auto parseTokenInfo = [](const auto &docData) {
             TransactionInfo::TokenInfo tokenInfo;
@@ -359,7 +359,7 @@ static std::tuple<bool, SizeTransactinType, const char*> readSimpleTransactionIn
         
         txInfo.tokenInfo = parseTokenInfo(docData);
     }
-    
+*/
     const char * const endClearTx = cur_pos;
     
     const size_t signSize = readVarInt(cur_pos, end_pos);
