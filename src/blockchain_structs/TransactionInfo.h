@@ -115,12 +115,16 @@ public:
             size_t value;
         };
 
+        struct BurnTokens {
+            size_t value;
+        };
+        
         struct MoveTokens {
             torrent_node_lib::Address toAddress;
             size_t value;
         };
 
-        std::variant<Create, ChangeOwner, ChangeEmission, AddTokens, MoveTokens> info;
+        std::variant<Create, ChangeOwner, ChangeEmission, AddTokens, MoveTokens, BurnTokens> info;
     };
 
 public:

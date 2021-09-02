@@ -29,6 +29,8 @@ bool crypto_check_sign_data(
 
 void initBlockchainUtilsImpl();
 
+std::string create_custom_address(const std::string &binowner, int nonce, char number);
+
 }
 
 #endif // BLOCKCHAIN_UTILS_H_

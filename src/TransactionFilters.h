@@ -14,6 +14,7 @@ struct TransactionsFilters {
     FilterType isOutput = FilterType::None;
     FilterType isDelegate = FilterType::None;
     FilterType isSuccess = FilterType::None;
+    FilterType isTokens = FilterType::None;
 };
 
 } // torrent_node_lib

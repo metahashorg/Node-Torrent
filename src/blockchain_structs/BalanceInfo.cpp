@@ -126,7 +126,9 @@ void BalanceInfo::addTokens(const TransactionInfo &tx, size_t value, bool isOkSt
     if (tx.tokenInfo.has_value()) {
         const Address &tokenAddress = tx.toAddress;
         tokens[tokenAddress.getBinaryString()].countOp++;
+        tokens[tokenAddress.getBinaryString()].countReceived++;
         tokens[tokenAddress.getBinaryString()].balance.receiveValue(value);
+        tokenBlockNumber = tx.blockNumber;
     }
 }
 
@@ -137,13 +139,15 @@ void BalanceInfo::moveTokens(const TransactionInfo &tx, const Address &address, 
     if (tx.tokenInfo.has_value()) {
         const Address &tokenAddress = tx.toAddress;
         if (tx.fromAddress == address) {
-            tokens[tokenAddress.getBinaryString()].countOp++;
+            tokens[tokenAddress.getBinaryString()].countSpent++;
             tokens[tokenAddress.getBinaryString()].balance.spentValue(value);
         }
         if (toAddress == address) {
-            tokens[tokenAddress.getBinaryString()].countOp++;
+            tokens[tokenAddress.getBinaryString()].countReceived++;
             tokens[tokenAddress.getBinaryString()].balance.receiveValue(value);
         }
+        tokens[tokenAddress.getBinaryString()].countOp++;
+        tokenBlockNumber = tx.blockNumber;
     }
 }
 
@@ -185,9 +189,20 @@ BalanceInfo& BalanceInfo::operator+=(const BalanceInfo& second) {
         tokens[token].balance.receiveValue(balance.balance.received());
         tokens[token].balance.spentValue(balance.balance.spent());
         tokens[token].countOp += balance.countOp;
+        tokens[token].countReceived += balance.countReceived;
+        tokens[token].countSpent += balance.countSpent;
     }
 
     blockNumber = std::max(blockNumber, second.blockNumber);
+    if (second.tokenBlockNumber.has_value() && tokenBlockNumber.has_value()) {
+        tokenBlockNumber = std::max(tokenBlockNumber.value(), second.tokenBlockNumber.value());
+    } else if (second.tokenBlockNumber.has_value() && !tokenBlockNumber.has_value()) {
+        tokenBlockNumber = second.tokenBlockNumber;
+    } else if (!second.tokenBlockNumber.has_value() && tokenBlockNumber.has_value()) {
+        // empty
+    } else {
+        // empty
+    }
     return *this;
 }
 
@@ -228,6 +243,8 @@ void BalanceInfo::serialize(std::vector<char>& buffer) const {
         serializeInt(balance.balance.received(), buffer);
         serializeInt(balance.balance.spent(), buffer);
         serializeInt(balance.countOp, buffer);
+        serializeInt(balance.countReceived, buffer);
+        serializeInt(balance.countSpent, buffer);
     }
 
     if (delegated.has_value()) {
@@ -244,6 +261,11 @@ void BalanceInfo::serialize(std::vector<char>& buffer) const {
         serializeInt<unsigned char>('f', buffer);
         serializeInt<size_t>(forged->countOp, buffer);
         serializeInt<size_t>(forged->forged, buffer);
+    }
+    
+    if (tokenBlockNumber.has_value()) {
+        serializeInt<unsigned char>('t', buffer);
+        serializeInt<size_t>(tokenBlockNumber.value(), buffer);
     }
 }
 
@@ -272,6 +294,8 @@ BalanceInfo BalanceInfo::deserialize(const std::string& raw) {
         TokenBalance balance;
         balance.balance.fill(received, spent);
         balance.countOp = deserializeInt<size_t>(raw, from);
+        balance.countReceived = deserializeInt<size_t>(raw, from);
+        balance.countSpent = deserializeInt<size_t>(raw, from);
 
         result.tokens.emplace(token, balance);
     }
@@ -294,6 +318,8 @@ BalanceInfo BalanceInfo::deserialize(const std::string& raw) {
             forged.countOp = deserializeInt<size_t>(raw, from);
             forged.forged = deserializeInt<size_t>(raw, from);
             result.forged = forged;
+        } else if (nextType == 't') {
+            result.tokenBlockNumber = deserializeInt<size_t>(raw, from);
         } else {
             throwErr("Incorrect type balance " + std::string(1, (char)nextType));
         }

@@ -25,6 +25,7 @@
 #include "blockchain_structs/DelegateState.h"
 
 #include "RejectedBlockSource/RejectedBlockSource.h"
+#include <log.h>
 
 using namespace common;
 using namespace torrent_node_lib;
@@ -312,14 +313,14 @@ std::string tokenToJson(const RequestId &requestId, const Token &info, bool isFo
     auto &allocator = doc.GetAllocator();
     addIdToResponse(requestId, doc, allocator);
     rapidjson::Value resultValue(rapidjson::kObjectType);
-    resultValue.AddMember("type", strToJson(info.type, allocator), allocator);
-    resultValue.AddMember("name", strToJson(info.name, allocator), allocator);
-    resultValue.AddMember("symbol", strToJson(info.symbol, allocator), allocator);
-    resultValue.AddMember("owner", strToJson(info.owner.calcHexString(), allocator), allocator);
-    resultValue.AddMember("decimals", info.decimals, allocator);
-    resultValue.AddMember("beginValue", info.beginValue, allocator);
-    resultValue.AddMember("allValue", info.allValue, allocator);
-    resultValue.AddMember("emission", info.emission, allocator);
+    if (info.owner.isSet_()) {
+        resultValue.AddMember("type", strToJson(info.type, allocator), allocator);
+        resultValue.AddMember("name", strToJson(info.name, allocator), allocator);
+        resultValue.AddMember("symbol", strToJson(info.symbol, allocator), allocator);
+        resultValue.AddMember("owner", strToJson(info.owner.calcHexString(), allocator), allocator);
+        resultValue.AddMember("decimals", info.decimals, allocator);
+        resultValue.AddMember("emission", info.allValue, allocator);
+    }
     doc.AddMember("result", resultValue, allocator);
     return jsonToString(doc, isFormat);
 }
@@ -379,20 +380,40 @@ static rapidjson::Value balanceInfoToJson(const std::string &address, const Bala
         resultValue.AddMember("countForgedOps", intOrString(balance.forged->countOp, isStringValue, allocator), allocator);
         resultValue.AddMember("forged", intOrString(balance.forged->forged, isStringValue, allocator), allocator);
     }
+    if (balance.tokenBlockNumber.has_value()) {
+        resultValue.AddMember("token_block_number", intOrString(balance.tokenBlockNumber.value(), isStringValue, allocator), allocator);
+    }
+    return resultValue;
+}
+
+static rapidjson::Value balanceInfoTokensToJson(const std::string &address, const BalanceInfo &balance, size_t currentBlock, rapidjson::Document::AllocatorType &allocator, const JsonVersion &version) {
+    const bool isStringValue = version == JsonVersion::V2;
+    rapidjson::Value resultValue(rapidjson::kObjectType);
+    resultValue.AddMember("block_number", intOrString(balance.blockNumber, isStringValue, allocator), allocator);
+    resultValue.AddMember("currentBlock", intOrString(currentBlock, isStringValue, allocator), allocator);
+    if (balance.hash.has_value()) {
+        resultValue.AddMember("hash", intOrString(balance.hash.value(), true, allocator), allocator);
+    }
     if (!balance.tokens.empty()) {
         rapidjson::Value tokens(rapidjson::kArrayType);
         for (const auto &[token, b]: balance.tokens) {
-            rapidjson::Value tokenJson;
+            rapidjson::Value tokenJson(rapidjson::kObjectType);
             
             const Address tokenAddress(token.begin(), token.end());
-            tokenJson.AddMember("token", strToJson(tokenAddress.calcHexString(), allocator), allocator);
-            tokenJson.AddMember("received", intOrString(b.balance.balance(), isStringValue, allocator), allocator);
-            tokenJson.AddMember("spent", intOrString(b.balance.balance(), isStringValue, allocator), allocator);
-            tokenJson.AddMember("countTokenOps", intOrString(b.countOp, isStringValue, allocator), allocator);
+            tokenJson.AddMember("address", strToJson(tokenAddress.calcHexString(), allocator), allocator);
+            tokenJson.AddMember("received", intOrString(b.balance.received(), isStringValue, allocator), allocator);
+            tokenJson.AddMember("spent", intOrString(b.balance.spent(), isStringValue, allocator), allocator);
+            tokenJson.AddMember("value", intOrString(b.balance.balance(), isStringValue, allocator), allocator);
+            tokenJson.AddMember("count_received", intOrString(b.countReceived, isStringValue, allocator), allocator);
+            tokenJson.AddMember("count_spent", intOrString(b.countSpent, isStringValue, allocator), allocator);
+            tokenJson.AddMember("count_txs", intOrString(b.countOp, isStringValue, allocator), allocator);
             
             tokens.PushBack(tokenJson, allocator);
         }
         resultValue.AddMember("tokens", tokens, allocator);
+        if (balance.tokenBlockNumber.has_value()) {
+            resultValue.AddMember("token_block_number", intOrString(balance.tokenBlockNumber.value(), isStringValue, allocator), allocator);
+        }
     }
     return resultValue;
 }
@@ -402,6 +423,14 @@ std::string balanceInfoToJson(const RequestId &requestId, const std::string &add
     auto &allocator = doc.GetAllocator();
     addIdToResponse(requestId, doc, allocator);
     doc.AddMember("result", balanceInfoToJson(address, balance, currentBlock, allocator, version), allocator);
+    return jsonToString(doc, isFormat);
+}
+
+std::string balanceTokenInfoToJson(const RequestId &requestId, const std::string &address, const BalanceInfo &balance, size_t currentBlock, bool isFormat, const JsonVersion &version) {
+    rapidjson::Document doc(rapidjson::kObjectType);
+    auto &allocator = doc.GetAllocator();
+    addIdToResponse(requestId, doc, allocator);
+    doc.AddMember("result", balanceInfoTokensToJson(address, balance, currentBlock, allocator, version), allocator);
     return jsonToString(doc, isFormat);
 }
 

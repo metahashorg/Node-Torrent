@@ -422,4 +422,146 @@ void initBlockchainUtilsImpl() {
     isInitialized = true;
 }
 
+template<typename PODType>
+size_t NumberSize(const PODType* value) {
+    PODType val = *value;
+    size_t currVal = 0;
+    while (val != 0) {
+        currVal++;
+        val /= 256;
+    }
+    return currVal;
+}
+
+template <typename IntType>
+std::string IntegerToBuffer(IntType val)
+{
+    uint8_t buf[sizeof(IntType)] = {0};
+    IntType value = val;
+    uint8_t rem = 0;
+    for (size_t i = 0; i < sizeof(IntType); ++i)
+    {
+        rem = value % 256;
+        buf[i] = rem;
+        value = value / 256;
+    }
+    return std::string((char*)buf, sizeof(IntType));
+}
+
+std::string EncodeField(std::string field) {
+    size_t fs = field.size();
+    std::string rslt = "";
+    if (fs == 1 && field.at(0) >= 0x0 && (uint8_t)field.at(0) <= 0x7F) {
+        if (field.at(0) == 0) {
+            rslt += 0x80;
+        } else {
+            rslt += field;
+        }
+    } else if (fs <= 55) {
+        char sz = 0x80 + char(fs);
+        rslt += sz;
+        rslt += field;
+    } else if (fs > 55 && fs < 0xFFFFFFFFFFFFFFFF) {
+        size_t sizelen = NumberSize(&fs);
+        
+        const std::string bigint = IntegerToBuffer(fs);
+        
+        char prefix = 0xB7 + char(sizelen);
+        rslt += prefix;
+        rslt += bigint.substr(0, sizelen);
+        rslt += field;
+    }
+    
+    return rslt;
+}
+
+std::string CalcTotalSize(std::string dump) {
+    std::string rslt = "";
+    size_t ds = dump.size();
+    if (ds <= 55) {
+        char sz = 0xC0 + char(ds);
+        rslt += sz;
+        rslt += dump;
+    } else {
+        size_t sizelen = NumberSize(&ds);
+        
+        const std::string bigint = IntegerToBuffer(ds);
+        
+        char prefix = 0xF7 + char(sizelen);
+        rslt += prefix;
+        rslt += bigint.substr(0, sizelen);
+        rslt += dump;
+    }
+    
+    return rslt;
+}
+
+std::string RLP(const std::vector<std::string> fields) {
+    std::string dump = "";
+    for (size_t i = 0; i < fields.size(); ++i) {
+        dump += EncodeField(fields[i]);
+    }
+    dump = CalcTotalSize(dump);
+    return dump;
+}
+
+std::string IntToRLP(int val) {
+    if (val == 0)
+        return std::string(1, '\x00');
+    uint8_t rlpval[sizeof(val)];
+    unsigned char* valptr = (unsigned char*)&val + sizeof(val) - 1;
+    
+    size_t j = 0;
+    bool start = false;
+    for (size_t i = 0; i < sizeof(val); ++i)
+    {
+        if (*(valptr-i))
+            start = true;
+        if (start)
+            rlpval[j++] = *(valptr-i);
+    }
+    
+    return std::string((const char*)rlpval, j);
+}
+
+std::string doubleSha(const std::string& data) {
+    std::string hash1(SHA256_DIGEST_LENGTH, 0);
+    std::string hash2(SHA256_DIGEST_LENGTH, 0);
+    SHA256((const unsigned char*)(data.data()), data.size(), (unsigned char*)(hash1.data()));
+    SHA256((const unsigned char*)(hash1.data()), SHA256_DIGEST_LENGTH, (unsigned char*)(hash2.data()));
+    return hash2;
+}
+
+std::string keccak(const std::string& input) {
+    uint32_t digest_length = SHA256_DIGEST_LENGTH;
+    const EVP_MD* algorithm = EVP_sha3_256();
+    uint8_t* digest = static_cast<uint8_t*>(OPENSSL_malloc(digest_length));
+    EVP_MD_CTX* context = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(context, algorithm, nullptr);
+    EVP_DigestUpdate(context, input.c_str(), input.size());
+    EVP_DigestFinal_ex(context, digest, &digest_length);
+    EVP_MD_CTX_destroy(context);
+    std::string output(digest, digest + digest_length);
+    OPENSSL_free(digest);
+    return output;
+}
+
+std::string create_custom_address(const std::string &binowner, int nonce, char number) {
+    std::vector<std::string> fields;
+    fields.push_back(binowner);
+    if (nonce > 0) {
+        std::string rlpnonce = IntToRLP(nonce);
+        fields.push_back(rlpnonce);
+    } else {
+        fields.push_back("");
+    }
+    std::string rlpenc = RLP(fields);
+    const std::string hs = keccak(rlpenc);
+    std::string address;
+    address += number;
+    address += hs.substr(12, 20);
+    address += doubleSha(address).substr(0, 4);
+    return address;
+}
+
 }

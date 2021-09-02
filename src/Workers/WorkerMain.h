@@ -109,6 +109,8 @@ private:
     
     void saveAddressTransaction(const TransactionInfo &tx, const Address &address, Batch &batch);
     
+    void saveAddressTokenTransaction(const TransactionInfo &tx, const Address &address, Batch &batch);
+    
     void saveAddressStatus(const TransactionStatus &status, const Address &address, Batch &batch);
     
     void saveAddressBalance(const TransactionInfo &tx, const Address &address, std::unordered_map<std::string, BalanceInfo> &balances, bool isForging);
@@ -120,6 +122,8 @@ private:
     void saveAddressBalanceAddToken(const TransactionInfo &tx, std::unordered_map<std::string, BalanceInfo> &balances);
     
     void saveAddressBalanceMoveToken(const TransactionInfo &tx, std::unordered_map<std::string, BalanceInfo> &balances);
+    
+    void saveAddressBalanceBurnToken(const TransactionInfo &tx, std::unordered_map<std::string, BalanceInfo> &balances);
     
     void processTokenOperation(const Address &token, Batch &txsBatch, const std::function<Token(Token token)> &process);
     

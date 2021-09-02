@@ -73,6 +73,8 @@ public:
     
     void addAddress(const std::string &address, const AddressInfo &value, size_t counter);
     
+    void addAddressToken(const std::string &address, const AddressInfo &value, size_t counter);
+    
     void addTransaction(const std::string &txHash, const TransactionInfo &value);
     
     void addBalance(const std::string &address, const BalanceInfo &value);
@@ -183,6 +185,8 @@ public:
     BlocksMetadata findBlockMetadata() const;
     
     std::vector<AddressInfo> findAddress(const std::string &address, size_t from, size_t count) const;
+    
+    std::vector<AddressInfo> findAddressTokens(const std::string &address, size_t from, size_t count) const;
     
     std::vector<TransactionStatus> findAddressStatus(const std::string &address) const;
     

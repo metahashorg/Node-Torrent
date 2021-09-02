@@ -42,6 +42,7 @@ using namespace torrent_node_lib;
 const static std::string GET_ADDRESS_HISTORY = "fetch-history";
 const static std::string GET_ADDRESS_HISTORY_FILTER = "fetch-history-filter";
 const static std::string GET_ADDRESS_BALANCE = "fetch-balance";
+const static std::string GET_ADDRESS_TOKENS = "address-get-tokens";
 const static std::string GET_ADDRESS_BALANCES = "fetch-balances";
 const static std::string GET_BLOCK_BY_HASH = "get-block-by-hash";
 const static std::string GET_BLOCK_BY_NUMBER = "get-block-by-number";
@@ -54,7 +55,7 @@ const static std::string GET_DUMP_BLOCK_BY_NUMBER = "get-dump-block-by-number";
 const static std::string GET_DUMPS_BLOCKS_BY_HASH = "get-dumps-blocks-by-hash";
 const static std::string GET_DUMPS_BLOCKS_BY_NUMBER = "get-dumps-blocks-by-number";
 const static std::string GET_TRANSACTION_INFO = "get-tx";
-const static std::string GET_TOKEN_INFO = "get-token";
+const static std::string GET_TOKEN_INFO = "token-get-info";
 const static std::string GET_TRANSACTIONS_INFO = "get-txs";
 const static std::string GET_ADDRESS_DELEGATIONS = "get-address-delegations";
 const static std::string GET_CONTRACT_DETAILS = "get-contract-details";
@@ -128,6 +129,7 @@ TransactionsFilters parseFilters(const rapidjson::Value &v) {
     processFilter("isTest", res.isTest);
     processFilter("isSuccess", res.isSuccess);
     processFilter("isDelegate", res.isDelegate);
+    processFilter("isToken", res.isTokens);
     
     return res;
 }
@@ -539,6 +541,15 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const BalanceInfo balance = sync.getBalance(address);
             
             response = balanceInfoToJson(requestId, addressString, balance, sync.getBlockchain().countBlocks(), isFormatJson, jsonVersion);
+        } else if (func == GET_ADDRESS_TOKENS) {
+            const auto &jsonParams = get<JsonObject>(doc, "params");
+            
+            const std::string &addressString = get<std::string>(jsonParams, "address");
+            const Address address(addressString);
+            
+            const BalanceInfo balance = sync.getBalance(address);
+            
+            response = balanceTokenInfoToJson(requestId, addressString, balance, sync.getBlockchain().countBlocks(), isFormatJson, jsonVersion);
         } else if (func == GET_ADDRESS_BALANCES) {
             const auto &jsonParams = get<JsonObject>(doc, "params");
             
@@ -589,7 +600,6 @@ bool Server::run(int thread_number, Request& mhd_req, Response& mhd_resp) {
             const Address &address = Address(get<std::string>(jsonParams, "address"));
             
             const Token res = sync.getTokenInfo(address);
-            
             response = tokenToJson(requestId, res, isFormatJson, jsonVersion);
         } else if (func == GET_TRANSACTIONS_INFO) {
             const auto &jsonParams = get<JsonObject>(doc, "params");

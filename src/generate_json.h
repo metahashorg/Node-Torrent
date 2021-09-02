@@ -64,6 +64,8 @@ std::string addressesInfoToJsonFilter(const RequestId &requestId, const std::str
 
 std::string balanceInfoToJson(const RequestId &requestId, const std::string &address, const torrent_node_lib::BalanceInfo &balance, size_t currentBlock, bool isFormat, const JsonVersion &version);
 
+std::string balanceTokenInfoToJson(const RequestId &requestId, const std::string &address, const torrent_node_lib::BalanceInfo &balance, size_t currentBlock, bool isFormat, const JsonVersion &version);
+
 std::string balancesInfoToJson(const RequestId &requestId, const std::vector<std::pair<std::string, torrent_node_lib::BalanceInfo>> &balances, size_t currentBlock, bool isFormat, const JsonVersion &version);
 
 std::string blockHeaderToJson(const RequestId &requestId, const torrent_node_lib::BlockHeader &bh, const std::variant<std::vector<torrent_node_lib::TransactionInfo>, std::vector<torrent_node_lib::SignTransactionInfo>> &signatures, bool isFormat, BlockTypeInfo type, const JsonVersion &version);

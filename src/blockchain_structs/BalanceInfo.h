@@ -106,6 +106,8 @@ public:
     struct TokenBalance {
         BalanceElement balance;
         size_t countOp = 0;
+        size_t countReceived = 0;
+        size_t countSpent = 0;
     };
 
 public:
@@ -123,6 +125,8 @@ public:
 
     size_t blockNumber = 0;
 
+    std::optional<size_t> tokenBlockNumber;
+    
     std::unordered_map<std::string, TokenBalance> tokens;
 
 public:

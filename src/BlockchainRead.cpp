@@ -312,54 +312,7 @@ static std::tuple<bool, SizeTransactinType, const char*> readSimpleTransactionIn
             txInfo.scriptInfo.value().type = TransactionInfo::ScriptInfo::ScriptType::pay;
         }
     }
-/*    
-    if (txInfo.toAddress.isTokenAddress()) {
-        const auto parseTokenInfo = [](const auto &docData) {
-            TransactionInfo::TokenInfo tokenInfo;
-            
-            try {
-                if (!docData.has_value()) {
-                    return tokenInfo;
-                }
-                const rapidjson::Document &doc = *docData;
-                const auto &tokenJson = getOpt<JsonObject>(doc);
-                if (!tokenJson.has_value()) {
-                    return tokenInfo;
-                }
-                const std::optional<std::string> type = getOpt<std::string>(*tokenJson, "type");
-                if (type.has_value()) {
-                    TransactionInfo::TokenInfo::Create tokenCreate;
-                    tokenCreate.type = type.value();
-                    
-                    tokenCreate.owner = Address(get<std::string>(*tokenJson, "owner"));
-                    tokenCreate.decimals = get<int>(*tokenJson, "decimals");
-                    tokenCreate.value = get<size_t>(*tokenJson, "total");
-                    tokenCreate.symbol = get<std::string>(*tokenJson, "symbol");
-                    tokenCreate.name = get<std::string>(*tokenJson, "name");
-                    tokenCreate.emission = get<bool>(*tokenJson, "emission");
-                    
-                    const auto distrArray = getOpt<JsonArray>(*tokenJson, "data");
-                    if (distrArray.has_value()) {
-                        for (const auto &distrJson: distrArray.value()) {
-                            const auto &obj = get<JsonObject>(distrJson);
-                            const Address address = Address(get<std::string>(obj, "address"));
-                            const size_t value = get<size_t>(obj, "value");
-                            tokenCreate.beginDistribution.emplace_back(address, value);
-                        }
-                    }
-                    
-                    tokenInfo.info = tokenCreate;
-                }
-            } catch (const exception &e) {
-                return TransactionInfo::TokenInfo();
-            }
-            
-            return tokenInfo;
-        };
-        
-        txInfo.tokenInfo = parseTokenInfo(docData);
-    }
-*/
+    
     const char * const endClearTx = cur_pos;
     
     const size_t signSize = readVarInt(cur_pos, end_pos);
@@ -410,6 +363,75 @@ static std::tuple<bool, SizeTransactinType, const char*> readSimpleTransactionIn
         if (!txInfo.fromAddress.isInitialWallet()) {
             CHECK(crypto_check_sign_data(txInfo.sign, txInfo.pubKey, (const unsigned char*)tx_start, std::distance(tx_start, endClearTx)), "Not validate");
         }
+    }
+        
+    if (txInfo.toAddress.isTokenAddress()) {
+        const auto parseTokenInfo = [&txInfo](const auto &docData) -> std::optional<TransactionInfo::TokenInfo> {           
+            try {
+                if (!docData.has_value()) {
+                    return std::nullopt;
+                }
+                const rapidjson::Document &doc = *docData;
+                const auto &tokenJson = getOpt<JsonObject>(doc);
+                if (!tokenJson.has_value()) {
+                    return std::nullopt;
+                }
+                const std::string method = get<std::string>(*tokenJson, "method");
+                if (method == "token-create") {
+                    const auto& params = get<JsonObject>(*tokenJson, "params");
+                    
+                    TransactionInfo::TokenInfo tokenInfo;
+                    TransactionInfo::TokenInfo::Create tokenCreate;
+                    
+                    const std::string type = get<std::string>(params, "type");
+                    CHECK(type == "M1", "Incorrect type");  
+                    tokenCreate.type = type;
+                    tokenCreate.owner = Address(get<std::string>(params, "owner"));
+                    tokenCreate.decimals = std::stoi(get<std::string>(params, "decimals"));
+                    tokenCreate.symbol = get<std::string>(params, "symbol");
+                    tokenCreate.name = get<std::string>(params, "name");
+                    tokenCreate.value = std::stoull(get<std::string>(params, "emission"));
+                    tokenCreate.emission = false;
+                    
+                    CHECK(tokenCreate.owner == txInfo.fromAddress, "Incorrect contract owner");
+                    //CHECK(create_custom_address(tokenCreate.owner.getBinaryString(), txInfo.nonce, 0x06) == txInfo.toAddress.getBinaryString(), "Incorrect token address");
+                    
+                    tokenInfo.info = tokenCreate;
+                    return tokenInfo;
+                } else if (method == "token-transfer") {
+                    const auto& params = get<JsonObject>(*tokenJson, "params");
+                    
+                    TransactionInfo::TokenInfo tokenInfo;
+                    TransactionInfo::TokenInfo::MoveTokens tokenMove;
+                    
+                    tokenMove.toAddress = Address(get<std::string>(params, "to"));
+                    tokenMove.value = std::stoull(get<std::string>(params, "value"));
+                    
+                    tokenInfo.info = tokenMove;
+                    return tokenInfo;
+                } else if (method == "burn-tokens") {
+                    const auto& params = get<JsonObject>(*tokenJson, "params");
+                    
+                    TransactionInfo::TokenInfo tokenInfo;
+                    TransactionInfo::TokenInfo::BurnTokens tokenBurn;
+                    
+                    tokenBurn.value = std::stoull(get<std::string>(params, "value"));
+                    
+                    tokenInfo.info = tokenBurn;
+                    return tokenInfo;
+                }
+            } catch (const exception &e) {
+                return std::nullopt;
+            } catch (const UserException &e) {
+                return std::nullopt;
+            } catch (...) {
+                return std::nullopt;
+            }
+            
+            return std::nullopt;
+        };
+        
+        txInfo.tokenInfo = parseTokenInfo(docData);
     }
     
     return std::make_tuple(true, tx_size, cur_pos);

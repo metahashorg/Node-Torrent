@@ -65,6 +65,7 @@ const static std::string KEY_BLOCK_METADATA = "?block_meta";
 const static std::string VERSION_DB = "?version_db";
 
 const static std::string ADDRESS_PREFIX = "a_";
+const static std::string ADDRESS_TOKEN_PREFIX = "ti_";
 const static std::string ADDRESS_STATUS_PREFIX = "A_";
 const static std::string BALANCE_PREFIX = "i_";
 const static std::string TRANSACTION_PREFIX = "t_";
@@ -356,6 +357,11 @@ void Batch::addAddress(const std::string& address, const AddressInfo& value, siz
     addKey(bufferKey, value);
 }
 
+void Batch::addAddressToken(const std::string& address, const AddressInfo& value, size_t counter) {
+    makeKey(bufferKey, ADDRESS_TOKEN_PREFIX, address, ADDRESS_POSTFIX, SerializerInt(counter));
+    addKey(bufferKey, value);
+}
+
 void Batch::addAddressStatus(const std::string& addressAndHash, const TransactionStatus& value) {
     addKey(addressAndHash, value);
 }
@@ -481,6 +487,16 @@ void LevelDb::saveModules(const std::string& modules) {
 std::vector<AddressInfo> LevelDb::findAddress(const std::string &address, size_t from, size_t count) const {
     std::vector<char> keyPrefix;
     makeKey(keyPrefix, ADDRESS_PREFIX, address);
+    std::vector<char> keyBegin = keyPrefix;
+    keyBegin.emplace_back(ADDRESS_POSTFIX);
+    std::vector<char> keyEnd = keyPrefix;
+    keyEnd.emplace_back(ADDRESS_POSTFIX + 1);
+    return findKeyValue<AddressInfo>(keyBegin, keyEnd, from, count);
+}
+
+std::vector<AddressInfo> LevelDb::findAddressTokens(const std::string &address, size_t from, size_t count) const {
+    std::vector<char> keyPrefix;
+    makeKey(keyPrefix, ADDRESS_TOKEN_PREFIX, address);
     std::vector<char> keyBegin = keyPrefix;
     keyBegin.emplace_back(ADDRESS_POSTFIX);
     std::vector<char> keyEnd = keyPrefix;

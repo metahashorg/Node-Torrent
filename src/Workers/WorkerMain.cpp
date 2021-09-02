@@ -153,6 +153,11 @@ void WorkerMain::saveAddressTransaction(const TransactionInfo &tx, const Address
     batch.addAddress(address.toBdString(), addrInfo, countVal.get());
 }
 
+void WorkerMain::saveAddressTokenTransaction(const TransactionInfo &tx, const Address &address, Batch &batch) {
+    AddressInfo addrInfo(tx.filePos.pos, tx.filePos.fileNameRelative, tx.blockNumber, tx.blockIndex);
+    batch.addAddressToken(address.toBdString(), addrInfo, countVal.get());
+}
+
 void WorkerMain::saveAddressStatus(const TransactionStatus &status, const Address &address, Batch &batch) {
     const std::string addressAndHash = makeAddressStatusKey(address.toBdString(), status.transaction);
     batch.addAddressStatus(addressAndHash, status);
@@ -190,7 +195,7 @@ void WorkerMain::saveAddressBalanceCreateToken(const TransactionInfo &tx, std::u
         
         rest -= value;
     }
-    
+
     balances[createTokenInfo.owner.toBdString()].addTokens(tx, rest, !tx.isIntStatusNotSuccess());
 }
 
@@ -217,6 +222,17 @@ void WorkerMain::saveAddressBalanceMoveToken(const TransactionInfo &tx, std::uno
     if (moveTokens.toAddress != tx.fromAddress) {
         balances[tx.fromAddress.toBdString()].moveTokens(tx, tx.fromAddress, moveTokens.toAddress, moveTokens.value, !tx.isIntStatusNotSuccess());
     }
+}
+
+void WorkerMain::saveAddressBalanceBurnToken(const TransactionInfo &tx, std::unordered_map<std::string, BalanceInfo> &balances) {
+    if (!tx.tokenInfo.has_value()) {
+        return;
+    }
+    if (!std::holds_alternative<TransactionInfo::TokenInfo::BurnTokens>(tx.tokenInfo.value().info)) {
+        return;
+    }
+    const TransactionInfo::TokenInfo::BurnTokens &burnTokens = std::get<TransactionInfo::TokenInfo::BurnTokens>(tx.tokenInfo.value().info);
+    balances[tx.fromAddress.toBdString()].moveTokens(tx, tx.fromAddress, ZERO_ADDRESS, burnTokens.value, !tx.isIntStatusNotSuccess());
 }
 
 void WorkerMain::processTokenOperation(const Address &token, Batch &txsBatch, const std::function<Token(Token token)> &process) {
@@ -283,6 +299,14 @@ void WorkerMain::changeTokenValue(const TransactionInfo &tx, Batch &txsBatch) {
 
             processTokenOperation(token, txsBatch, [&](Token tokenInfo) {
                 tokenInfo.allValue += addTokens.value;
+                return tokenInfo;
+            });
+        } else if (std::holds_alternative<TransactionInfo::TokenInfo::BurnTokens>(tx.tokenInfo.value().info)) {
+            const TransactionInfo::TokenInfo::BurnTokens &burnTokens = std::get<TransactionInfo::TokenInfo::BurnTokens>(tx.tokenInfo.value().info);
+            const Address &token = tx.toAddress;
+            
+            processTokenOperation(token, txsBatch, [&](Token tokenInfo) {
+                tokenInfo.allValue -= burnTokens.value;
                 return tokenInfo;
             });
         }
@@ -434,7 +458,7 @@ void WorkerMain::worker() {
                                 if (!tx.isIntStatusNotSuccess()) {
                                     if (std::holds_alternative<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info)) {
                                         const TransactionInfo::TokenInfo::Create &createToken = std::get<TransactionInfo::TokenInfo::Create>(tx.tokenInfo->info);
-                                        
+                                                                                
                                         Token token;
                                         token.type = createToken.type;
                                         token.allValue = createToken.value;
@@ -447,14 +471,32 @@ void WorkerMain::worker() {
                                         token.txHash = tx.hash;
                                         
                                         batch.addToken(tx.toAddress.toBdString(), token);
+                                        
+                                        saveAddressTokenTransaction(tx, createToken.owner, batch);
+                                        for (const auto& [addr, value]: createToken.beginDistribution) {
+                                            saveAddressTokenTransaction(tx, addr, batch);
+                                        }
                                     } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeOwner>(tx.tokenInfo->info)) {
+                                        const TransactionInfo::TokenInfo::ChangeOwner &changeOwner = std::get<TransactionInfo::TokenInfo::ChangeOwner>(tx.tokenInfo->info);
                                         changeTokenOwner(tx, batch);
+                                        saveAddressTokenTransaction(tx, tx.fromAddress, batch);
+                                        saveAddressTokenTransaction(tx, changeOwner.newOwner, batch);
                                     } else if (std::holds_alternative<TransactionInfo::TokenInfo::ChangeEmission>(tx.tokenInfo->info)) {
                                         changeTokenEmission(tx, batch);
+                                        saveAddressTokenTransaction(tx, tx.fromAddress, batch);
                                     } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                        const TransactionInfo::TokenInfo::AddTokens &addTokens = std::get<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info);
                                         changeTokenValue(tx, batch);
+                                        saveAddressTokenTransaction(tx, addTokens.toAddress, batch);
                                     } else if (std::holds_alternative<TransactionInfo::TokenInfo::MoveTokens>(tx.tokenInfo->info)) {
-                                        // empty
+                                        const TransactionInfo::TokenInfo::MoveTokens &moveTokens = std::get<TransactionInfo::TokenInfo::MoveTokens>(tx.tokenInfo->info);
+                                        saveAddressTokenTransaction(tx, tx.fromAddress, batch);
+                                        if (tx.fromAddress != moveTokens.toAddress) {
+                                            saveAddressTokenTransaction(tx, moveTokens.toAddress, batch);
+                                        }
+                                    } else if (std::holds_alternative<TransactionInfo::TokenInfo::BurnTokens>(tx.tokenInfo->info)) {
+                                        changeTokenValue(tx, batch);
+                                        saveAddressTokenTransaction(tx, tx.fromAddress, batch);
                                     } else {
                                         throwErr("Unknown token type");
                                     }
@@ -468,8 +510,10 @@ void WorkerMain::worker() {
                                     saveAddressBalanceCreateToken(tx, balances);
                                 } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
                                     saveAddressBalanceAddToken(tx, balances);
-                                } else if (std::holds_alternative<TransactionInfo::TokenInfo::AddTokens>(tx.tokenInfo->info)) {
+                                } else if (std::holds_alternative<TransactionInfo::TokenInfo::MoveTokens>(tx.tokenInfo->info)) {
                                     saveAddressBalanceMoveToken(tx, balances);
+                                } else if (std::holds_alternative<TransactionInfo::TokenInfo::BurnTokens>(tx.tokenInfo->info)) {
+                                    saveAddressBalanceBurnToken(tx, balances);
                                 }
                             }
                         }
@@ -607,6 +651,10 @@ static void filterTxs(std::vector<TransactionInfo> &txs, const TransactionsFilte
             return remove;
         }
         
+        if (filters.isTokens == TransactionsFilters::FilterType::True) {
+            return !remove;
+        }
+        
         if (filters.isDelegate == TransactionsFilters::FilterType::None && filters.isForging == TransactionsFilters::FilterType::None && filters.isTest == TransactionsFilters::FilterType::None) {
             return !remove;
         }
@@ -629,7 +677,12 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const A
     const size_t countLimited = limitTxs;
     std::vector<TransactionInfo> result;
     while (true) {
-        const std::vector<AddressInfo> foundResults = leveldb.findAddress(address.toBdString(), from, countLimited - result.size());
+        std::vector<AddressInfo> foundResults;
+        if (filters.isTokens == TransactionsFilters::FilterType::True) {
+            foundResults = leveldb.findAddressTokens(address.toBdString(), from, countLimited - result.size());
+        } else {
+            foundResults = leveldb.findAddress(address.toBdString(), from, countLimited - result.size());
+        }
         if (foundResults.empty()) {
             break;
         }
@@ -638,14 +691,14 @@ std::vector<TransactionInfo> WorkerMain::getTxsForAddressWithoutStatuses(const A
 
         filterTxs(txs, filters, address);
         result.insert(result.end(), txs.begin(), txs.end());
-
+        
         from += foundResults.size();
         
         if (result.size() >= count) {
             break;
         }
     }
-    result.resize(count);
+    result.resize(std::min(result.size(), count));
     
     std::sort(result.begin(), result.end(), [](const TransactionInfo &first, const TransactionInfo &second) {
         return first.blockNumber > second.blockNumber;
